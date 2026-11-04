@@ -7,8 +7,8 @@ import {
   type AppEventMap,
 } from "@/lib/eventBus";
 import { ANNOTATION_STYLES, DEFAULT_FIELD_STYLE } from "@/constants";
-import { getNextLayerOrderForPage } from "@/lib/controlLayerOrder";
-import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
+import { getNextLayerOrderForPage } from "@legir/pdf-model/controlLayerOrder";
+import { getMovedAnnotationUpdates } from "@legir/pdf-model/controlMovement";
 import {
   ANNOTATION_LIST_TYPES,
   filterAnnotationsForList,
@@ -16,7 +16,7 @@ import {
   sortAnnotationsForList,
   type AnnotationListType,
 } from "@/lib/annotationList";
-import { getReadableStampLabel } from "@/lib/stamps";
+import { getReadableStampLabel } from "@legir/pdf-model/stamps";
 import {
   getDefaultArrowSize,
   getRectAndNormalizedShapePoints,
@@ -25,7 +25,7 @@ import {
   getShapeTypeWithoutArrow,
   isOpenLineShapeType,
   shapeSupportsFill,
-} from "@/lib/shapeGeometry";
+} from "@legir/pdf-model/shapeGeometry";
 import {
   useEditorView as defaultEditorStore,
   type EditorViewApi,

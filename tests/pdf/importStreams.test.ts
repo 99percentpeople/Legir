@@ -11,9 +11,9 @@ import {
   createPdfStreamTextReader,
   decodePdfStreamBytes,
   decodePdfStreamToText,
-} from "@/services/pdfService/lib/pdf-import-utils";
-import * as streamUtils from "@/services/pdfService/lib/pdf-import-utils";
-import { ensurePdfEmbeddedFontLoaded } from "@/services/pdfService/lib/embedded-fonts";
+} from "@legir/pdf-core/lib/pdf-import-utils";
+import * as streamUtils from "@legir/pdf-core/lib/pdf-import-utils";
+import { ensurePdfEmbeddedFontLoaded } from "@legir/pdf-core/lib/embedded-fonts";
 
 const fontSetDescriptor = Object.getOwnPropertyDescriptor(document, "fonts");
 afterEach(() => {

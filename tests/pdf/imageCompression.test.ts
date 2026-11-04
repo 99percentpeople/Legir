@@ -11,8 +11,8 @@ import { exportPDF } from "@/services/pdfService";
 import {
   getImageExportPixelSize,
   prepareStampImageForPdf,
-} from "@/services/pdfService/lib/image-export";
-import { normalizeImageCompression } from "@/lib/imageCompression";
+} from "@legir/pdf-core/lib/image-export";
+import { normalizeImageCompression } from "@legir/pdf-model/imageCompression";
 import { initialState, mergeEditorOptions } from "@/store/helpers";
 import type { Annotation, ImageCompressionOptions } from "@/types";
 

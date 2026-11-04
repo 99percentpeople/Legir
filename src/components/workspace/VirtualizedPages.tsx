@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { findVisibleRange } from "@/lib/visibleRange";
+import { findVisibleRange } from "@legir/pdf-model/visibleRange";
 
 type Rect = {
   top: number;

@@ -3,11 +3,11 @@ import { PDFDocument, PDFDict, PDFName } from "@legir/pdfium/authoring";
 import { loadPDF, exportPDF } from "@/services/pdfService";
 import { exportSelectedPages } from "@/services/pdfService/pageClipboard";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
   PdfPermissionDeniedError,
   UNRESTRICTED_PDF_PERMISSIONS,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import { createTestEditorStore } from "../helpers/editorStore";
 
 const worker = {

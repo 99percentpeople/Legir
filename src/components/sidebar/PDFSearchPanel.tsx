@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { PDFSearchMode } from "@/lib/pdfSearch";
+import type { PDFSearchMode } from "@legir/pdf-core/search";
 import type { PDFSearchResult } from "@/types";
 import { useLanguage } from "../language-provider";
 import { cn } from "@/utils/cn";

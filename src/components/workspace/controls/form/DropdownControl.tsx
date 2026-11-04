@@ -4,7 +4,7 @@ import { ListBox, ListBoxItem } from "react-aria-components";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { cn } from "@/utils/cn";
-import { resolveFormControlFontFamilyCss } from "@/lib/fonts";
+import { resolveFormControlFontFamilyCss } from "@legir/pdf-model/fonts";
 
 export const DropdownControl: React.FC<FormControlProps> = (props) => {
   const {

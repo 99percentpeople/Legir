@@ -17,11 +17,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { PlatformDroppedPdf } from "@/services/platform";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
   canAssemblePdf,
   canPerformPdfPermissionOperation,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import { getPageView } from "@/components/workspace/lib/pageViewRotation";
 import { parsePageRange, formatPageRange } from "@/utils/pageRange";
 import { cn } from "@/utils/cn";

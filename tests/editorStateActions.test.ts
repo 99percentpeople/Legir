@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
+import { UNRESTRICTED_PDF_PERMISSIONS } from "@legir/pdf-model/pdfPermissions";
 import { ANNOTATION_STYLES } from "@/constants";
 import { FieldType } from "@/types";
 import { createAiChatSnapshotReader } from "@/hooks/useAiChatController/editorSnapshot";

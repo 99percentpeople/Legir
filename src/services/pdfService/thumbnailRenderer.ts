@@ -4,7 +4,7 @@ import {
   THUMBNAIL_TARGET_WIDTH,
 } from "@/constants";
 import type { PDFWorkerService } from "./pdfWorkerService";
-import type { ThumbnailContent } from "./types";
+import type { ThumbnailContent } from "@legir/pdf-core/types";
 import { encodedImageDataUrl } from "@/utils/encodedImageDataUrl";
 import type {
   PageData,

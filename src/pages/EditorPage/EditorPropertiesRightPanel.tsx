@@ -2,11 +2,11 @@ import React from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { PropertiesPanel } from "@/components/properties-panel/PropertiesPanel";
-import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
+import { getMovedAnnotationUpdates } from "@legir/pdf-model/controlMovement";
 import {
   canModifyPdfContents,
   mergePdfPermissionDirtyScopes,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import { selectPropertiesRightPanelState } from "@/store/selectors";
 import { useEditorView } from "@/store/useEditorView";
 import type { Annotation, FormField } from "@/types";

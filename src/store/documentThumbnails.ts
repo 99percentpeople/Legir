@@ -1,11 +1,11 @@
 import { THUMBNAIL_WARMUP_PRIORITY } from "@/constants";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
   getThumbnailContents,
   renderThumbnail,
 } from "@/services/pdfService/thumbnailRenderer";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import type { ThumbnailContent } from "@/services/pdfService/types";
+import type { ThumbnailContent } from "@legir/pdf-core/types";
 import type { EditorStore, EditorStoreSlice } from "./store.types";
 import type { PageData } from "@/types";
 

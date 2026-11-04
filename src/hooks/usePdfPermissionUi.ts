@@ -5,7 +5,7 @@ import { useLanguage } from "@/components/language-provider";
 import {
   canPerformPdfPermissionOperation,
   type PdfPermissionOperation,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import { usePreferencesStore } from "@/store/preferencesStore";
 import type { PDFDocumentPermissions } from "@/types";
 

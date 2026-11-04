@@ -8,14 +8,14 @@ import {
 } from "@legir/pdfium/authoring";
 import { createHash } from "node:crypto";
 import { exportPDF, loadPDF } from "@/services/pdfService";
-import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
+import { decodePdfStreamToText } from "@legir/pdf-core/lib/pdf-import-utils";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { Annotation, StampImageAppearance } from "@/types";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 import { pagePointToView } from "@/components/workspace/lib/pageViewRotation";
-import { normalizeRotationDeg } from "@/lib/controlRotation";
-import { StampParser } from "@/services/pdfService/parsers/AnnotationParsers";
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import { normalizeRotationDeg } from "@legir/pdf-model/controlRotation";
+import { StampParser } from "@legir/pdf-core/parsers/AnnotationParsers";
+import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 
 // A 4 x 2 JPEG needs no browser canvas to round-trip its native image resource.
 const jpeg =

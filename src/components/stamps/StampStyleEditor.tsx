@@ -22,7 +22,7 @@ import {
   STAMP_PRESETS,
   type StampKind,
   type StampPresetId,
-} from "@/lib/stamps";
+} from "@legir/pdf-model/stamps";
 import { StampFace } from "./StampFace";
 
 export interface StampStyleEditorValue {

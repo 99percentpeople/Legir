@@ -5,7 +5,7 @@ import { createEditorView } from "@/store/editorView";
 import { createPdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createEditorTabSnapshotFromState } from "@/app/editorTabs/storeSnapshot";
 import { restoreEditorTabSessionTransfer } from "@/app/editorTabs/transfer";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 
 vi.mock("@/services/pdfService/pdfWorkerService", () => ({
   createPdfWorkerService: () => {

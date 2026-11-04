@@ -11,13 +11,13 @@ import {
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createEditorView } from "@/store/editorView";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
   getPageView,
   pagePointToView,
   viewPointToPage,
 } from "@/components/workspace/lib/pageViewRotation";
-import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
+import { UNRESTRICTED_PDF_PERMISSIONS } from "@legir/pdf-model/pdfPermissions";
 import { isSavedDocumentRevision } from "@/app/editorTabs/saveState";
 
 const worker = {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useEditorTabRuntime } from "@/app/editorTabs/runtimeContext";
 import { useLanguage } from "@/components/language-provider";
-import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
+import { canPerformPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
 import { useGlobalProcessingToast } from "@/hooks/useGlobalProcessingToast";
 import {
   canOpenWithPicker,

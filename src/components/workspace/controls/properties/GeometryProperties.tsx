@@ -24,7 +24,7 @@ import {
   normalizeRotationDeg,
   normalizeRightAngleRotationDeg,
   rotateOuterRectKeepingCenter,
-} from "@/lib/controlRotation";
+} from "@legir/pdf-model/controlRotation";
 
 export const GeometryProperties: React.FC<
   PropertyPanelProps<FormField | Annotation>

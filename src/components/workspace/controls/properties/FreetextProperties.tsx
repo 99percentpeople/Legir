@@ -16,9 +16,9 @@ import {
 } from "@/components/ui/select";
 import { FONT_FAMILY_MAP } from "@/constants";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
-import { resolveFontStackForDisplay } from "@/lib/fonts";
+import { resolveFontStackForDisplay } from "@legir/pdf-model/fonts";
 import { ColorPropertyInput } from "./ColorPropertyInput";
-import { getFreeTextPadding } from "@/services/pdfService/lib/freeTextLayout";
+import { getFreeTextPadding } from "@legir/pdf-core/lib/freeTextLayout";
 import { cn } from "@/utils/cn";
 
 export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({

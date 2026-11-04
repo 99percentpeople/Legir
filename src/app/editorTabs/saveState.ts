@@ -1,6 +1,6 @@
 import type { EditorState, EditorSaveTarget } from "@/types";
 import type { EditorViewApi } from "@/store/useEditorView";
-import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
+import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@legir/pdf-model/pdfPermissions";
 
 /** Compare the exported revision, not the active tab or a boolean dirty flag. */
 export const isSavedDocumentRevision = (

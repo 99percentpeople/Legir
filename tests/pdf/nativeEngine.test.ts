@@ -15,21 +15,21 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import {
   loadEditingDocument,
   saveEditingDocument,
-} from "@/services/pdfService/engine/editingDocument";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+} from "@legir/pdf-core/engine/editingDocument";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 import {
   getNativePageViewport,
   getNativeTextContent,
   getNativePermissions,
   getNativeOutline,
   resolveNativeDestination,
-} from "@/services/pdfService/engine/pageContent";
+} from "@legir/pdf-core/engine/pageContent";
 import {
   rasterizePage,
   disposeNativePage,
-} from "@/services/pdfService/engine/raster";
-import { verifyPdfOwnerPassword } from "@/services/pdfService/lib/owner-password";
-import { createPdfLibViewport } from "@/services/pdfService/lib/coords";
+} from "@legir/pdf-core/engine/raster";
+import { verifyPdfOwnerPassword } from "@legir/pdf-core/lib/owner-password";
+import { createPdfLibViewport } from "@legir/pdf-core/lib/coords";
 
 afterEach(() => vi.restoreAllMocks());
 const worker = {

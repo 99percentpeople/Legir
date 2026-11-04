@@ -5,7 +5,7 @@ import {
 } from "@/components/page-editor/pageDrag";
 import { insertionIndex } from "@/components/page-editor/InsertionPosition";
 import { getPageGridLayout } from "@/components/page-editor/pageGridLayout";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import { createTestEditorStore, field, page } from "./helpers/editorStore";
 
 it("keeps untouched pages and controls when sorting pages without source identities", () => {

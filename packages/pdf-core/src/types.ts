@@ -1,0 +1,199 @@
+/**
+ * PDF pipeline contracts.
+ *
+ * Keep parser/exporter interfaces, viewport abstractions, and engine/authoring-model
+ * adapter types here. Do not put editor-wide models here; those belong in
+ * `@legir/pdf-model`.
+ */
+import {
+  PDFDocument,
+  PDFForm,
+  PDFPage,
+  PDFRef,
+  type PDFFont,
+  type PDFField,
+  type PDFStream,
+} from "@legir/pdfium/authoring";
+import {
+  Annotation,
+  FormField,
+  PreservedSourceAnnotationRef,
+  StampImageAppearance,
+  StampImageResource,
+  ImageCompressionOptions,
+} from "@legir/pdf-model";
+
+// [x, y, width, height]
+export type Tile = [number, number, number, number];
+
+export type PdfJsAnnotationOption =
+  | string
+  | {
+      display?: string;
+      exportValue?: string;
+    };
+
+export interface PdfJsStampPayload {
+  name?: string;
+  image?: StampImageResource;
+  appearance?: StampImageAppearance;
+}
+
+export type PdfJsAnnotation = Record<string, unknown> & {
+  subtype: string;
+  rect: [number, number, number, number];
+
+  sourcePdfRef?: { objectNumber: number; generationNumber: number };
+  annotationFlags?: number;
+
+  fieldName?: string;
+  fieldType?: string;
+  fieldFlags?: number;
+  fieldValue?: unknown;
+  maxLen?: number;
+  alternativeText?: string;
+  placeholder?: string;
+  options?: PdfJsAnnotationOption[];
+
+  color?: number[] | Uint8ClampedArray;
+  backgroundColor?: number[] | Uint8ClampedArray;
+  fillColor?: number[] | Uint8ClampedArray;
+  interiorColor?: number[] | Uint8ClampedArray;
+  borderStyle?: {
+    width?: number;
+    style?: "solid" | "dashed" | "underline";
+    dashArray?: number[];
+  };
+  line?: number[];
+  vertices?: number[];
+  lineEndings?: string[];
+  arrowSize?: number;
+  startArrowStyle?: string;
+  endArrowStyle?: string;
+  borderEffect?: {
+    style?: string;
+    intensity?: number;
+  };
+  intent?: string;
+  rectDifferences?: number[];
+  cloudSpacing?: number;
+  shapeFillOpacity?: number;
+  appearanceRotation?: number;
+  appearanceSize?: { width: number; height: number };
+  defaultAppearance?: string;
+  DA?: string;
+  textAlignment?: number;
+  rotation?: number;
+
+  checkBox?: boolean;
+  radioButton?: boolean;
+  buttonValue?: string;
+
+  title?: string;
+  contents?: string;
+  highlightedText?: string;
+  richText?: string;
+  modificationDate?: string;
+  stamp?: PdfJsStampPayload;
+  inReplyTo?: string | null;
+  replyType?: string;
+  popupRef?: string | null;
+  quadPoints?: number[];
+  opacity?: number;
+  url?: string;
+  unsafeUrl?: string;
+  dest?: unknown;
+  destPageIndex?: number | null;
+};
+
+export type ViewportLike = {
+  viewBox?: [number, number, number, number];
+  userUnit?: number;
+  width: number;
+  height: number;
+  scale: number;
+  rotation: number;
+  transform: [number, number, number, number, number, number];
+  offsetX: number;
+  offsetY: number;
+  convertToViewportPoint: (x: number, y: number) => [number, number];
+  convertToPdfPoint: (x: number, y: number) => [number, number];
+};
+
+export interface ParserContext {
+  pageAnnotations: PdfJsAnnotation[];
+  pageIndex: number;
+  viewport: ViewportLike;
+  preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
+  pdfDoc?: PDFDocument;
+  fontMap?: Map<string, string>;
+  globalDA?: string;
+  systemFontFamilies?: string[];
+  systemFontAliasToFamilyCompact?: Record<string, string>;
+  embeddedFontCache?: Map<string, Promise<string | undefined>>;
+  collectFont?: (family: string, bytes: Uint8Array) => void;
+  embeddedFontFaces?: Set<FontFace>;
+  readStreamText?: (stream: PDFStream) => Promise<string>;
+}
+
+export interface IAnnotationParser {
+  parse(context: ParserContext): Promise<Annotation[]> | Annotation[];
+}
+
+export interface IControlParser {
+  parse(context: ParserContext): Promise<FormField[]> | FormField[];
+}
+
+export interface AnnotationExportOptions {
+  imageCompression?: ImageCompressionOptions;
+}
+
+export interface IAnnotationExporter {
+  shouldExport(annotation: Annotation): boolean;
+  save(
+    pdfDoc: PDFDocument,
+    page: PDFPage,
+    annotation: Annotation,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+    options?: AnnotationExportOptions,
+  ): Promise<PDFRef | undefined> | PDFRef | undefined;
+}
+
+export type FormExportContext = {
+  findField: (
+    field: Pick<FormField, "name" | "sourcePdfRef">,
+  ) => PDFField | undefined;
+  registerField: (field: PDFField) => void;
+  widgetRefsByPage: Map<PDFPage, Set<string>>;
+  regeneratedAppearances: ReadonlySet<PDFRef>;
+  scheduleAppearanceUpdate: (
+    field: PDFField,
+    update: () => void | boolean,
+  ) => void;
+  flushAppearanceUpdates: () => void;
+};
+
+export type ControlExportOptions = {
+  flattenAppearance?: boolean;
+  context?: FormExportContext;
+};
+
+export interface IControlExporter {
+  shouldExport(field: FormField): boolean;
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+    options?: ControlExportOptions,
+  ): Promise<void> | void;
+}
+/** A page snapshot, expressed in the source viewport's unrotated UI coordinates. */
+export interface ThumbnailContent {
+  width: number;
+  height: number;
+  fields: FormField[];
+  annotations: Annotation[];
+  preserved: PreservedSourceAnnotationRef[];
+}

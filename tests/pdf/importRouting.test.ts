@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PDFDocument, PDFString } from "@legir/pdfium/authoring";
 import { loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import * as stampVector from "@/services/pdfService/lib/stampVector";
+import * as stampVector from "@legir/pdf-core/lib/stampVector";
 import { PDF_CUSTOM_KEYS } from "@/constants";
 
 const worker = (destination: number | null = 1) => ({

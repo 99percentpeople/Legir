@@ -1,5 +1,5 @@
 import { Annotation, FieldType, FormField } from "@/types";
-import { cloneAnnotationReplies } from "@/lib/annotationReplies";
+import { cloneAnnotationReplies } from "@legir/pdf-model/annotationReplies";
 
 const createDuplicateToken = () =>
   `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;

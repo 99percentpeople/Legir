@@ -2,7 +2,10 @@ import type React from "react";
 import { preload, type PreloadableLazyComponent } from "@/utils/preload";
 import { registry } from "./registry/ControlRegistry";
 import { Annotation, FieldType, FormField } from "@/types";
-import { getStampAspectRatio, restoreStampRectAspectRatio } from "@/lib/stamps";
+import {
+  getStampAspectRatio,
+  restoreStampRectAspectRatio,
+} from "@legir/pdf-model/stamps";
 
 // Workspace control system.
 //

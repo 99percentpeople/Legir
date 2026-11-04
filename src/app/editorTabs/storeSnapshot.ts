@@ -1,5 +1,5 @@
-import { normalizeControlLayerOrders } from "@/lib/controlLayerOrder";
-import { prepareAnnotationsForStore } from "@/lib/inkGeometry";
+import { normalizeControlLayerOrders } from "@legir/pdf-model/controlLayerOrder";
+import { prepareAnnotationsForStore } from "@legir/pdf-model/inkGeometry";
 import { initialState } from "@/store/helpers";
 import { createShortId } from "@/utils/createShortId";
 import type {

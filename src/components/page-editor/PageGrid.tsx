@@ -17,7 +17,7 @@ import {
 import { SortableKeyboardPlugin } from "@dnd-kit/dom/sortable";
 import { useEditorView, useEditorViewApi } from "@/store/useEditorView";
 import { useLanguage } from "@/components/language-provider";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { PlatformDroppedPdf } from "@/services/platform";
 import type { PageData } from "@/types";

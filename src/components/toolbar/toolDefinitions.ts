@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { EditorState, Tool } from "@/types";
-import { canUseToolWithPdfPermissions } from "@/lib/pdfPermissions";
+import { canUseToolWithPdfPermissions } from "@legir/pdf-model/pdfPermissions";
 import { getShapeToolIcon, type ShapeTool } from "./shapeTools";
 
 type ToolDefinition = {

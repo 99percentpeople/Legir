@@ -14,7 +14,7 @@ import {
 } from "@/constants";
 import type { WorkspaceEditorState } from "@/types";
 import { useEventListener } from "@/hooks/useEventListener";
-import { pickClosestRectCandidate } from "@/lib/viewportMath";
+import { pickClosestRectCandidate } from "@legir/pdf-model/viewportMath";
 import {
   useEditorEventBus,
   useEditorElementById,

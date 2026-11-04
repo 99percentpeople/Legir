@@ -1,4 +1,4 @@
-import { getShapeStrokeDashArray } from "@/lib/shapeGeometry";
+import { getShapeStrokeDashArray } from "@legir/pdf-model/shapeGeometry";
 import { useLanguage } from "../language-provider";
 import type { StrokePreviewProps } from "./types";
 

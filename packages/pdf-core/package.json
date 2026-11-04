@@ -1,0 +1,36 @@
+{
+  "name": "@legir/pdf-core",
+  "version": "0.1.0",
+  "description": "PDF import, export, forms and document sessions without the application shell",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist', {recursive:true, force:true})\" && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@legir/pdf-model": "workspace:*",
+    "@legir/pdfium": "workspace:*",
+    "pdf-fontkit": "^1.8.9"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "@types/node": "^24.12.4"
+  }
+}

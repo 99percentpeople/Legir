@@ -18,7 +18,7 @@ import {
   normalizeShapeDashDensity,
   getShapeStrokeDashArray,
   type ShapeBorderStyle,
-} from "@/lib/shapeGeometry";
+} from "@legir/pdf-model/shapeGeometry";
 import { Slider } from "../ui/slider";
 
 interface ShapeBorderStyleSectionProps {

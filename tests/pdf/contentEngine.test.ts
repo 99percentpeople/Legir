@@ -16,13 +16,13 @@ import type { Annotation } from "@/types";
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createEditorView } from "@/store/editorView";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
-import { pdfContentEngine } from "@/services/pdfService/engine";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
+import { pdfContentEngine } from "@legir/pdf-core/engine/index";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 import { PDFPage as NativePage } from "@legir/pdfium";
-import type { PdfQuad } from "@/services/pdfService/engine/types";
-import { applyTextRedactionsUnderFlattenedFreetext } from "@/services/pdfService/lib/textRedaction";
-import { createPdfLibViewport } from "@/services/pdfService/lib/coords";
+import type { PdfQuad } from "@legir/pdf-core/engine/types";
+import { applyTextRedactionsUnderFlattenedFreetext } from "@legir/pdf-core/lib/textRedaction";
+import { createPdfLibViewport } from "@legir/pdf-core/lib/coords";
 
 afterEach(() => vi.restoreAllMocks());
 

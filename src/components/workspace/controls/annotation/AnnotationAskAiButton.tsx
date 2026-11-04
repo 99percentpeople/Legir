@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
-import { getReadableStampLabel } from "@/lib/stamps";
+import { getReadableStampLabel } from "@legir/pdf-model/stamps";
 import type { Annotation } from "@/types";
 
 const getAnnotationAskAiPreview = (

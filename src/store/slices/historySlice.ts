@@ -1,9 +1,6 @@
 import type { EditorState, HistorySnapshot } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
-import {
-  getPageId,
-  mapPageIndexes,
-} from "@/services/pdfService/lib/pageStructure";
+import { getPageId, mapPageIndexes } from "@legir/pdf-core/lib/pageStructure";
 import { revokeObjectUrlIfNeeded } from "../helpers";
 
 export const captureHistorySnapshot = (

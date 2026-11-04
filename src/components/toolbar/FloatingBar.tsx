@@ -6,7 +6,7 @@ import {
 } from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import type { AppEventMap } from "@/lib/eventBus";
-import { canUseModeWithPdfPermissions } from "@/lib/pdfPermissions";
+import { canUseModeWithPdfPermissions } from "@legir/pdf-model/pdfPermissions";
 import type { EditorState, PageFlowDirection, PageLayoutMode } from "@/types";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";

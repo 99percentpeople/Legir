@@ -59,13 +59,26 @@ new measurement outputs stay outside version control. See the
 [current architecture review](docs/PDFIUM_REVIEW.md) and [test map](tests/README.md)
 for ownership boundaries, remaining maintenance work and validation commands.
 
+## Reusable packages
+
+The application now consumes `@legir/pdf-model`, `@legir/pdf-core` and
+`@legir/pdf-renderer` alongside the existing `@legir/pdfium` SDK. Their source
+lives in `packages/`; the app supplies events, fonts, assets and worker factories
+through a narrow host adapter. See [the package guide](packages/README.md) for
+module boundaries and standalone Node/browser examples.
+
+Run `bun run build:packages` to build all libraries, `bun run check:boundaries`
+to enforce their dependency direction, and `bun run test:consumer` to verify
+packed artifacts from a plain Node project outside this repository. The latter
+packs locally; it does not publish to a registry.
+
 ## Deployment
 
 Deploy the repository root as the app project at `https://legir.app`, and deploy `www/` as a separate Vercel project at `https://www.legir.app` with `Root Directory = www`. Bind each domain to its project's production deployment without a redirect between the two domains.
 
 The landing project shares source files and assets with the repository root, so enable **Include source files outside of the Root Directory in the Build Step** in its Vercel settings.
 
-Keep the landing project's Build Command as `bun run build` and Output Directory as `dist`. The landing site typechecks its own source and the shared UI it imports, then builds with Vite. It does not build or depend on the PDFium SDK or its generated `packages/pdfium/dist` directory.
+Keep the landing project's Build Command as `bun run build` and Output Directory as `dist`. The landing site typechecks its own source and the shared UI it imports, then builds with Vite. It builds the lightweight model package, but does not build or depend on the PDFium SDK or its generated `packages/pdfium/dist` directory.
 
 The landing site's app links default to `https://legir.app`, including on preview deployments. Local development uses `http://localhost:5173`. To explicitly configure the destination, set `VITE_APP_URL` in the landing project's environment:
 

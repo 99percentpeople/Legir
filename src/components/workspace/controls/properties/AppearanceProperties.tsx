@@ -15,7 +15,7 @@ import { Palette } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { FONT_FAMILY_MAP } from "@/constants";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
-import { resolveFontStackForDisplay } from "@/lib/fonts";
+import { resolveFontStackForDisplay } from "@legir/pdf-model/fonts";
 import { ColorPropertyInput } from "./ColorPropertyInput";
 
 export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({

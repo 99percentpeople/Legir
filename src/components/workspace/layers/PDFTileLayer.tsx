@@ -7,7 +7,7 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   getDistanceBetweenPoints,
   getDistanceSquaredBetweenPoints,
-} from "@/lib/viewportMath";
+} from "@legir/pdf-model/viewportMath";
 import {
   getWorkspaceRenderMetrics,
   getWorkspaceTileMaxDim,

@@ -19,6 +19,9 @@
         "@fontsource-variable/geist-mono": "^5.2.8",
         "@fontsource/geist": "^5.2.9",
         "@internationalized/date": "3.12.1",
+        "@legir/pdf-core": "workspace:*",
+        "@legir/pdf-model": "workspace:*",
+        "@legir/pdf-renderer": "workspace:*",
         "@legir/pdfium": "workspace:*",
         "@openrouter/ai-sdk-provider": "^2.10.0",
         "@radix-ui/react-slider": "1.3.6",
@@ -88,6 +91,40 @@
         "vitest": "4.1.11",
       },
     },
+    "packages/pdf-core": {
+      "name": "@legir/pdf-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@legir/pdf-model": "workspace:*",
+        "@legir/pdfium": "workspace:*",
+        "pdf-fontkit": "^1.8.9",
+      },
+      "devDependencies": {
+        "@types/node": "^24.12.4",
+        "typescript": "~5.9.3",
+      },
+    },
+    "packages/pdf-model": {
+      "name": "@legir/pdf-model",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "^24.12.4",
+        "typescript": "~5.9.3",
+      },
+    },
+    "packages/pdf-renderer": {
+      "name": "@legir/pdf-renderer",
+      "version": "0.1.0",
+      "dependencies": {
+        "@legir/pdf-core": "workspace:*",
+        "@legir/pdf-model": "workspace:*",
+        "@legir/pdfium": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^24.12.4",
+        "typescript": "~5.9.3",
+      },
+    },
     "packages/pdfium": {
       "name": "@legir/pdfium",
       "version": "0.1.0",
@@ -103,6 +140,9 @@
     "www": {
       "name": "legir-www",
       "version": "0.0.0",
+      "dependencies": {
+        "@legir/pdf-model": "workspace:*",
+      },
     },
   },
   "overrides": {
@@ -471,6 +511,12 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@legir/pdf-core": ["@legir/pdf-core@workspace:packages/pdf-core"],
+
+    "@legir/pdf-model": ["@legir/pdf-model@workspace:packages/pdf-model"],
+
+    "@legir/pdf-renderer": ["@legir/pdf-renderer@workspace:packages/pdf-renderer"],
 
     "@legir/pdfium": ["@legir/pdfium@workspace:packages/pdfium"],
 

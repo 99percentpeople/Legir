@@ -1,5 +1,5 @@
 import type { EditorState, PenStyle, Tool } from "@/types";
-import type { ShapeBorderStyle } from "@/lib/shapeGeometry";
+import type { ShapeBorderStyle } from "@legir/pdf-model/shapeGeometry";
 import type { ReactNode } from "react";
 
 export interface ResponsiveToolbarItem {

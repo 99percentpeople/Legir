@@ -24,7 +24,7 @@ import {
 } from "../ui/dropdown-menu";
 import { useLanguage } from "../language-provider";
 import ZoomDropdownControl from "./ZoomDropdownControl";
-import { pdfViewerScaleToWorkspaceScale } from "@/lib/pdfScale";
+import { pdfViewerScaleToWorkspaceScale } from "@legir/pdf-model/pdfScale";
 import {
   MIN_PAGE_THUMBNAIL_SCALE,
   MAX_PAGE_THUMBNAIL_SCALE,
@@ -33,7 +33,7 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   canPrintPdf,
   canUseModeWithPdfPermissions,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import SaveMenu from "./SaveMenu";
 import { canSaveAs } from "@/services/platform";
 import { useEditorView } from "@/store/useEditorView";

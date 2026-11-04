@@ -20,7 +20,7 @@ import { useLanguage } from "@/components/language-provider";
 import { PanelLayout } from "./PanelLayout";
 import { type Tag, TagInput } from "emblor";
 import { cn } from "@/utils/cn";
-import { getEffectivePdfPermissions } from "@/lib/pdfPermissions";
+import { getEffectivePdfPermissions } from "@legir/pdf-model/pdfPermissions";
 
 export interface DocumentPropertiesPanelProps {
   metadata: PDFMetadata;

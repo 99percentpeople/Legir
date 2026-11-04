@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
 
 import { MAX_EDITOR_SCALE, MIN_EDITOR_SCALE } from "@/constants";
-import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
+import { UNRESTRICTED_PDF_PERMISSIONS } from "@legir/pdf-model/pdfPermissions";
 import { createEditorViewSlice } from "@/store/slices/editorViewSlice";
 import type { EditorStore } from "@/store/store.types";
 

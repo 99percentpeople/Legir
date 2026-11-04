@@ -28,7 +28,7 @@ import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useMouse } from "@/hooks/useMouse";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import { getRotatedOuterRect } from "@/lib/controlRotation";
+import { getRotatedOuterRect } from "@legir/pdf-model/controlRotation";
 import {
   getDefaultArrowSize,
   getLineEndingMarker,
@@ -65,8 +65,8 @@ import {
   removeShapePoint,
   shapeSupportsVertexInsertion,
   shapeSupportsVertices,
-} from "@/lib/shapeGeometry";
-import { getMoveDelta } from "@/lib/controlMovement";
+} from "@legir/pdf-model/shapeGeometry";
+import { getMoveDelta } from "@legir/pdf-model/controlMovement";
 import { getContrastColor } from "@/utils/colors";
 import type { MoveDirection } from "@/types";
 

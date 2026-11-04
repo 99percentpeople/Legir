@@ -1,7 +1,7 @@
 import React, { useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useLanguage } from "@/components/language-provider";
-import { workspaceScaleToZoomPercent } from "@/lib/pdfScale";
+import { workspaceScaleToZoomPercent } from "@legir/pdf-model/pdfScale";
 import {
   connectPDFPageRenderDebug,
   syncPDFPageRenderDebugView,

@@ -1,10 +1,10 @@
-import { cloneAnnotationReplies } from "@/lib/annotationReplies";
+import { cloneAnnotationReplies } from "@legir/pdf-model/annotationReplies";
 import {
   getMovedAnnotationUpdates,
   translateRect,
-} from "@/lib/controlMovement";
-import { prepareInkAnnotationForStore } from "@/lib/inkGeometry";
-import { assertPdfPermissionOperation } from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/controlMovement";
+import { prepareInkAnnotationForStore } from "@legir/pdf-model/inkGeometry";
+import { assertPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
 import type { EditorState, FormField, PageData } from "@/types";
 import { controlClipboardSchema } from "./schema";
 import type { ControlClipboard } from "./types";

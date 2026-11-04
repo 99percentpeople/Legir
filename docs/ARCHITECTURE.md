@@ -5,6 +5,34 @@ For the PDFium branch's current maintenance findings, see [PDFium architecture r
 
 It intentionally avoids repeating setup, build, and deployment instructions that already live in the root [README.md](../README.md). The focus here is module boundaries, data flow, persistence strategy, and extension points.
 
+## Reusable package boundary
+
+The shared PDF implementation now lives in four workspace packages. See the
+[package guide](../packages/README.md) for ownership, public examples, verification
+commands and licensing.
+
+- `@legir/pdf-model`: portable document contracts, geometry and editing policies.
+- `@legir/pdfium`: the existing independent native/WASM engine (unchanged).
+- `@legir/pdf-core`: import/export, forms, annotations and transactional sessions.
+- `@legir/pdf-renderer`: worker client, ownership lookup and browser render runtime.
+
+Dependencies point from the application to renderer/core, and from those layers
+to the model and PDFium. The packages cannot import `src/`, React, Zustand or
+Tauri. `scripts/check-module-boundaries.mjs` enforces the allowed graph.
+`src/services/pdfService/host.ts` injects application events, system fonts, owner
+lookup and worker creation. `assets.ts` supplies build-specific asset URLs.
+The React workspace and application state remain in `src/`.
+
+The old `documentPipeline.ts` is now an application compatibility facade. The
+implementation is split into `packages/pdf-core/src/pipeline/{load,annotations,
+export,loadSession,types}.ts`; the application and core share the load-session
+implementation. The browser worker files in `src/workers/` only bootstrap their
+package entry points and assets.
+
+Development Vite aliases resolve package sources for hot updates; production
+and tests use compiled package exports. The website depends only on the model
+package, not the PDFium engine or the renderer.
+
 ## Scope
 
 This repository currently has two frontend surfaces:
@@ -57,7 +85,7 @@ src/
     ui/                     Shared UI primitives
 
   services/
-    pdfService/             PDF parsing, rendering, export, worker protocol
+    pdfService/             Application PDF host, assets and UI/file adapters
     recentFiles/            Recent-file storage adapters and browser handle logic
     platform/               Web/Tauri abstraction layer
     ai/                     Optional AI-related service entry points
@@ -293,7 +321,7 @@ The PDF pipeline lives in:
 - `src/services/pdfService/index.ts`
 - `src/services/pdfService/pdfWorkerService.ts`
 - `src/services/pdfService/pdfRenderer.ts`
-- `src/services/pdfService/workerProtocol.ts`
+- `packages/pdf-core/src/workerProtocol.ts`
 
 `packages/pdfium` is an independent PDFium WASM/TypeScript package used by both
 Web and Tauri. Its native bridge and pinned source patches supply:

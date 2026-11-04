@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createTestEditorStore, field, page } from "./helpers/editorStore";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { EditorView } from "@/store/editorView";
-import type { ThumbnailContent } from "@/services/pdfService/types";
+import type { ThumbnailContent } from "@legir/pdf-core/types";
 
 const render = vi.hoisted(() => vi.fn());
 vi.mock("@/services/pdfService/thumbnailRenderer", async (original) => ({

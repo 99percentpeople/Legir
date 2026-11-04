@@ -4,7 +4,7 @@ import { isDesktopApp } from "./runtime";
 import {
   hasWorkerFontProvider,
   requestHostFont,
-} from "@/services/pdfService/engine/fontHost";
+} from "@legir/pdf-core/engine/fontHost";
 
 const normalizeFontBytes = (value: Uint8Array | number[] | null) => {
   if (!value) return undefined;

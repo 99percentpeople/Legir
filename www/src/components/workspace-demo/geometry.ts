@@ -3,7 +3,7 @@ import { FIT_WIDTH_PADDING_X } from "@/constants";
 import {
   PDF_TO_CSS_UNITS,
   workspaceScaleToPdfViewerScale,
-} from "@/lib/pdfScale";
+} from "@legir/pdf-model/pdfScale";
 import {
   calculateWorkspaceFitScreenScale,
   calculateWorkspaceFitWidthScale,

@@ -11,7 +11,7 @@ import {
   readControlClipboard,
   writeControlClipboard,
 } from "@/lib/controlClipboard";
-import { PdfPermissionDeniedError } from "@/lib/pdfPermissions";
+import { PdfPermissionDeniedError } from "@legir/pdf-model/pdfPermissions";
 import { useEditorViewApi } from "@/store/useEditorView";
 
 export function useEditorControlClipboardActions() {

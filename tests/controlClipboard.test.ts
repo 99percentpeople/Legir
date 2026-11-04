@@ -8,8 +8,8 @@ import {
 import {
   PdfPermissionDeniedError,
   UNRESTRICTED_PDF_PERMISSIONS,
-} from "@/lib/pdfPermissions";
-import { getInkRenderPath } from "@/lib/inkGeometry";
+} from "@legir/pdf-model/pdfPermissions";
+import { getInkRenderPath } from "@legir/pdf-model/inkGeometry";
 import { FieldType, type Annotation } from "@/types";
 import { createTestEditorStore, field, page } from "./helpers/editorStore";
 

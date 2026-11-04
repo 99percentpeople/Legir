@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { TextContent } from "@/services/pdfService/engine/textTypes";
+import type { TextContent } from "@legir/pdf-core/engine/textTypes";
 
 import {
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT,

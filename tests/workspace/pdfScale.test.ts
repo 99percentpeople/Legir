@@ -6,7 +6,7 @@ import {
   pdfViewerScaleToWorkspaceScale,
   workspaceScaleToPdfViewerScale,
   workspaceScaleToZoomPercent,
-} from "@/lib/pdfScale";
+} from "@legir/pdf-model/pdfScale";
 
 describe("PDF.js-compatible zoom scale", () => {
   it("converts PDF points from 72 DPI to CSS pixels at 96 DPI", () => {

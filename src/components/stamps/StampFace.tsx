@@ -9,7 +9,7 @@ import {
   getPresetStampSvgDataUrl,
   type StampKind,
   type StampPresetId,
-} from "@/lib/stamps";
+} from "@legir/pdf-model/stamps";
 
 interface StampFaceProps {
   kind: StampKind;

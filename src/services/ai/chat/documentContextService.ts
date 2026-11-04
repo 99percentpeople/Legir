@@ -8,14 +8,17 @@ import {
   AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
 } from "@/constants";
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
-import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
-import { getEffectivePdfPermissions } from "@/lib/pdfPermissions";
+import {
+  findPdfSearchResults,
+  type PDFSearchMode,
+} from "@legir/pdf-core/search";
+import { getEffectivePdfPermissions } from "@legir/pdf-model/pdfPermissions";
 import {
   workspaceScaleToPdfViewerScale,
   workspaceScaleToZoomPercent,
-} from "@/lib/pdfScale";
+} from "@legir/pdf-model/pdfScale";
 import { pageTranslationService } from "@/services/pageTranslationService";
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 import {
   pdfWorkerService,
   type PDFWorkerService,

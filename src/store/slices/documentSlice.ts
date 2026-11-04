@@ -1,12 +1,12 @@
 import { initialState, revokeThumbnailObjectUrls } from "@/store/helpers";
-import { prepareAnnotationsForStore } from "@/lib/inkGeometry";
-import { normalizeControlLayerOrders } from "@/lib/controlLayerOrder";
+import { prepareAnnotationsForStore } from "@legir/pdf-model/inkGeometry";
+import { normalizeControlLayerOrders } from "@legir/pdf-model/controlLayerOrder";
 import {
   assertPdfPermissionOperation,
   getEffectivePdfPermissions,
   mergePdfPermissionDirtyScopes,
   UNRESTRICTED_PDF_PERMISSIONS,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 import type { PDFMetadata } from "@/types";
 
@@ -150,7 +150,7 @@ export const createDocumentSlice: EditorStoreSlice<
     }
 
     const { verifyPdfOwnerPassword } =
-      await import("@/services/pdfService/lib/owner-password");
+      await import("@legir/pdf-core/lib/owner-password");
     const result = await verifyPdfOwnerPassword(store.pdfBytes, password);
     if (!result.ok) {
       return {

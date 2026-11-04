@@ -21,3 +21,5 @@ Rule of thumb:
 - Pure stateless helper: `src/utils`
 - PDF-domain helper: `src/services/pdfService/lib`
 - Workspace-only rendering/interaction helper: `src/components/workspace/lib`
+
+Portable PDF models, geometry, font naming, stamp helpers and permission policies now live in `@legir/pdf-model`. Import their package subpaths rather than reintroducing copies here.

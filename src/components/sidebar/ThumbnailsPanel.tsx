@@ -8,7 +8,7 @@ import {
   getPageDisplayRotation,
 } from "@/components/workspace/lib/pageViewRotation";
 import { useEditorView } from "@/store/useEditorView";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import { useThumbnailViewport } from "@/hooks/useThumbnailViewport";
 
 interface ThumbnailItemProps {

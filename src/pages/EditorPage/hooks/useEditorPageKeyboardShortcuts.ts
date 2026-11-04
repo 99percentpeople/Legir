@@ -1,4 +1,4 @@
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import React from "react";
 import { toast } from "sonner";
 
@@ -7,7 +7,7 @@ import { useEventListener } from "@/hooks/useEventListener";
 import {
   canPerformPdfPermissionOperation,
   type PdfPermissionOperation,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import { useEditorViewApi } from "@/store/useEditorView";
 import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { useEditorToolActions } from "@/hooks/useEditorToolActions";

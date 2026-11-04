@@ -5,7 +5,7 @@ import {
 import {
   exportPreviews,
   type PdfFileData,
-} from "./pdfService/engine/exportPreviews";
+} from "@legir/pdf-core/engine/exportPreviews";
 
 const bytesToDataUrl = async (bytes: Uint8Array, mimeType: string) => {
   const safeBytes = new Uint8Array(bytes);

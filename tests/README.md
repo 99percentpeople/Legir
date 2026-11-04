@@ -41,3 +41,14 @@ Do not infer browser scheduling, display quality, process peak memory or Tauri
 WebView behavior from jsdom/Node tests. Run the relevant manual browser tools when
 those paths change, and keep performance measurement separate from validation.
 Retired duplicate/experimental tools are listed in the [benchmark archive](../scripts/pdf-benchmark/ARCHIVE.md).
+
+## Package boundaries and external consumers
+
+`bun run test` builds all workspace libraries and checks dependency boundaries
+before running the application regressions. `bun run test:consumer` separately
+packs all four libraries, installs their tarballs outside this repository and
+runs `scripts/pdf-consumer-smoke.mjs` under plain Node. It covers AcroForm import,
+fill, save, flatten, raster parity, transactional rollback and explicit native
+cleanup without Vite aliases, application source, React or Tauri. These checks
+also run in the CI validation job. They do not replace browser or native desktop
+validation when those paths change.

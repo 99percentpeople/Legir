@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
+import { canPerformPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import { useEditorView } from "@/store/useEditorView";
 import { useShallow } from "zustand/react/shallow";

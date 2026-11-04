@@ -1,9 +1,9 @@
-import { getThumbnailSourceAnnotations } from "@/services/pdfService/lib/thumbnailSourceAnnotations";
+import { getThumbnailSourceAnnotations } from "@legir/pdf-core/lib/thumbnailSourceAnnotations";
 import { expect, it } from "vitest";
 import { PDFDocument } from "@legir/pdfium/authoring";
 import { FieldType, type Annotation } from "@/types";
-import { drawThumbnailOverlay } from "@/services/pdfService/lib/thumbnailOverlay";
-import type { ThumbnailContent } from "@/services/pdfService/types";
+import { drawThumbnailOverlay } from "@legir/pdf-core/lib/thumbnailOverlay";
+import type { ThumbnailContent } from "@legir/pdf-core/types";
 import { field } from "../helpers/editorStore";
 
 async function createThumbnailOverlay(content: ThumbnailContent) {

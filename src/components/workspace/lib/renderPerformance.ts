@@ -6,7 +6,7 @@ import {
 import {
   createViewportFromPageInfo,
   type PageViewportInfo,
-} from "@/services/pdfService/lib/coords";
+} from "@legir/pdf-core/lib/coords";
 
 export const getWorkspaceViewportPixelCount = (
   pageInfo: PageViewportInfo,

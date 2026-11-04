@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, type RefObject } from "react";
-import { prepareInkAnnotationForStore } from "@/lib/inkGeometry";
+import { prepareInkAnnotationForStore } from "@legir/pdf-model/inkGeometry";
 import { INK_SESSION_CHUNK_IDLE_DELAY_MS } from "@/constants";
 import { Annotation, EditorState, Tool, WorkspaceEditorState } from "@/types";
 

@@ -1,3 +1,4 @@
+import "./host";
 import {
   pdfWorkerService,
   getPdfWorkerForBytes,
@@ -6,109 +7,31 @@ import {
 import type {
   LoadedPdfDocument,
   ReadablePdfDocument,
-  LoadPDFInternalOptions,
+  LoadPDFInternalOptions as CoreLoadOptions,
 } from "./documentPipeline";
-import type { ExportPdfOptions, ExportPdfRequest } from "./engine/sessionTypes";
+import type {
+  ExportPdfOptions,
+  ExportPdfRequest,
+} from "@legir/pdf-core/engine/sessionTypes";
 import type { FormField, Annotation, PDFMetadata } from "@/types";
-import { getPdfPermissionPolicy } from "@/lib/pdfPermissions";
-import { appEventBus } from "@/lib/eventBus";
+import { getPdfPermissionPolicy } from "@legir/pdf-model/pdfPermissions";
+import {
+  createPdfLoadSession,
+  getPdfPasswordReason,
+} from "@legir/pdf-core/pipeline/loadSession";
 import { getSystemFontCatalog } from "@/lib/system-fonts";
-import { exportPreviews } from "./engine/exportPreviews";
-import { yieldPdfTask } from "./engine/yieldTask";
+import { exportPreviews } from "@legir/pdf-core/engine/exportPreviews";
+import { yieldPdfTask } from "@legir/pdf-core/engine/yieldTask";
 export type {
   LoadedPdfDocument,
   ReadablePdfDocument,
 } from "./documentPipeline";
 
+type LoadPDFInternalOptions = Omit<CoreLoadOptions, "workerService"> & {
+  workerService?: import("./pdfWorkerService").PDFWorkerService;
+};
+
 const isNode = () => typeof process !== "undefined" && !!process.versions?.node;
-type PdfLoadSession = {
-  id: string;
-  requestPassword: (
-    reason: "need_password" | "incorrect_password",
-  ) => Promise<string>;
-  getLastPassword: () => string | undefined;
-  markProgress: (loaded: number, total?: number) => void;
-  finish: (ok: boolean) => void;
-};
-
-const createPdfLoadSession = (
-  label?: string,
-  signal?: AbortSignal,
-): PdfLoadSession => {
-  const id = `pdf_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  let lastPassword: string | undefined = undefined;
-
-  const markProgress = (loaded: number, total?: number) => {
-    appEventBus.emit("pdf:loadProgress", {
-      id,
-      loaded,
-      total,
-    });
-  };
-
-  appEventBus.emit("pdf:loadStart", { id, label });
-  markProgress(0, 1);
-
-  const requestPassword = (reason: "need_password" | "incorrect_password") =>
-    new Promise<string>((resolve, reject) => {
-      let settled = false;
-      const submit = (password: string) => {
-        if (settled) return;
-        settled = true;
-        signal?.removeEventListener("abort", cancel);
-        lastPassword = password;
-        resolve(password);
-      };
-      const cancel = () => {
-        if (settled) return;
-        settled = true;
-        signal?.removeEventListener("abort", cancel);
-        reject(new DOMException("Password prompt cancelled", "AbortError"));
-      };
-
-      if (signal?.aborted) {
-        cancel();
-        return;
-      }
-      signal?.addEventListener("abort", cancel, { once: true });
-      appEventBus.emit("pdf:passwordRequired", {
-        id,
-        reason,
-        submit,
-        cancel,
-      });
-    });
-
-  const finish = (ok: boolean) => {
-    appEventBus.emit("pdf:loadEnd", { id, ok });
-  };
-
-  return {
-    id,
-    requestPassword,
-    getLastPassword: () => lastPassword,
-    markProgress,
-    finish,
-  };
-};
-
-const getPdfPasswordReason = (
-  error: unknown,
-  hadPassword: boolean,
-): "need_password" | "incorrect_password" | null => {
-  if (error instanceof Error && error.name === "EncryptedPDFError") {
-    return hadPassword ? "incorrect_password" : "need_password";
-  }
-
-  if (error instanceof Error) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes("password")) {
-      return hadPassword ? "incorrect_password" : "need_password";
-    }
-  }
-
-  return null;
-};
 
 const loadPDFInternal = async (
   input: File | Uint8Array,

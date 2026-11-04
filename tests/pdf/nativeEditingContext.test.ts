@@ -7,8 +7,8 @@ import {
   PDFStream,
   StandardFonts,
 } from "@legir/pdfium/authoring";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
-import { NativeEditingContext } from "@/services/pdfService/engine/nativeEditingContext";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
+import { NativeEditingContext } from "@legir/pdf-core/engine/nativeEditingContext";
 
 describe("native editing views", () => {
   it("copies native encoded streams and flushes newly authored streams before copying", async () => {

@@ -1,3 +1,4 @@
+import "./services/pdfService/host";
 import "./globals.css";
 
 import { initializePwaLaunchQueue } from "./services/platform/browser/launch";

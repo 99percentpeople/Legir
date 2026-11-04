@@ -3,7 +3,7 @@ import { Check } from "lucide-react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { cn } from "@/utils/cn";
-import { resolveFontStackWithCjkFallback } from "@/lib/fonts";
+import { resolveFontStackWithCjkFallback } from "@legir/pdf-model/fonts";
 
 export const CheckboxControl: React.FC<FormControlProps> = (props) => {
   const {

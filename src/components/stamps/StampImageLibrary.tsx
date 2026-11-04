@@ -10,7 +10,7 @@ import {
   loadStampImageFile,
   STAMP_IMAGE_ACCEPT,
   STAMP_LIBRARY_DRAG_TYPE,
-} from "@/lib/stampImage";
+} from "@legir/pdf-model/stampImage";
 import type { StampImageResource } from "@/types";
 import { cn } from "@/utils/cn";
 

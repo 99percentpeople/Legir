@@ -7,17 +7,17 @@ import { Button } from "@/components/ui/button";
 import { ContextMenuItem } from "@/components/ui/context-menu";
 import { StampStylePopover } from "@/components/toolbar/StampStylePopover";
 import { StampFace } from "@/components/stamps/StampFace";
-import { normalizeRotationDeg } from "@/lib/controlRotation";
+import { normalizeRotationDeg } from "@legir/pdf-model/controlRotation";
 import {
   decodeStampImageDataUrl,
   getStampImageExtension,
   getSuggestedStampImageFilename,
-} from "@/lib/stampImage";
+} from "@legir/pdf-model/stampImage";
 import {
   DEFAULT_STAMP_OPACITY,
   normalizeStampOpacity,
   restoreStampRectAspectRatio,
-} from "@/lib/stamps";
+} from "@legir/pdf-model/stamps";
 import { saveFileAs } from "@/services/platform/files";
 import { FloatingToolbar } from "../FloatingToolbar";
 import { ControlWrapper } from "../ControlWrapper";

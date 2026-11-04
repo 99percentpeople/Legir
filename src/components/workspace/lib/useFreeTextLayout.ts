@@ -1,9 +1,9 @@
 import { useLayoutEffect, useMemo, useState } from "react";
-import { splitTextRuns } from "@/lib/fonts";
+import { splitTextRuns } from "@legir/pdf-model/fonts";
 import {
   getFreeTextBaseline,
   wrapFreeText,
-} from "@/services/pdfService/lib/freeTextLayout";
+} from "@legir/pdf-core/lib/freeTextLayout";
 
 let canvas: HTMLCanvasElement | undefined;
 type FontMetrics = { capCenter: number; cssBaselineEm: number };

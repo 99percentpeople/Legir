@@ -1,14 +1,11 @@
 import { parsePageRange } from "@/utils/pageRange";
 export type { ParsePageRangeResult } from "@/utils/pageRange";
-import type {
-  TextContent,
-  TextStyle,
-} from "@/services/pdfService/engine/textTypes";
+import type { TextContent, TextStyle } from "@legir/pdf-core/engine/textTypes";
 import {
   pdfWorkerService,
   type PDFWorkerService,
 } from "@/services/pdfService/pdfWorkerService";
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 import {
   DEFAULT_PDF_TEXT_STYLE,
   deltaRotationDeg,
@@ -19,7 +16,7 @@ import {
   normalizeRotationDeg,
   projectPointsInterval,
   transform,
-} from "@/services/pdfService/lib/textGeometry";
+} from "@legir/pdf-core/lib/textGeometry";
 import type {
   Annotation,
   PageData,
@@ -35,10 +32,13 @@ import {
   parseAiSdkModelSpecifier,
   type AiSdkProviderId,
 } from "@/services/ai/providers";
-import { resolveFontStackForDisplay } from "@/lib/fonts";
+import { resolveFontStackForDisplay } from "@legir/pdf-model/fonts";
 import { preferencesStore } from "@/store/preferencesStore";
 import { translatePageBlocksStructuredWithAiSdk } from "@/services/ai/tasks";
-import { resolveCjkFallbackFontStack, splitTextRuns } from "@/lib/fonts";
+import {
+  resolveCjkFallbackFontStack,
+  splitTextRuns,
+} from "@legir/pdf-model/fonts";
 
 export type PageTranslationTextBlock = {
   text: string;

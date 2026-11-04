@@ -39,6 +39,8 @@ const browser = await chromium.launch({
 });
 try {
   const context = await browser.newContext({
+    // The workflow uses English selectors; do not inherit the host OS locale.
+    locale: "en-US",
     viewport: { width: 1440, height: 1000 },
   });
   const page = await context.newPage();

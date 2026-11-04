@@ -17,7 +17,7 @@ import {
   PDF_TEXT_SELECTION_HANDLE_WIDTH_PX,
 } from "@/constants";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 import { buildTextLayer } from "../lib/pdfTextLayer";
 import { useTextLayerSelection } from "../hooks/useTextLayerSelection";
 import { useDeferredRenderScale } from "../hooks/useDeferredRenderScale";

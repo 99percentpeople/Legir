@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IMAGE_COMPRESSION_DPI_PRESETS } from "@/lib/imageCompression";
+import { IMAGE_COMPRESSION_DPI_PRESETS } from "@legir/pdf-model/imageCompression";
 import type { AppOptions } from "@/types";
 
 import { SETTINGS_CARD_COMPACT_CLASS } from "./styles";

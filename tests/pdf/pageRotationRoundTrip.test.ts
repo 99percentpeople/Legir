@@ -7,13 +7,13 @@ import {
   degrees,
 } from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { pagePointToView } from "@/components/workspace/lib/pageViewRotation";
 import {
   normalizeRotationDeg,
   rotateOuterRectKeepingCenter,
-} from "@/lib/controlRotation";
+} from "@legir/pdf-model/controlRotation";
 import { FieldType, type Annotation, type FormField } from "@/types";
 
 const worker = {

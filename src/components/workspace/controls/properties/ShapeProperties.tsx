@@ -28,7 +28,7 @@ import {
   SHAPE_ARROW_STYLE_OPTIONS,
   type ShapeArrowStyle,
   shapeSupportsFill,
-} from "@/lib/shapeGeometry";
+} from "@legir/pdf-model/shapeGeometry";
 import type { Annotation } from "@/types";
 
 import type { PropertyPanelProps } from "./types";

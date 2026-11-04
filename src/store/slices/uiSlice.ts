@@ -1,5 +1,5 @@
 import { DEFAULT_EDITOR_UI_STATE } from "@/constants";
-import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
+import { canPerformPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
 import type { EditorState, EditorUiState } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 

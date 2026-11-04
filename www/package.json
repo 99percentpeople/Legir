@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "bun run --cwd ../packages/pdf-model build && tsc --noEmit && vite build",
     "preview": "vite preview"
+  },
+  "dependencies": {
+    "@legir/pdf-model": "workspace:*"
   }
 }

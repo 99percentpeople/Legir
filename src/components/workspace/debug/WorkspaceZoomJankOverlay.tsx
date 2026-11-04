@@ -1,6 +1,6 @@
 import React from "react";
 import { useLanguage } from "@/components/language-provider";
-import { workspaceScaleToZoomPercent } from "@/lib/pdfScale";
+import { workspaceScaleToZoomPercent } from "@legir/pdf-model/pdfScale";
 import { useWorkspaceZoomJankDebug } from "../hooks/useWorkspaceZoomJankDebug";
 
 interface WorkspaceZoomJankOverlayProps {

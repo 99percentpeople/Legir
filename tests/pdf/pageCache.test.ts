@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import type { PDFPage } from "@legir/pdfium";
-import { NativePageCache } from "@/services/pdfService/engine/pageCache";
+import { NativePageCache } from "@legir/pdf-core/engine/pageCache";
 
 it("retains reader pages through background scans and promotes without loading twice", () => {
   const load = vi.fn(

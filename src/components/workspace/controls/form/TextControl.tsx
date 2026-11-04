@@ -5,7 +5,7 @@ import { cn } from "@/utils/cn";
 import {
   DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM,
   resolveFormControlFontFamilyCss,
-} from "@/lib/fonts";
+} from "@legir/pdf-model/fonts";
 import { measureCssTextVisualCenterAboveBaselineEm } from "../../lib/formTextMetrics";
 
 export const TextControl: React.FC<FormControlProps> = (props) => {

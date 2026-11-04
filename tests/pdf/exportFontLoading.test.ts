@@ -11,8 +11,8 @@ import { FieldType, type FormField, type Annotation } from "@/types";
 import {
   canFontEncodeText,
   pickControlValueFont,
-} from "@/services/pdfService/lib/font-selection";
-import { prepareExportFonts } from "@/services/pdfService/lib/export-fonts";
+} from "@legir/pdf-core/lib/font-selection";
+import { prepareExportFonts } from "@legir/pdf-core/lib/export-fonts";
 
 let fontBytes: Uint8Array;
 beforeAll(async () => {

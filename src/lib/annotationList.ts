@@ -1,4 +1,4 @@
-import { getReadableStampLabel } from "@/lib/stamps";
+import { getReadableStampLabel } from "@legir/pdf-model/stamps";
 import type { Annotation } from "@/types";
 
 export const ANNOTATION_LIST_TYPES = [

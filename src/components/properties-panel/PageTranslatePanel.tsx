@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FONT_FAMILY_MAP } from "@/constants";
-import { resolveFontStackForDisplay } from "@/lib/fonts";
+import { resolveFontStackForDisplay } from "@legir/pdf-model/fonts";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
 import { PanelLayout } from "./PanelLayout";
 import {

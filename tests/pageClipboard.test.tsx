@@ -5,8 +5,8 @@ import PageEditor from "@/components/page-editor/PageEditor";
 import { EditorViewContext } from "@/store/useEditorView";
 import { EditorTabActiveContext } from "@/app/editorTabs/context";
 import { LanguageProvider } from "@/components/language-provider";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
-import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
+import { UNRESTRICTED_PDF_PERMISSIONS } from "@legir/pdf-model/pdfPermissions";
 import { createTestEditorStore, page } from "./helpers/editorStore";
 
 const mocks = vi.hoisted(() => ({

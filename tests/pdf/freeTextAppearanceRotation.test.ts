@@ -9,11 +9,11 @@ import {
   degrees,
 } from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { Annotation } from "@/types";
-import { getFreeTextAppearanceRotation } from "@/services/pdfService/lib/freeTextAppearance";
-import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
+import { getFreeTextAppearanceRotation } from "@legir/pdf-core/lib/freeTextAppearance";
+import { decodePdfStreamToText } from "@legir/pdf-core/lib/pdf-import-utils";
 
 const worker = {
   loadDocument: async () => true,

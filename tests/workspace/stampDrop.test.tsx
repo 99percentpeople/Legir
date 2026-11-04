@@ -3,9 +3,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWorkspaceStampDrop } from "@/components/workspace/hooks/useWorkspaceStampDrop";
 import { useStampLibraryStore } from "@/store/stampLibraryStore";
-import * as stampImage from "@/lib/stampImage";
+import * as stampImage from "@legir/pdf-model/stampImage";
 import { initialState } from "@/store/helpers";
-import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
+import { UNRESTRICTED_PDF_PERMISSIONS } from "@legir/pdf-model/pdfPermissions";
 import type { WorkspaceEditorState } from "@/types";
 
 const runtime = vi.hoisted(() => ({ active: true, disposed: false }));

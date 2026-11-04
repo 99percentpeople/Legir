@@ -2,6 +2,7 @@
 
 ## Project Structure & Module Organization
 
+- `packages/` houses reusable PDF libraries; see `packages/README.md`. Keep dependencies directed toward the model/engine. Run `bun run check:boundaries` and `bun run test:consumer` after changing package interfaces.
 - `src/` houses the React + Vite app. Key areas: `src/pages/` (screens), `src/components/` (UI + workspace layers), `src/store/` (Zustand SSOT), `src/services/` (PDF pipeline, file ops, AI), `src/workers/`, `src/styles/`, `src/locales/`.
 - `src-tauri/` contains the desktop wrapper and Rust entry points.
 - `public/` stores static assets and bundled fonts. The PDFium runtime lives in `packages/pdfium/wasm/` and is copied into versioned build assets.

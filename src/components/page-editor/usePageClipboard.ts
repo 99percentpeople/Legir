@@ -8,14 +8,14 @@ import { createClipboardData, ownsTextClipboard } from "@/lib/clipboard";
 import {
   assertPdfPermissionOperation,
   PdfPermissionDeniedError,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import {
   readPageClipboard,
   readPageClipboardId,
   writePageClipboard,
 } from "@/services/pageClipboard";
 import { exportSelectedPages } from "@/services/pdfService/pageClipboard";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import { useEditorViewApi } from "@/store/useEditorView";
 
 export function usePageClipboard({

@@ -1,20 +1,20 @@
 import { ANNOTATION_STYLES } from "@/constants";
 import { preparePastedControl } from "@/lib/controlClipboard";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
   getMoveDelta,
   getMovedAnnotationUpdates,
   getMovedFieldUpdates,
-} from "@/lib/controlMovement";
+} from "@legir/pdf-model/controlMovement";
 import {
   getNextLayerOrderForPage,
   reorderControlLayer,
-} from "@/lib/controlLayerOrder";
+} from "@legir/pdf-model/controlLayerOrder";
 import { shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
 import {
   prepareAnnotationsForStore,
   prepareInkAnnotationForStore,
-} from "@/lib/inkGeometry";
+} from "@legir/pdf-model/inkGeometry";
 import {
   PdfPermissionDeniedError,
   assertPdfPermissionOperation,
@@ -25,7 +25,7 @@ import {
   getFormFieldUpdateDirtyScopes,
   isFormFieldValueUpdate,
   mergePdfPermissionDirtyScopes,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import type { Annotation, AnnotationReply, FormField } from "@/types";
 import { FieldType } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";

@@ -1,4 +1,4 @@
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 import {
   DEFAULT_PDF_TEXT_STYLE,
   deltaRotationDeg,
@@ -9,8 +9,8 @@ import {
   normalizeRotationDeg,
   projectPointsInterval,
   transform,
-} from "@/services/pdfService/lib/textGeometry";
-import type { TextContent } from "@/services/pdfService/engine/textTypes";
+} from "@legir/pdf-core/lib/textGeometry";
+import type { TextContent } from "@legir/pdf-core/engine/textTypes";
 import type { PageData } from "@/types";
 
 type SerializablePageInfo = Pick<PageData, "rotation" | "userUnit" | "viewBox">;

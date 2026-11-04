@@ -13,7 +13,7 @@ import {
   getInkBoundingRect,
   getInkStrokes,
   getInkRenderPath,
-} from "@/lib/inkGeometry";
+} from "@legir/pdf-model/inkGeometry";
 import { getContrastColor } from "@/utils/colors";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 

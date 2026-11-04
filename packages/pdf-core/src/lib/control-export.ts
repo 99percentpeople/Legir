@@ -1,0 +1,60 @@
+import type { FormField } from "@legir/pdf-model";
+import type { PDFPage } from "@legir/pdfium/authoring";
+import type { ViewportLike } from "../types.js";
+import { hexToPdfColor } from "./colors.js";
+import { uiRectToPdfBounds } from "./coords.js";
+import { getWidgetRotationFromControlRotation } from "@legir/pdf-model/controlRotation";
+
+export const getCommonControlExportOpts = (
+  field: FormField,
+  page: PDFPage,
+  viewport?: ViewportLike,
+) => {
+  const b = uiRectToPdfBounds(page, field.rect, viewport);
+  const bw = field.style?.borderWidth ?? 1;
+  const hasBorder = bw > 0;
+  return {
+    x: b.x,
+    y: b.y,
+    width: b.width,
+    height: b.height,
+    borderColor: hasBorder
+      ? hexToPdfColor(field.style?.borderColor)
+      : undefined,
+    backgroundColor: field.style?.isTransparent
+      ? undefined
+      : hexToPdfColor(field.style?.backgroundColor),
+    borderWidth: hasBorder ? bw : 0,
+    textColor: hexToPdfColor(field.style?.textColor),
+  };
+};
+
+export const applyWidgetExportRotation = (
+  widget:
+    | {
+        getAppearanceCharacteristics?: () =>
+          | { getRotation: () => number | undefined }
+          | undefined;
+        getOrCreateAppearanceCharacteristics: () => {
+          setRotation: (rotation: number) => void;
+        };
+      }
+    | undefined,
+  page: PDFPage,
+  fieldRotationDeg?: number,
+) => {
+  if (!widget) return 0;
+
+  const widgetRotation = getWidgetRotationFromControlRotation(
+    page.getRotation().angle,
+    fieldRotationDeg ?? 0,
+  );
+  if (
+    widgetRotation === 0 &&
+    !widget.getAppearanceCharacteristics?.()?.getRotation()
+  )
+    return 0;
+
+  widget.getOrCreateAppearanceCharacteristics().setRotation(widgetRotation);
+  return widgetRotation;
+};

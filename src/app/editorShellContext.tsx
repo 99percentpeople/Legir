@@ -2,7 +2,7 @@ import React, { createContext, useContext } from "react";
 
 import type { PDFSearchResult } from "@/types";
 import type { FloatingToolbarCommands } from "@/components/toolbar/types";
-import type { PDFSearchMode } from "@/lib/pdfSearch";
+import type { PDFSearchMode } from "@legir/pdf-core/search";
 
 export interface EditorShellCommands extends FloatingToolbarCommands {
   zoomIn: () => void;

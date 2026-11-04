@@ -4,7 +4,7 @@ import { cn } from "@/utils/cn";
 import { ControlProps } from "./types";
 import { useEditorEventBus } from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import { getMoveDelta } from "@/lib/controlMovement";
+import { getMoveDelta } from "@legir/pdf-model/controlMovement";
 import { useMouse } from "@/hooks/useMouse";
 import { useLanguage } from "@/components/language-provider";
 import type { Annotation, FormField, MoveDirection } from "@/types";
@@ -14,7 +14,7 @@ import {
   normalizeRightAngleRotationDeg,
   normalizeRotationDeg,
   rotateOuterRectKeepingCenter,
-} from "@/lib/controlRotation";
+} from "@legir/pdf-model/controlRotation";
 import {
   ControlContextMenu,
   dispatchSyntheticContextMenuEscape,

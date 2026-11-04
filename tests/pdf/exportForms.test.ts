@@ -14,7 +14,7 @@ import {
   PDFWidgetAnnotation,
   StandardFonts,
 } from "@legir/pdfium/authoring";
-import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
+import { decodePdfStreamToText } from "@legir/pdf-core/lib/pdf-import-utils";
 import { exportPDF } from "@/services/pdfService";
 import {
   FieldType,
@@ -22,8 +22,8 @@ import {
   type FormField,
   type PDFDocumentPermissions,
 } from "@/types";
-import { getPdfTextVisualCenterAboveBaselineEm } from "@/services/pdfService/lib/text-field-metrics";
-import { setPdfPermissionPolicyProvider } from "@/lib/pdfPermissions";
+import { getPdfTextVisualCenterAboveBaselineEm } from "@legir/pdf-core/lib/text-field-metrics";
+import { setPdfPermissionPolicyProvider } from "@legir/pdf-model/pdfPermissions";
 
 const createTextFieldPdf = async (options?: { withXfa?: boolean }) => {
   const pdfDoc = await PDFDocument.create();

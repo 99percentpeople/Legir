@@ -3,7 +3,7 @@ import { PDFDocument, degrees } from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { copySelectedControl } from "@/lib/controlClipboard";
-import { prepareInkAnnotationForStore } from "@/lib/inkGeometry";
+import { prepareInkAnnotationForStore } from "@legir/pdf-model/inkGeometry";
 import { FieldType, type Annotation } from "@/types";
 import { createTestEditorStore, field } from "../helpers/editorStore";
 

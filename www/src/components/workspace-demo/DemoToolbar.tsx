@@ -41,7 +41,7 @@ import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
 import ZoomDropdownControl from "@/components/toolbar/ZoomDropdownControl";
 import PageSettingsDropdownControl from "@/components/toolbar/PageSettingsDropdownControl";
 import SaveMenu from "@/components/toolbar/SaveMenu";
-import { pdfViewerScaleToWorkspaceScale } from "@/lib/pdfScale";
+import { pdfViewerScaleToWorkspaceScale } from "@legir/pdf-model/pdfScale";
 import {
   ANNOTATION_STYLES,
   MIN_PAGE_THUMBNAIL_SCALE,

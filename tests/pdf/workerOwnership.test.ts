@@ -15,7 +15,7 @@ vi.mock("@/services/pdfService/pdfWorkerService", () => ({
 }));
 import { renderPdfPreviewDataUrl } from "@/services/recentFilePreview";
 import { renderPageBytes } from "@/services/pdfService/pdfRenderer";
-import { exportPreviews } from "@/services/pdfService/engine/exportPreviews";
+import { exportPreviews } from "@legir/pdf-core/engine/exportPreviews";
 
 it("uses the saved revision's preview without opening exported bytes or reading the live draft", async () => {
   const blob = new Blob(["saved output"]);

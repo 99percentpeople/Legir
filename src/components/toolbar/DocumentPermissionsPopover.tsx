@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { getEffectivePdfPermissions } from "@/lib/pdfPermissions";
+import { getEffectivePdfPermissions } from "@legir/pdf-model/pdfPermissions";
 import { cn } from "@/utils/cn";
 import type { PDFDocumentPermissions } from "@/types";
 

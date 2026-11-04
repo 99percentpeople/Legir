@@ -13,8 +13,8 @@ import {
   DEFAULT_SCALE,
 } from "@/constants";
 import { clampAiChatCompressionThresholdPercent } from "@/services/ai/chat/runtime/compression/threshold";
-import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
-import { normalizeImageCompression } from "@/lib/imageCompression";
+import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@legir/pdf-model/pdfPermissions";
+import { normalizeImageCompression } from "@legir/pdf-model/imageCompression";
 import type {
   AppOptions,
   EditorState,

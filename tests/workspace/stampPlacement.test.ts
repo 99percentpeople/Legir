@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStampRectAtPoint } from "@/lib/stamps";
+import { getStampRectAtPoint } from "@legir/pdf-model/stamps";
 
 describe("new image stamp placement", () => {
   it.each([0.25, 0.5, 1, 2, 4])(

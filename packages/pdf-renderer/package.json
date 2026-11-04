@@ -1,0 +1,39 @@
+{
+  "name": "@legir/pdf-renderer",
+  "version": "0.1.0",
+  "description": "Host-injected PDF worker client and browser rendering runtime",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./dist/worker.js",
+    "./dist/content-worker.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist', {recursive:true, force:true})\" && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@legir/pdf-model": "workspace:*",
+    "@legir/pdf-core": "workspace:*",
+    "@legir/pdfium": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "@types/node": "^24.12.4"
+  }
+}

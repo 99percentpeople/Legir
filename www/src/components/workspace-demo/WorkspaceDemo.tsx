@@ -24,7 +24,7 @@ import {
   DEFAULT_EDITOR_UI_STATE,
   WORKSPACE_BASE_PAGE_GAP_PX,
 } from "@/constants";
-import { pdfViewerScaleToWorkspaceScale } from "@/lib/pdfScale";
+import { pdfViewerScaleToWorkspaceScale } from "@legir/pdf-model/pdfScale";
 import type { PreviewMode } from "../../content/types";
 import { resolveAppUrl } from "../../lib/app-url";
 import { getDemoCopy } from "./copy";

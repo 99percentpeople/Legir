@@ -3,8 +3,8 @@ import { expect, it, vi } from "vitest";
 import { PDFDocument, PDFRef } from "@legir/pdfium/authoring";
 import { exportPDFBlob } from "@/services/pdfService";
 import { FieldType } from "@/types";
-import { DocumentSession } from "@/services/pdfService/engine/documentSession";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import { DocumentSession } from "@legir/pdf-core/engine/documentSession";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 
 const asBytes = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer());
 const hasOriginalPrefix = (output: Uint8Array, input: Uint8Array) =>

@@ -18,7 +18,7 @@ import { page } from "./helpers/editorStore";
 // These tests exercise the real search controller, external subscription and
 // Context providers. The text matcher/geometry backend is deterministic so late
 // worker completion, rejection and cancellation can be tested without a PDF.
-vi.mock("@/lib/pdfSearch", () => ({
+vi.mock("@legir/pdf-core/search", () => ({
   findPdfSearchResults: (
     content: { tag: string },
     query: string,

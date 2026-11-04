@@ -9,16 +9,16 @@ import type { EditorActions, EditorStoreSlice } from "../store.types";
 import {
   assertPdfPermissionOperation,
   mergePdfPermissionDirtyScopes,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import {
   getPageId,
   identifyPage,
   identifyPages,
   mapPageIndexes,
   remapOutline,
-} from "@/services/pdfService/lib/pageStructure";
+} from "@legir/pdf-core/lib/pageStructure";
 import { captureHistorySnapshot } from "./historySlice";
-import { cloneAnnotationReplies } from "@/lib/annotationReplies";
+import { cloneAnnotationReplies } from "@legir/pdf-model/annotationReplies";
 import { revokeObjectUrlIfNeeded } from "../helpers";
 
 export type ImportedPages = {

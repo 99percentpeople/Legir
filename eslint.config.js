@@ -8,7 +8,7 @@ export default tseslint.config(
     files: [
       "src/**/*.{js,jsx,ts,tsx}",
       "www/**/*.{js,jsx,ts,tsx}",
-      "packages/pdfium/src/**/*.{js,ts}",
+      "packages/*/src/**/*.{js,ts}",
     ],
     rules: {
       semi: "error",
@@ -21,6 +21,14 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "warn",
     },
+  },
+  {
+    files: [
+      "scripts/check-module-boundaries.mjs",
+      "scripts/check-package-consumer.mjs",
+      "scripts/pdf-consumer-smoke.mjs",
+    ],
+    languageOptions: { globals: { console: "readonly", process: "readonly" } },
   },
   {
     // Ignores specific files

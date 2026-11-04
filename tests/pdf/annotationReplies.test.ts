@@ -11,7 +11,7 @@ import {
 import { exportPDF, exportPDFBlob, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createTestEditorStore } from "../helpers/editorStore";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import { duplicateAnnotationForDrag } from "@/components/workspace/lib/duplicateControlForDrag";
 
 const worker = {

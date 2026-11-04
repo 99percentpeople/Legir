@@ -1,0 +1,184 @@
+import type { TextContent } from "./engine/textTypes.js";
+import type { PDFDocumentPermissions, PDFOutlineItem } from "@legir/pdf-model";
+import type { ThumbnailContent, Tile } from "./types.js";
+import type { DocumentCommands } from "./engine/sessionTypes.js";
+
+type CommandSpec<TRequest extends object, TResponse = never> =
+  | TRequest
+  | [TRequest, TResponse];
+
+type SpecRequest<T> = T extends [infer Req, unknown] ? Req : T;
+type SpecResponse<T> = T extends [unknown, infer Res] ? Res : never;
+
+export type WorkerCommandPayloadMap = {
+  [K in keyof DocumentCommands]: [
+    DocumentCommands[K]["input"],
+    DocumentCommands[K]["output"],
+  ];
+} & {
+  render: CommandSpec<
+    {
+      docId?: string;
+      pageIndex: number;
+      scale: number;
+      rotation?: number;
+      canvas?: OffscreenCanvas;
+      canvasId: string;
+      priority?: number;
+      tile?: Tile;
+      renderAnnotations?: boolean;
+    },
+    boolean
+  >;
+
+  cancel: CommandSpec<object, void>;
+
+  load: CommandSpec<
+    {
+      docId?: string;
+      data: Uint8Array;
+      password?: string;
+      preview?: boolean;
+      pageIndexes?: number[];
+    },
+    boolean
+  >;
+
+  unload: CommandSpec<
+    {
+      docId?: string;
+    },
+    boolean
+  >;
+
+  renderImage: CommandSpec<
+    {
+      docId?: string;
+      pageIndex: number;
+      scale?: number;
+      targetWidth?: number;
+      rotation?: number;
+      /** Region in displayed page space at scale 1; rendered without a full-page bitmap. */
+      clipRect?: { x: number; y: number; width: number; height: number };
+      renderAnnotations?: boolean;
+      thumbnailContent?: ThumbnailContent;
+      /** Downsample an existing reader canvas instead of rasterizing the PDF again. */
+      previewCanvasId?: string;
+      mimeType?: string;
+      quality?: number;
+      priority?: number;
+    } & (
+      | {
+          isNewDoc: true;
+          data: Uint8Array;
+          password?: string;
+        }
+      | {
+          isNewDoc?: false | undefined;
+          data?: Uint8Array | null | undefined;
+        }
+    ),
+    { mimeType: string; imageBytes: ArrayBuffer } | false
+  >;
+
+  releaseCanvas: CommandSpec<
+    {
+      canvasIds: string[];
+    },
+    boolean
+  >;
+
+  cancelQueuedRenders: CommandSpec<
+    {
+      docId?: string;
+      pageIndex: number;
+      scale: number;
+    },
+    boolean
+  >;
+
+  reprioritize: CommandSpec<
+    {
+      docId?: string;
+      pageIndex: number;
+      scale: number;
+      viewportCenter: [number, number];
+    },
+    boolean
+  >;
+
+  getTextContent: CommandSpec<
+    {
+      docId?: string;
+      pageIndex: number;
+    },
+    TextContent | false
+  >;
+
+  getOutline: CommandSpec<
+    {
+      docId?: string;
+    },
+    PDFOutlineItem[] | false
+  >;
+
+  getPermissions: CommandSpec<
+    {
+      docId?: string;
+    },
+    PDFDocumentPermissions | false
+  >;
+
+  resolveDest: CommandSpec<
+    {
+      docId?: string;
+      dest: unknown;
+    },
+    number | null | false
+  >;
+};
+
+export type WorkerCommandType = keyof WorkerCommandPayloadMap;
+
+export type WorkerCommand<TType extends WorkerCommandType> = {
+  type: TType;
+  id: string;
+} & SpecRequest<WorkerCommandPayloadMap[TType]>;
+
+export type WorkerResponsePayload<TType extends WorkerCommandType> =
+  SpecResponse<WorkerCommandPayloadMap[TType]>;
+
+export type WorkerResponseFor<TType extends WorkerCommandType> =
+  WorkerResponse<TType>;
+
+export type WorkerRequest = {
+  [K in WorkerCommandType]: WorkerCommand<K>;
+}[WorkerCommandType];
+
+export type WorkerSuccessResponse<
+  TType extends WorkerCommandType = WorkerCommandType,
+> = {
+  id: string;
+  success: true;
+  payload?: WorkerResponsePayload<TType>;
+};
+
+export type WorkerErrorResponse = {
+  id: string;
+  success: false;
+  error: string;
+};
+
+export type WorkerResponse<
+  TType extends WorkerCommandType = WorkerCommandType,
+> = WorkerSuccessResponse<TType> | WorkerErrorResponse;
+
+export type WorkerProgressResponse = {
+  type: "loadProgress";
+  id: string;
+  docId?: string;
+  loaded: number;
+  total?: number;
+};
+
+export type WorkerMessage = WorkerResponse | WorkerProgressResponse;

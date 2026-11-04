@@ -8,12 +8,12 @@ import {
   degrees,
 } from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 import {
   freeTextPaddingFromPdf,
   getFreeTextContentBox,
   wrapFreeText,
-} from "@/services/pdfService/lib/freeTextLayout";
+} from "@legir/pdf-core/lib/freeTextLayout";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { Annotation } from "@/types";
 

@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { useLanguage } from "@/components/language-provider";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import { cn } from "@/utils/cn";
 import { getPageView } from "@/components/workspace/lib/pageViewRotation";
 import { PageThumbnail } from "./PageThumbnail";

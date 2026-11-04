@@ -6,7 +6,7 @@ import type { ResponsiveToolbarItem } from "@/components/toolbar/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEditorViewApi } from "@/store/useEditorView";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import { PageActions } from "./PageActions";
 import type { PageAction } from "./types";
 

@@ -29,6 +29,7 @@ jobs:
       - run: bun run lint
       - run: bun run test
       - run: bun run test:pdfium
+      - run: bun run test:consumer
 
   build:
     needs: validate

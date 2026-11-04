@@ -1,4 +1,4 @@
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import type { PageData } from "@/types";
 import type { PageGridLayout } from "./pageGridLayout";
 

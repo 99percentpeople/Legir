@@ -1,0 +1,451 @@
+import {
+  PDFForm,
+  PDFName,
+  PDFString,
+  TextAlignment,
+  degrees,
+  type PDFFont,
+} from "@legir/pdfium/authoring";
+import { FormField, FieldType } from "@legir/pdf-model";
+import { PDF_CUSTOM_KEYS } from "@legir/pdf-model/constants";
+import {
+  IControlExporter,
+  type ControlExportOptions,
+  ViewportLike,
+} from "../types.js";
+import { pickControlValueFont } from "../lib/font-selection.js";
+import {
+  applyWidgetExportRotation,
+  getCommonControlExportOpts,
+} from "../lib/control-export.js";
+import {
+  getInnerSizeFromOuterAabb,
+  getWidgetRotationFromControlRotation,
+} from "@legir/pdf-model/controlRotation";
+import { flattenTextFieldAppearanceProvider } from "../lib/text-field-appearance.js";
+import {
+  getOrCreateExportField,
+  updateExportFieldAppearance,
+} from "../lib/form-export-context.js";
+
+export class TextControlExporter implements IControlExporter {
+  shouldExport(field: FormField): boolean {
+    return field.type === FieldType.TEXT;
+  }
+
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+    options?: ControlExportOptions,
+  ): void {
+    const page = form.doc.getPage(field.pageIndex);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
+
+    const fieldFont = pickControlValueFont(field, form, fontMap);
+
+    const tf = getOrCreateExportField(
+      field.name,
+      () => form.getTextField(field.name),
+      () => form.createTextField(field.name),
+      options?.context,
+    );
+
+    tf.addToPage(page, { ...commonOpts, font: fieldFont });
+    applyWidgetExportRotation(
+      tf.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
+    const appearanceFont = fieldFont ?? form.getDefaultFont();
+
+    if (field.value) {
+      tf.setText(field.value);
+    }
+    if (field.toolTip) {
+      tf.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+    } else {
+      tf.acroField.dict.delete(PDFName.of("TU"));
+    }
+
+    if (field.placeholder) {
+      tf.acroField.dict.set(
+        PDFName.of(PDF_CUSTOM_KEYS.placeholder),
+        PDFString.of(field.placeholder),
+      );
+    } else {
+      tf.acroField.dict.delete(PDFName.of(PDF_CUSTOM_KEYS.placeholder));
+    }
+
+    if (field.style?.fontSize) tf.setFontSize(field.style.fontSize);
+
+    if (field.alignment === "center") tf.setAlignment(TextAlignment.Center);
+    else if (field.alignment === "right") tf.setAlignment(TextAlignment.Right);
+
+    if (field.multiline) tf.enableMultiline();
+
+    updateExportFieldAppearance(
+      tf,
+      () => {
+        try {
+          if (options?.flattenAppearance) {
+            tf.updateAppearances(
+              appearanceFont,
+              flattenTextFieldAppearanceProvider,
+            );
+          } else {
+            tf.updateAppearances(appearanceFont);
+          }
+        } catch (e) {
+          console.warn("Failed to update text field appearances", e);
+          return false;
+        }
+      },
+      options?.context,
+    );
+  }
+}
+
+export class CheckboxControlExporter implements IControlExporter {
+  shouldExport(field: FormField): boolean {
+    return field.type === FieldType.CHECKBOX;
+  }
+
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+    options?: ControlExportOptions,
+  ): void {
+    const page = form.doc.getPage(field.pageIndex);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
+
+    const cb = getOrCreateExportField(
+      field.name,
+      () => form.getCheckBox(field.name),
+      () => form.createCheckBox(field.name),
+      options?.context,
+    );
+
+    cb.addToPage(page, commonOpts);
+    applyWidgetExportRotation(
+      cb.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
+    if (field.isChecked) cb.check();
+    else cb.uncheck();
+
+    if (field.toolTip) {
+      cb.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+    }
+
+    updateExportFieldAppearance(
+      cb,
+      () => {
+        try {
+          cb.updateAppearances();
+        } catch (e) {
+          console.warn("Failed to update checkbox appearances", e);
+          return false;
+        }
+      },
+      options?.context,
+    );
+  }
+}
+
+export class DropdownControlExporter implements IControlExporter {
+  shouldExport(field: FormField): boolean {
+    return field.type === FieldType.DROPDOWN;
+  }
+
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+    options?: ControlExportOptions,
+  ): void {
+    const page = form.doc.getPage(field.pageIndex);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
+
+    const fieldFont = pickControlValueFont(field, form, fontMap);
+
+    if (field.isMultiSelect) {
+      const ol = getOrCreateExportField(
+        field.name,
+        () => form.getOptionList(field.name),
+        () => form.createOptionList(field.name),
+        options?.context,
+      );
+
+      ol.addToPage(page, { ...commonOpts, font: fieldFont });
+      applyWidgetExportRotation(
+        ol.acroField.getWidgets().at(-1),
+        page,
+        field.rotationDeg,
+      );
+      const appearanceFont = fieldFont ?? form.getDefaultFont();
+      if (field.options) ol.setOptions(field.options);
+
+      ol.enableMultiselect();
+
+      if (field.value) {
+        const vals = field.value.split("\n").filter((v) => v && v !== "");
+        try {
+          ol.select(vals);
+        } catch (e) {
+          console.warn("Failed to select values for option list", e);
+        }
+      }
+
+      if (field.toolTip) {
+        ol.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+      }
+
+      if (field.style?.fontSize) ol.setFontSize(field.style.fontSize);
+      updateExportFieldAppearance(
+        ol,
+        () => {
+          try {
+            ol.updateAppearances(appearanceFont);
+          } catch (e) {
+            console.warn("Failed to update option list appearances", e);
+            return false;
+          }
+        },
+        options?.context,
+      );
+    } else {
+      const dd = getOrCreateExportField(
+        field.name,
+        () => form.getDropdown(field.name),
+        () => form.createDropdown(field.name),
+        options?.context,
+      );
+
+      dd.addToPage(page, { ...commonOpts, font: fieldFont });
+      applyWidgetExportRotation(
+        dd.acroField.getWidgets().at(-1),
+        page,
+        field.rotationDeg,
+      );
+      const appearanceFont = fieldFont ?? form.getDefaultFont();
+      if (field.options) dd.setOptions(field.options);
+      if (field.allowCustomValue) dd.enableEditing();
+
+      if (field.value) {
+        try {
+          dd.select(field.value);
+        } catch (e) {
+          console.warn("Failed to select value for dropdown", e);
+        }
+      }
+
+      if (field.toolTip) {
+        dd.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+      }
+
+      if (field.style?.fontSize) dd.setFontSize(field.style.fontSize);
+      updateExportFieldAppearance(
+        dd,
+        () => {
+          try {
+            dd.updateAppearances(appearanceFont);
+          } catch (e) {
+            console.warn("Failed to update dropdown appearances", e);
+            return false;
+          }
+        },
+        options?.context,
+      );
+    }
+  }
+}
+
+export class RadioControlExporter implements IControlExporter {
+  shouldExport(field: FormField): boolean {
+    return field.type === FieldType.RADIO;
+  }
+
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+    options?: ControlExportOptions,
+  ): void {
+    const page = form.doc.getPage(field.pageIndex);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
+
+    const rg = getOrCreateExportField(
+      field.name,
+      () => form.getRadioGroup(field.name),
+      () => {
+        const group = form.createRadioGroup(field.name);
+        if (field.toolTip) {
+          group.acroField.dict.set(
+            PDFName.of("TU"),
+            PDFString.of(field.toolTip),
+          );
+        }
+        return group;
+      },
+      options?.context,
+    );
+
+    const val = field.radioValue || field.exportValue || `Choice_${field.id}`;
+    rg.addOptionToPage(val, page, commonOpts);
+    applyWidgetExportRotation(
+      rg.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
+
+    if (field.isChecked) {
+      rg.select(val);
+    }
+
+    updateExportFieldAppearance(
+      rg,
+      () => {
+        try {
+          rg.updateAppearances();
+        } catch (e) {
+          console.warn("Failed to update radio appearances", e);
+          return false;
+        }
+      },
+      options?.context,
+    );
+  }
+}
+
+export class SignatureControlExporter implements IControlExporter {
+  shouldExport(field: FormField): boolean {
+    return field.type === FieldType.SIGNATURE;
+  }
+
+  async save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+    options?: ControlExportOptions,
+  ): Promise<void> {
+    const page = form.doc.getPage(field.pageIndex);
+
+    // 1. Handle Image Signature (flattened)
+    if (field.signatureData) {
+      const pdfDoc = form.doc;
+      const imageBytes = await fetch(field.signatureData).then((res) =>
+        res.arrayBuffer(),
+      );
+      let image;
+      if (field.signatureData.startsWith("data:image/png")) {
+        image = await pdfDoc.embedPng(imageBytes);
+      } else {
+        image = await pdfDoc.embedJpg(imageBytes);
+      }
+
+      const imgDims = image.scale(1);
+      const common = getCommonControlExportOpts(field, page, viewport);
+      const boxWidth = common.width;
+      const boxHeight = common.height;
+      const rotationDeg = getWidgetRotationFromControlRotation(
+        viewport?.rotation ?? page.getRotation().angle,
+        field.rotationDeg ?? 0,
+      );
+      const innerBox =
+        rotationDeg === 0
+          ? { width: boxWidth, height: boxHeight }
+          : getInnerSizeFromOuterAabb(
+              { width: boxWidth, height: boxHeight },
+              rotationDeg,
+            );
+
+      let drawWidth = innerBox.width;
+      let drawHeight = innerBox.height;
+
+      const scaleMode = field.imageScaleMode || "contain";
+
+      if (scaleMode === "contain") {
+        const widthRatio = innerBox.width / imgDims.width;
+        const heightRatio = innerBox.height / imgDims.height;
+        const scale = Math.min(widthRatio, heightRatio);
+
+        drawWidth = imgDims.width * scale;
+        drawHeight = imgDims.height * scale;
+      }
+
+      const centerX = common.x + boxWidth / 2;
+      const centerY = common.y + boxHeight / 2;
+      let drawX = centerX - drawWidth / 2;
+      let drawY = centerY - drawHeight / 2;
+
+      if (rotationDeg === 90) {
+        drawX = centerX + drawHeight / 2;
+        drawY = centerY - drawWidth / 2;
+      } else if (rotationDeg === 180) {
+        drawX = centerX + drawWidth / 2;
+        drawY = centerY + drawHeight / 2;
+      } else if (rotationDeg === 270) {
+        drawX = centerX - drawHeight / 2;
+        drawY = centerY + drawWidth / 2;
+      }
+
+      page.drawImage(image, {
+        x: drawX,
+        y: drawY,
+        width: drawWidth,
+        height: drawHeight,
+        rotate: rotationDeg !== 0 ? degrees(rotationDeg) : undefined,
+      });
+      return; // Done
+    }
+
+    // 2. Handle Form Field Signature (widget)
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
+
+    // Resolve font
+    let fieldFont = fontMap?.get("Helvetica");
+    if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
+      fieldFont = fontMap.get(field.style.fontFamily);
+    }
+
+    const tf = getOrCreateExportField(
+      field.name,
+      () => form.getTextField(field.name),
+      () => form.createTextField(field.name),
+      options?.context,
+    );
+
+    tf.addToPage(page, { ...commonOpts, font: fieldFont });
+    applyWidgetExportRotation(
+      tf.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
+    const appearanceFont = fieldFont ?? form.getDefaultFont();
+
+    if (field.toolTip) {
+      tf.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+    }
+
+    updateExportFieldAppearance(
+      tf,
+      () => {
+        try {
+          tf.updateAppearances(appearanceFont);
+        } catch (e) {
+          console.warn("Failed to update signature appearances", e);
+          return false;
+        }
+      },
+      options?.context,
+    );
+  }
+}

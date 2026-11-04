@@ -1,4 +1,4 @@
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
   MAX_EDITOR_SCALE,
   MIN_EDITOR_SCALE,
@@ -8,7 +8,7 @@ import {
 import {
   canUseModeWithPdfPermissions,
   canUseToolWithPdfPermissions,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 
 const clampEditorScale = (scale: number) =>

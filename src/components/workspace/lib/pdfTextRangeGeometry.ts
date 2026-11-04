@@ -1,6 +1,6 @@
-import type { TextContent } from "@/services/pdfService/engine/textTypes";
+import type { TextContent } from "@legir/pdf-core/engine/textTypes";
 import type { PageData, PDFSearchResult } from "@/types";
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 import {
   getInlineRectBounds,
   mergeInlineRects,

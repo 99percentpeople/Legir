@@ -2,7 +2,7 @@ import { EditorViewContext } from "./editorViewContext";
 import { useContext } from "react";
 import { useStore } from "zustand";
 import type { EditorState } from "../types";
-import { setPdfPermissionPolicyProvider } from "@/lib/pdfPermissions";
+import { setPdfPermissionPolicyProvider } from "@legir/pdf-model/pdfPermissions";
 import { preferencesStore } from "./preferencesStore";
 import {
   createEditorView,

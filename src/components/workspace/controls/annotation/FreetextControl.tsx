@@ -20,8 +20,8 @@ import {
   resolveFontStackWithCjkFallback,
   isKnownFontKey,
   splitTextRuns,
-} from "@/lib/fonts";
-import { getFreeTextContentBox } from "@/services/pdfService/lib/freeTextLayout";
+} from "@legir/pdf-model/fonts";
+import { getFreeTextContentBox } from "@legir/pdf-core/lib/freeTextLayout";
 import { useFreeTextLayout } from "../../lib/useFreeTextLayout";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 

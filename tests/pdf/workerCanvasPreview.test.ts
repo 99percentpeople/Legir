@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import type { WorkerRequest } from "@/services/pdfService/workerProtocol";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import type { WorkerRequest } from "@legir/pdf-core/workerProtocol";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 
-vi.mock("@/services/pdfService/engine/runtime", () => ({ getPDFium: vi.fn() }));
+vi.mock("@legir/pdf-core/engine/runtime", () => ({ getPDFium: vi.fn() }));
 const surfaces: FakeCanvas[] = [];
 const encode = vi.fn(async () => new Blob(["preview"], { type: "image/jpeg" }));
 class FakeCanvas {

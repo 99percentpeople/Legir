@@ -6,7 +6,7 @@ import { LanguageProvider } from "@/components/language-provider";
 import { usePageImport } from "@/components/page-editor/usePageImport";
 import type { LoadedPdfDocument } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
+import { UNRESTRICTED_PDF_PERMISSIONS } from "@legir/pdf-model/pdfPermissions";
 
 const mocks = vi.hoisted(() => ({
   start: vi.fn(),

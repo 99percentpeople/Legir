@@ -1,10 +1,10 @@
 import { expect, it } from "vitest";
-import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
+import { getMovedAnnotationUpdates } from "@legir/pdf-model/controlMovement";
 import {
   getInkRenderPath,
   getInkSvgPath,
   prepareInkAnnotationForStore,
-} from "@/lib/inkGeometry";
+} from "@legir/pdf-model/inkGeometry";
 import { createTestEditorStore } from "./helpers/editorStore";
 import type { Annotation } from "@/types";
 

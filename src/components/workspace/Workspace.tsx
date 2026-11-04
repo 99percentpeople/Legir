@@ -26,7 +26,7 @@ import {
 } from "@/constants";
 import { cn } from "@/utils/cn";
 import FileDragOverlay from "@/components/FileDragOverlay";
-import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
+import { getMovedAnnotationUpdates } from "@legir/pdf-model/controlMovement";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
 import { useEventListener } from "@/hooks/useEventListener";
@@ -87,7 +87,7 @@ import {
   normalizeRightAngleRotationDeg,
   rotateOuterRectKeepingCenter,
   resizeRectFromRotatedHandle,
-} from "@/lib/controlRotation";
+} from "@legir/pdf-model/controlRotation";
 import {
   getRectAndNormalizedShapePoints,
   getShapeStrokeLinecap,
@@ -97,18 +97,18 @@ import {
   isOpenLineShapeType,
   snapShapePointToAngle,
   shapeSupportsFill,
-} from "@/lib/shapeGeometry";
+} from "@legir/pdf-model/shapeGeometry";
 import {
   getStampRectAtPoint,
   getReadableStampLabel,
   normalizeStampKind,
   normalizeStampOpacity,
-} from "@/lib/stamps";
+} from "@legir/pdf-model/stamps";
 import {
   duplicateAnnotationForDrag,
   duplicateFieldForDrag,
 } from "./lib/duplicateControlForDrag";
-import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
+import { canPerformPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
 import { useStampLibraryStore } from "@/store/stampLibraryStore";
 import { useLanguage } from "@/components/language-provider";
 import { toast } from "sonner";
@@ -119,7 +119,7 @@ import {
   ContextMenuItem,
 } from "@/components/ui/context-menu";
 import type { ControlPasteTarget } from "@/lib/controlClipboard/types";
-import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 
 import { schedulePreload } from "@/lib/schedulePreload";
 import {

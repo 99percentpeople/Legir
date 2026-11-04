@@ -7,7 +7,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 
-import { workspaceScaleToPdfViewerScale } from "@/lib/pdfScale";
+import { workspaceScaleToPdfViewerScale } from "@legir/pdf-model/pdfScale";
 import { cn } from "@/utils/cn";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";

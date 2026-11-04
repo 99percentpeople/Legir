@@ -1,14 +1,11 @@
-import type {
-  TextContent,
-  TextStyle,
-} from "@/services/pdfService/engine/textTypes";
+import type { TextContent, TextStyle } from "@legir/pdf-core/engine/textTypes";
 import {
   DEFAULT_PDF_TEXT_STYLE,
   getItemTransform,
   isMarkedContent,
   transform,
-} from "@/services/pdfService/lib/textGeometry";
-import type { ViewportLike } from "@/services/pdfService/types";
+} from "@legir/pdf-core/lib/textGeometry";
+import type { ViewportLike } from "@legir/pdf-core/types";
 
 const MAX_TEXT_DIVS_TO_RENDER = 100000;
 const DEFAULT_FONT_SIZE = 30;

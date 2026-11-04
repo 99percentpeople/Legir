@@ -7,6 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { viteDevApiProxyPlugin } from "./config/vite/devApiProxy";
 import { createPwaPlugin } from "./config/vite/pwa";
 import { createStaticCopyPlugin } from "./config/vite/staticCopy";
+import { workspacePackageAliases } from "./config/vite/workspacePackages";
 
 const pdfiumBuild = JSON.parse(
   readFileSync("./packages/pdfium/wasm/provenance.json", "utf-8"),
@@ -43,7 +44,7 @@ const getManualChunk = (id: string) => {
   return undefined;
 };
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const isTauriEnv = mode === "tauri" || !!process.env.TAURI_ENV_PLATFORM;
 
   return {
@@ -79,9 +80,10 @@ export default defineConfig(({ mode }) => {
       __PDFIUM_VERSION__: JSON.stringify(pdfiumVersion),
     },
     resolve: {
-      alias: {
-        "@": path.resolve(__dirname, "./src"),
-      },
+      alias: [
+        ...(command === "serve" ? workspacePackageAliases : []),
+        { find: "@", replacement: path.resolve(__dirname, "./src") },
+      ],
     },
     // Env variables starting with the item of `envPrefix` will be exposed in tauri's source code through `import.meta.env`.
     envPrefix: ["VITE_", "TAURI_ENV_*"],

@@ -7,7 +7,11 @@
       "outputs": ["dist/**"]
     },
     "//#build": {
-      "dependsOn": ["@legir/pdfium#build"],
+      "dependsOn": [
+        "@legir/pdf-model#build",
+        "@legir/pdf-core#build",
+        "@legir/pdf-renderer#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$"],
       "outputs": ["dist/**"]
     }

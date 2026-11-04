@@ -2,7 +2,7 @@ import React from "react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { cn } from "@/utils/cn";
-import { getInnerSizeFromOuterAabb } from "@/lib/controlRotation";
+import { getInnerSizeFromOuterAabb } from "@legir/pdf-model/controlRotation";
 
 export const RadioControl: React.FC<FormControlProps> = (props) => {
   const {

@@ -9,7 +9,7 @@ import {
   canPerformPdfPermissionOperation,
   canModifyPdfContents,
   mergePdfPermissionDirtyScopes,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 
 // --- Main Container Component ---

@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import type { Annotation, FormField, PageLayoutMode } from "@/types";
-import { getOrderedPageControls } from "@/lib/controlLayerOrder";
+import { getOrderedPageControls } from "@legir/pdf-model/controlLayerOrder";
 
 const sameItems = <T>(left: T[] | undefined, right: T[]) =>
   left?.length === right.length &&

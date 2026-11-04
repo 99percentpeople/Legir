@@ -4,7 +4,7 @@ import { renderThumbnail } from "@/services/pdfService/thumbnailRenderer";
 import { cn } from "@/utils/cn";
 import type { PageData } from "@/types";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import type { ThumbnailContent } from "@/services/pdfService/types";
+import type { ThumbnailContent } from "@legir/pdf-core/types";
 import {
   getPageDisplayRotation,
   getPageView,

@@ -1,4 +1,4 @@
-import { hasStampImageTransfer } from "@/lib/stampImage";
+import { hasStampImageTransfer } from "@legir/pdf-model/stampImage";
 import React, {
   useCallback,
   useEffect,
@@ -64,7 +64,7 @@ import { recentFilesService } from "./services/recentFilesService";
 import {
   canPrintPdf,
   getPdfPermissionSaveBlockReason,
-} from "@/lib/pdfPermissions";
+} from "@legir/pdf-model/pdfPermissions";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { usePlatformFileDrop } from "@/hooks/usePlatformFileDrop";
 import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";

@@ -1,6 +1,6 @@
 import type { EditorState } from "@/types";
-import { assertPdfPermissionOperation } from "@/lib/pdfPermissions";
-import { getPageId, identifyPage } from "./lib/pageStructure";
+import { assertPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
+import { getPageId, identifyPage } from "@legir/pdf-core/lib/pageStructure";
 import { exportPDFBlob } from "./index";
 
 /** Capture the current selection before starting any async PDF work. */

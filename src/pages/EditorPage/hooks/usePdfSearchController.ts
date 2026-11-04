@@ -1,6 +1,9 @@
 import React from "react";
 import { useEditorEventBus } from "@/app/editorTabs/context";
-import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
+import {
+  findPdfSearchResults,
+  type PDFSearchMode,
+} from "@legir/pdf-core/search";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { useEditorViewApi } from "@/store/useEditorView";
 import type { EditorState, PDFSearchResult } from "@/types";

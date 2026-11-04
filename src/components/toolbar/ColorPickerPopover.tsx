@@ -7,7 +7,7 @@ import { Button } from "../ui/button";
 import { ChevronDown } from "lucide-react";
 import { ColorPaletteControl } from "../ui/color-palette";
 import type { ColorPaletteType } from "@/lib/colorPalette";
-import type { ShapeBorderStyle } from "@/lib/shapeGeometry";
+import type { ShapeBorderStyle } from "@legir/pdf-model/shapeGeometry";
 import type { StrokePreviewProps } from "./types";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useWorkspacePointerDownDismiss } from "@/lib/workspacePointerDownDismissContext";

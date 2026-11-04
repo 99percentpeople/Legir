@@ -32,7 +32,7 @@ import {
   calculateWorkspaceFitScreenScale,
   calculateWorkspaceFitWidthScale,
 } from "@/components/workspace/lib/calculateWorkspaceFitScale";
-import { workspaceScaleToPdfViewerScale } from "@/lib/pdfScale";
+import { workspaceScaleToPdfViewerScale } from "@legir/pdf-model/pdfScale";
 import { FIT_WIDTH_PADDING_X } from "@/constants";
 
 // The shared drag-and-drop runtime creates its observer during module loading.

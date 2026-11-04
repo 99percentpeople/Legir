@@ -1,6 +1,17 @@
+export {
+  DEFAULT_FIELD_STYLE,
+  FONT_FAMILY_MAP,
+  CJK_FALLBACK_SANS_FONT_KEY,
+  CJK_FALLBACK_SERIF_FONT_KEY,
+  PDF_CUSTOM_KEYS,
+  THUMBNAIL_TARGET_WIDTH,
+  THUMBNAIL_MIME_TYPE,
+  THUMBNAIL_JPEG_QUALITY,
+  THUMBNAIL_WARMUP_PRIORITY,
+} from "@legir/pdf-model/constants";
 import type { EditorUiState, PageTranslateOptions } from "./types";
-import { pdfViewerScaleToWorkspaceScale } from "./lib/pdfScale";
-import { DEFAULT_IMAGE_COMPRESSION } from "./lib/imageCompression";
+import { pdfViewerScaleToWorkspaceScale } from "@legir/pdf-model/pdfScale";
+import { DEFAULT_IMAGE_COMPRESSION } from "@legir/pdf-model/imageCompression";
 
 export const DEFAULT_SCALE = pdfViewerScaleToWorkspaceScale(1);
 export const MIN_EDITOR_SCALE = pdfViewerScaleToWorkspaceScale(0.25);
@@ -20,13 +31,6 @@ export const MAX_PIXELS_PER_PAGE = 16_000_000;
 export const TILE_MAX_DIM = 2048;
 export const WORKSPACE_HEAVY_PAGE_PIXEL_THRESHOLD = 8_000_000;
 export const WORKSPACE_HEAVY_PAGE_DPR_CAP = 1;
-
-// Shared encoding for sidebar, page editor and import thumbnails. The document
-// queue refreshes only changed pages and yields to workspace interactions.
-export const THUMBNAIL_TARGET_WIDTH = 500;
-export const THUMBNAIL_MIME_TYPE = "image/jpeg";
-export const THUMBNAIL_JPEG_QUALITY = 0.7;
-export const THUMBNAIL_WARMUP_PRIORITY = 10000;
 
 export const FIT_WIDTH_PADDING_X = 96;
 export const FIT_SCREEN_PADDING_X = 96;
@@ -163,16 +167,6 @@ export const BACKGROUND_COMMON_COLORS = [
   "#80d6ff",
 ] as const;
 
-export const DEFAULT_FIELD_STYLE = {
-  borderColor: "#000000",
-  backgroundColor: "#e6f2ff", // Light blue-ish hint by default
-  borderWidth: 1,
-  textColor: "#000000",
-  fontSize: 12,
-  fontFamily: "Helvetica",
-  isTransparent: false,
-};
-
 export const ANNOTATION_STYLES = {
   highlight: {
     color: "#ffce00", // Yellow
@@ -215,18 +209,6 @@ export const ANNOTATION_STYLES = {
   },
 };
 
-export const FONT_FAMILY_MAP: Record<string, string> = {
-  Helvetica: "Helvetica, Arial, sans-serif",
-  "Times Roman": '"Times New Roman", Times, serif',
-  Courier: '"Courier New", Courier, monospace',
-  "Noto Sans SC":
-    '"Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif',
-  "Source Han Serif SC": '"Source Han Serif SC", "Songti SC", "STSong", serif',
-};
-
-export const CJK_FALLBACK_SANS_FONT_KEY = "Noto Sans SC";
-export const CJK_FALLBACK_SERIF_FONT_KEY = "Source Han Serif SC";
-
 export const LEFT_SIDEBAR_MIN_WIDTH_PX = 200;
 export const LEFT_SIDEBAR_MAX_WIDTH_PX = 600;
 
@@ -240,14 +222,3 @@ export const AI_CHAT_PAGE_IMAGE_MAX_DIMENSION = 2048;
 export const AI_CHAT_PAGE_IMAGE_MAX_PIXELS = 2_000_000;
 export const AI_CHAT_PAGE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 export const AI_CHAT_MAX_PAGE_IMAGES_PER_REQUEST = 4;
-
-export const PDF_CUSTOM_KEYS = {
-  placeholder: "FFPlaceholder",
-  cloudSpacing: "FFCloudSpacing",
-  shapeFillOpacity: "FFShapeFillOpacity",
-  arrowSize: "FFArrowSize",
-  startArrowStyle: "FFStartArrowStyle",
-  endArrowStyle: "FFEndArrowStyle",
-  stampSourceSvgData: "FFStampSourceSvgData",
-  stampImageScaleMode: "FFStampImageScaleMode",
-} as const;

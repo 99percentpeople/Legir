@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PDFDocument } from "@legir/pdfium/authoring";
 import { PDFPage as NativePage, PDFRenderTask } from "@legir/pdfium";
-import * as editing from "@/services/pdfService/engine/editingDocument";
-import { getPDFium } from "@/services/pdfService/engine/runtime";
+import * as editing from "@legir/pdf-core/engine/editingDocument";
+import { getPDFium } from "@legir/pdf-core/engine/runtime";
 import { loadPDF, startPdfOpenSession } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import {
   createRenderedPageImageCropper,
   cropRenderedPageImageToDataUrl,
-} from "@/services/pdfService/lib/renderedImageCrop";
+} from "@legir/pdf-core/lib/renderedImageCrop";
 
 const draw = vi.fn();
 const encode = vi.fn();

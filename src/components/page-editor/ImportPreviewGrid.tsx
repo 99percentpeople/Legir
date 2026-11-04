@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { getThumbnailContents } from "@/services/pdfService/thumbnailRenderer";
-import type { ThumbnailContent } from "@/services/pdfService/types";
+import type { ThumbnailContent } from "@legir/pdf-core/types";
 import type { PageData } from "@/types";
 import { useLanguage } from "@/components/language-provider";
 import { Checkbox } from "@/components/ui/checkbox";
