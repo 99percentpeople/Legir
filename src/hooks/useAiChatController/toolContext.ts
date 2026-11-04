@@ -1,3 +1,4 @@
+import { isListBoxField } from "@legir/pdf-model/choiceFields";
 import { paginateAiResults } from "@/services/ai/chat/pagination";
 import type { MutableRefObject } from "react";
 
@@ -104,7 +105,7 @@ const splitMultiselectValue = (value: string | undefined) =>
     .filter(Boolean);
 
 const allowsCustomDropdownValue = (field: FormField) => {
-  if (field.type !== FieldType.DROPDOWN || field.isMultiSelect) return false;
+  if (field.type !== FieldType.DROPDOWN || isListBoxField(field)) return false;
   if (field.allowCustomValue) return true;
 
   const hint = `${field.toolTip || ""}\n${field.name || ""}`.toLowerCase();
@@ -125,6 +126,8 @@ const getAiFormFieldKind = (type: FieldType): AiFormFieldKind => {
       return "radio";
     case FieldType.DROPDOWN:
       return "dropdown";
+    case FieldType.BUTTON:
+      return "button";
     case FieldType.SIGNATURE:
       return "signature";
     case FieldType.TEXT:
@@ -141,6 +144,8 @@ const getFieldTypeFromAiFormFieldKind = (type: AiFormFieldKind): FieldType => {
       return FieldType.RADIO;
     case "dropdown":
       return FieldType.DROPDOWN;
+    case "button":
+      return FieldType.BUTTON;
     case "signature":
       return FieldType.SIGNATURE;
     case "text":
@@ -159,7 +164,11 @@ const getAiFormFieldCurrentValue = (field: FormField) => {
         ? splitMultiselectValue(field.value)
         : (field.value ?? "");
     case FieldType.SIGNATURE:
-      return field.signatureData ? true : false;
+      return !!field.signature?.present;
+    case FieldType.BUTTON:
+      return (
+        field.buttonCaption || !!(field.buttonImage ?? field.buttonIconPreview)
+      );
     case FieldType.TEXT:
     default:
       return field.value ?? "";
@@ -193,7 +202,14 @@ const isAiFormFieldEmpty = (field: FormField) => {
         ? splitMultiselectValue(field.value).length === 0
         : !(field.value || "").trim();
     case FieldType.SIGNATURE:
-      return !field.signatureData;
+      return !field.signature?.present;
+    case FieldType.BUTTON:
+      return !(
+        field.buttonCaption ||
+        (field.buttonImage === null
+          ? undefined
+          : (field.buttonImage ?? field.buttonIconPreview))
+      );
     case FieldType.TEXT:
     default:
       return !(field.value || "").trim();
@@ -327,7 +343,10 @@ export const summarizeFormField = (
   options?: { includeLayout?: boolean },
 ): AiFormFieldSummary => {
   const type = getAiFormFieldKind(field.type);
-  const editable = !field.readOnly && field.type !== FieldType.SIGNATURE;
+  const editable =
+    !field.readOnly &&
+    field.type !== FieldType.SIGNATURE &&
+    field.type !== FieldType.BUTTON;
   const optionValue =
     field.type === FieldType.CHECKBOX || field.type === FieldType.RADIO
       ? (field.radioValue || field.exportValue || "").trim() || undefined
@@ -361,7 +380,9 @@ export const summarizeFormField = (
     unsupportedReason:
       field.type === FieldType.SIGNATURE
         ? "AI signature filling is not supported."
-        : undefined,
+        : field.type === FieldType.BUTTON
+          ? "Use the button image editor; button actions and image filling are not executed by this tool."
+          : undefined,
   };
 };
 
@@ -1506,14 +1527,17 @@ export const createAiChatToolContext = (options: {
         continue;
       }
 
-      if (target.type === FieldType.SIGNATURE) {
+      if (
+        target.type === FieldType.SIGNATURE ||
+        target.type === FieldType.BUTTON
+      ) {
         results.push({
           fieldId: target.id,
           pageNumber: summary.pageNumber,
           name: summary.name,
           type: summary.type,
           status: "rejected",
-          reason: "AI signature filling is not supported.",
+          reason: "AI signature and button-image filling are not supported.",
         });
         continue;
       }
@@ -2046,6 +2070,9 @@ export const createAiChatToolContext = (options: {
           id: `direct_${Date.now()}_${index}`,
           pageIndex,
           type: fieldType,
+          ...(fieldType === FieldType.BUTTON
+            ? { buttonCaption: normalizedName, buttonLayout: 0 as const }
+            : {}),
           name: normalizedName,
           rect: clampFieldRectToPage(page, item.rect),
           required: item.required === true ? true : undefined,

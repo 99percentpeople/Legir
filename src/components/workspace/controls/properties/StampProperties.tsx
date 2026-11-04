@@ -26,6 +26,7 @@ export const StampProperties: React.FC<PropertyPanelProps<Annotation>> = ({
         {t("toolbar.stamp_properties")}
       </h4>
       <StampStyleEditor
+        selectionKey={data.id}
         showDisplayMode
         value={{
           kind: stampKind,

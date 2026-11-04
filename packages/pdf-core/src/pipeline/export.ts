@@ -1,3 +1,5 @@
+import { FieldType } from "@legir/pdf-model";
+import { planFieldTypeReplacements } from "../lib/form-field-types.js";
 import {
   loadEditingDocument,
   saveEditingDocument,
@@ -474,9 +476,22 @@ export const exportPDF = async (
       );
     }
     const existingFields = form?.getFields() ?? [];
+    const replacements =
+      form && shouldSyncFormFields
+        ? planFieldTypeReplacements(form, fields, existingFields)
+        : new Set();
+    const originalFieldNames = new Set(
+      existingFields
+        .filter((field) => !replacements.has(field.ref))
+        .map((field) => field.getName()),
+    );
     for (const field of existingFields) {
       await checkpoint();
       if (!form) break;
+      if (replacements.has(field.ref)) {
+        safeRemovePdfField(form, field);
+        continue;
+      }
       let shouldRemove = false;
       try {
         const typeName = field.constructor.name;
@@ -496,7 +511,13 @@ export const exportPDF = async (
           typeName === "PDFSignature";
         const isButton = field instanceof PDFButton || typeName === "PDFButton";
         const isSupportedExportField =
-          isText || isCheck || isDropdown || isOptionList || isRadio || isSig;
+          isText ||
+          isCheck ||
+          isDropdown ||
+          isOptionList ||
+          isRadio ||
+          isSig ||
+          isButton;
         const isImportedSourceField = fieldMatchesSourcePdfRef(
           field,
           sourceFieldRefKeys,
@@ -514,11 +535,10 @@ export const exportPDF = async (
         }
 
         shouldRemove =
-          (shouldSyncFormFields &&
-            isSupportedExportField &&
-            !isCurrentFieldByName &&
-            !isImportedSourceField) ||
-          (options?.flattenFormFields === true && isButton);
+          shouldSyncFormFields &&
+          isSupportedExportField &&
+          !isCurrentFieldByName &&
+          !isImportedSourceField;
 
         if (shouldRemove) {
           safeRemovePdfField(form, field);
@@ -677,16 +697,18 @@ export const exportPDF = async (
 
         const field = entry.control;
         if (!form) throw new Error("Missing export form for a field control.");
-        const didUpdateExistingField = updateExistingSourceField(
-          form,
-          field,
-          fontMap,
-          {
+        const isNewSpecialWidget =
+          (field.type === FieldType.BUTTON ||
+            field.type === FieldType.SIGNATURE) &&
+          !field.sourcePdfRef &&
+          !originalFieldNames.has(field.name);
+        const didUpdateExistingField =
+          !isNewSpecialWidget &&
+          (await updateExistingSourceField(form, field, fontMap, {
             flattenAppearance: options?.flattenFormFields === true,
             viewport,
             context: formExportContext,
-          },
-        );
+          }));
         if (didUpdateExistingField) continue;
 
         const exporter = controlExporters.find((e) => e.shouldExport(field));
@@ -697,6 +719,11 @@ export const exportPDF = async (
             context: formExportContext,
           });
         } catch (e) {
+          if (
+            field.type === FieldType.BUTTON ||
+            field.type === FieldType.SIGNATURE
+          )
+            throw e;
           console.error(`Failed to export field ${field.name}`, e);
         }
       }

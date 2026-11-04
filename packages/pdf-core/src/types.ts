@@ -88,6 +88,13 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   checkBox?: boolean;
   radioButton?: boolean;
   buttonValue?: string;
+  pushButton?: boolean;
+  buttonCaption?: string;
+  buttonLayout?: FormField["buttonLayout"];
+  buttonImageFit?: FormField["buttonImageFit"];
+  buttonIconPreview?: string;
+  sourceAppearance?: string;
+  signature?: FormField["signature"];
 
   title?: string;
   contents?: string;

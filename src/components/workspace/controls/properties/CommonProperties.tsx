@@ -70,6 +70,9 @@ export const CommonProperties: React.FC<PropertyPanelProps<FormField>> = ({
               <SelectItem value={FieldType.DROPDOWN}>
                 {t("properties.type.dropdown")}
               </SelectItem>
+              <SelectItem value={FieldType.BUTTON}>
+                {t("properties.type.button")}
+              </SelectItem>
               <SelectItem value={FieldType.SIGNATURE}>
                 {t("properties.type.signature")}
               </SelectItem>

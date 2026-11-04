@@ -1,3 +1,4 @@
+import { isListBoxField } from "@legir/pdf-model/choiceFields";
 import { isSerifFamily } from "./text.js";
 import type { PDFFont, PDFForm } from "@legir/pdfium/authoring";
 import { FieldType, type FormField } from "@legir/pdf-model";
@@ -31,8 +32,10 @@ export const pickCjkFontFromMap = (
 };
 
 export const getControlAppearanceTexts = (field: FormField): string[] => [
-  field.value ?? "",
-  ...(field.type === FieldType.DROPDOWN && field.isMultiSelect
+  field.type === FieldType.BUTTON
+    ? (field.buttonCaption ?? "")
+    : (field.value ?? ""),
+  ...(field.type === FieldType.DROPDOWN && isListBoxField(field)
     ? (field.options ?? [])
     : []),
 ];

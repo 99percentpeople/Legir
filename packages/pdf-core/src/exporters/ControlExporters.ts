@@ -1,9 +1,9 @@
+import { isListBoxField } from "@legir/pdf-model/choiceFields";
 import {
   PDFForm,
   PDFName,
   PDFString,
   TextAlignment,
-  degrees,
   type PDFFont,
 } from "@legir/pdfium/authoring";
 import { FormField, FieldType } from "@legir/pdf-model";
@@ -18,10 +18,6 @@ import {
   applyWidgetExportRotation,
   getCommonControlExportOpts,
 } from "../lib/control-export.js";
-import {
-  getInnerSizeFromOuterAabb,
-  getWidgetRotationFromControlRotation,
-} from "@legir/pdf-model/controlRotation";
 import { flattenTextFieldAppearanceProvider } from "../lib/text-field-appearance.js";
 import {
   getOrCreateExportField,
@@ -174,7 +170,7 @@ export class DropdownControlExporter implements IControlExporter {
 
     const fieldFont = pickControlValueFont(field, form, fontMap);
 
-    if (field.isMultiSelect) {
+    if (isListBoxField(field)) {
       const ol = getOrCreateExportField(
         field.name,
         () => form.getOptionList(field.name),
@@ -191,10 +187,13 @@ export class DropdownControlExporter implements IControlExporter {
       const appearanceFont = fieldFont ?? form.getDefaultFont();
       if (field.options) ol.setOptions(field.options);
 
-      ol.enableMultiselect();
+      if (field.isMultiSelect) ol.enableMultiselect();
+      else ol.disableMultiselect();
 
       if (field.value) {
-        const vals = field.value.split("\n").filter((v) => v && v !== "");
+        const vals = field.isMultiSelect
+          ? field.value.split("\n").filter(Boolean)
+          : [field.value];
         try {
           ol.select(vals);
         } catch (e) {
@@ -324,128 +323,4 @@ export class RadioControlExporter implements IControlExporter {
   }
 }
 
-export class SignatureControlExporter implements IControlExporter {
-  shouldExport(field: FormField): boolean {
-    return field.type === FieldType.SIGNATURE;
-  }
-
-  async save(
-    form: PDFForm,
-    field: FormField,
-    fontMap?: Map<string, PDFFont>,
-    viewport?: ViewportLike,
-    options?: ControlExportOptions,
-  ): Promise<void> {
-    const page = form.doc.getPage(field.pageIndex);
-
-    // 1. Handle Image Signature (flattened)
-    if (field.signatureData) {
-      const pdfDoc = form.doc;
-      const imageBytes = await fetch(field.signatureData).then((res) =>
-        res.arrayBuffer(),
-      );
-      let image;
-      if (field.signatureData.startsWith("data:image/png")) {
-        image = await pdfDoc.embedPng(imageBytes);
-      } else {
-        image = await pdfDoc.embedJpg(imageBytes);
-      }
-
-      const imgDims = image.scale(1);
-      const common = getCommonControlExportOpts(field, page, viewport);
-      const boxWidth = common.width;
-      const boxHeight = common.height;
-      const rotationDeg = getWidgetRotationFromControlRotation(
-        viewport?.rotation ?? page.getRotation().angle,
-        field.rotationDeg ?? 0,
-      );
-      const innerBox =
-        rotationDeg === 0
-          ? { width: boxWidth, height: boxHeight }
-          : getInnerSizeFromOuterAabb(
-              { width: boxWidth, height: boxHeight },
-              rotationDeg,
-            );
-
-      let drawWidth = innerBox.width;
-      let drawHeight = innerBox.height;
-
-      const scaleMode = field.imageScaleMode || "contain";
-
-      if (scaleMode === "contain") {
-        const widthRatio = innerBox.width / imgDims.width;
-        const heightRatio = innerBox.height / imgDims.height;
-        const scale = Math.min(widthRatio, heightRatio);
-
-        drawWidth = imgDims.width * scale;
-        drawHeight = imgDims.height * scale;
-      }
-
-      const centerX = common.x + boxWidth / 2;
-      const centerY = common.y + boxHeight / 2;
-      let drawX = centerX - drawWidth / 2;
-      let drawY = centerY - drawHeight / 2;
-
-      if (rotationDeg === 90) {
-        drawX = centerX + drawHeight / 2;
-        drawY = centerY - drawWidth / 2;
-      } else if (rotationDeg === 180) {
-        drawX = centerX + drawWidth / 2;
-        drawY = centerY + drawHeight / 2;
-      } else if (rotationDeg === 270) {
-        drawX = centerX - drawHeight / 2;
-        drawY = centerY + drawWidth / 2;
-      }
-
-      page.drawImage(image, {
-        x: drawX,
-        y: drawY,
-        width: drawWidth,
-        height: drawHeight,
-        rotate: rotationDeg !== 0 ? degrees(rotationDeg) : undefined,
-      });
-      return; // Done
-    }
-
-    // 2. Handle Form Field Signature (widget)
-    const commonOpts = getCommonControlExportOpts(field, page, viewport);
-
-    // Resolve font
-    let fieldFont = fontMap?.get("Helvetica");
-    if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
-      fieldFont = fontMap.get(field.style.fontFamily);
-    }
-
-    const tf = getOrCreateExportField(
-      field.name,
-      () => form.getTextField(field.name),
-      () => form.createTextField(field.name),
-      options?.context,
-    );
-
-    tf.addToPage(page, { ...commonOpts, font: fieldFont });
-    applyWidgetExportRotation(
-      tf.acroField.getWidgets().at(-1),
-      page,
-      field.rotationDeg,
-    );
-    const appearanceFont = fieldFont ?? form.getDefaultFont();
-
-    if (field.toolTip) {
-      tf.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
-    }
-
-    updateExportFieldAppearance(
-      tf,
-      () => {
-        try {
-          tf.updateAppearances(appearanceFont);
-        } catch (e) {
-          console.warn("Failed to update signature appearances", e);
-          return false;
-        }
-      },
-      options?.context,
-    );
-  }
-}
+export { SignatureControlExporter } from "./SignatureControlExporter.js";

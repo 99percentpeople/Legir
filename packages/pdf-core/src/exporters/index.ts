@@ -1,3 +1,4 @@
+import { ButtonControlExporter } from "./ButtonControlExporter.js";
 import type { IAnnotationExporter, IControlExporter } from "../types.js";
 import {
   InkExporter,
@@ -32,4 +33,5 @@ export const controlExporters: IControlExporter[] = [
   new RadioControlExporter(),
   new DropdownControlExporter(),
   new SignatureControlExporter(),
+  new ButtonControlExporter(),
 ];

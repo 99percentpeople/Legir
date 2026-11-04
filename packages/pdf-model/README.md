@@ -16,6 +16,12 @@ layout, font naming and permission helpers. Existing coordinate conventions,
 field names and serialized values are preserved; this extraction is not a data
 migration or a new template schema.
 
+Choice fields keep presentation separate from selection: `FormField.isListBox`
+identifies a list box, while `isMultiSelect` controls how many values it accepts.
+`isListBoxField` from `@legir/pdf-model/choiceFields` also recognizes legacy
+multi-select records without the new property. A single-select list box must not
+be inferred to be a dropdown merely because `isMultiSelect` is false.
+
 Application settings, AI provider types, browser file handles, window state and
 Zustand stores stay in `src/types.ts` and the application. That file re-exports
 the shared document contracts for compatibility. The application constants also

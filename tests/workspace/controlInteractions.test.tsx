@@ -1,3 +1,4 @@
+import { ButtonControl } from "@/components/workspace/controls/form/ButtonControl";
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +10,7 @@ import { ControlWrapper } from "@/components/workspace/controls/ControlWrapper";
 import { HighlightControl } from "@/components/workspace/controls/annotation/HighlightControl";
 import type { FormControlProps } from "@/components/workspace/controls/types";
 import { FieldType } from "@/types";
+import { getFormAppearanceKey } from "@legir/pdf-model/formAppearance";
 import { useEditorPageKeyboardShortcuts } from "@/pages/EditorPage/hooks/useEditorPageKeyboardShortcuts";
 import { EditorViewContext } from "@/store/useEditorView";
 import { createTestEditorStore } from "../helpers/editorStore";
@@ -175,7 +177,59 @@ describe("form control interaction", () => {
     },
   );
 
-  it("does not open the signature file picker for read-only fields", async () => {
+  it("opens the image-button picker only with fill permission and never executes ordinary buttons", async () => {
+    const props = controlProps(FieldType.BUTTON);
+    props.data = { ...props.data, buttonLayout: 1 };
+    const picker = vi
+      .spyOn(HTMLInputElement.prototype, "click")
+      .mockImplementation(() => {});
+    const click = () =>
+      act(async () => {
+        host.querySelector<HTMLElement>('[role="button"]')!.click();
+      });
+    for (const patch of [
+      { data: { ...props.data, readOnly: true } },
+      { canFillFormValue: false },
+      { isSelectable: false },
+      { isFormMode: true, isAnnotationMode: false },
+      { data: { ...props.data, buttonLayout: 0 as const } },
+    ]) {
+      await render(<ButtonControl {...props} {...patch} />);
+      await click();
+      expect(picker).not.toHaveBeenCalled();
+    }
+    await render(<ButtonControl {...props} />);
+    await click();
+    expect(picker).toHaveBeenCalledOnce();
+    expect(props.onUpdate).not.toHaveBeenCalled();
+    await act(async () =>
+      host
+        .querySelector<HTMLElement>('[role="button"]')!
+        .dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        ),
+    );
+    expect(picker).toHaveBeenCalledTimes(2);
+  });
+
+  it("displays the original unsigned signature appearance until its style changes", async () => {
+    const props = controlProps(FieldType.SIGNATURE);
+    props.data.sourceAppearance = "data:image/png;base64,fixture";
+    props.data.sourceAppearanceKey = getFormAppearanceKey(props.data);
+    await render(<SignatureControl {...props} />);
+    expect(host.querySelector("img")?.getAttribute("src")).toBe(
+      props.data.sourceAppearance,
+    );
+    await render(
+      <SignatureControl
+        {...props}
+        data={{ ...props.data, style: { borderColor: "#ff0000" } }}
+      />,
+    );
+    expect(host.querySelector("img")).toBeNull();
+    expect(host.querySelector('input[type="file"]')).toBeNull();
+  });
+  it("never opens an image picker for real signature fields", async () => {
     const props = controlProps(FieldType.SIGNATURE);
     const openPicker = vi
       .spyOn(HTMLInputElement.prototype, "click")
@@ -192,7 +246,8 @@ describe("form control interaction", () => {
 
     await render(<SignatureControl {...props} />);
     await clickField();
-    expect(openPicker).toHaveBeenCalledOnce();
+    expect(openPicker).not.toHaveBeenCalled();
+    expect(host.querySelector('input[type="file"]')).toBeNull();
     expect(props.onUpdate).not.toHaveBeenCalled();
   });
 });
@@ -301,5 +356,46 @@ describe("control keyboard ownership", () => {
     });
     expect(store.getState().tool).toBe("select");
     expect(store.getState().keys.space).toBe(false);
+  });
+
+  it("leaves keys to an active option sorter even when DOM reordering moves focus to the body", async () => {
+    const data = controlProps(FieldType.TEXT).data;
+    const store = createTestEditorStore({
+      tool: "select",
+      mode: "form",
+      fields: [data],
+      selectedId: data.id,
+    });
+    function KeyboardProbe() {
+      useEditorPageKeyboardShortcuts({
+        defaultTool: "select",
+        isPdfSearchOpen: false,
+        openPdfSearch: vi.fn(),
+        closePdfSearch: vi.fn(),
+        runPrimarySaveAction: async () => true,
+        onPrint: vi.fn(),
+        onToggleFullscreen: vi.fn(),
+      });
+      return <div data-app-keyboard-dragging="true" />;
+    }
+    await render(
+      <EditorViewContext.Provider value={store}>
+        <KeyboardProbe />
+      </EditorViewContext.Provider>,
+    );
+    for (const key of [" ", "ArrowUp", "Delete"]) {
+      const event = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => {
+        document.body.dispatchEvent(event);
+      });
+      expect(event.defaultPrevented).toBe(false);
+      expect(store.getState().tool).toBe("select");
+      expect(store.getState().keys.space).toBe(false);
+      expect(store.getState().fields).toEqual([data]);
+    }
   });
 });

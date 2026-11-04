@@ -6,6 +6,7 @@ export enum FieldType {
   CHECKBOX = "Checkbox",
   RADIO = "Radio",
   DROPDOWN = "Dropdown",
+  BUTTON = "Button",
   SIGNATURE = "Signature",
 }
 
@@ -27,6 +28,7 @@ export type Tool =
   | "draw_checkbox"
   | "draw_radio"
   | "draw_dropdown"
+  | "draw_button"
   | "draw_signature"
   // Annotation Tools
   | "draw_highlight"
@@ -76,6 +78,9 @@ export interface FormField {
     height: number;
   };
   required?: boolean;
+  /** PDF choice presentation: list box when true, combo box otherwise.
+   * Legacy models with isMultiSelect=true are also treated as list boxes. */
+  isListBox?: boolean;
   isMultiSelect?: boolean;
   allowCustomValue?: boolean;
   style?: FieldStyle;
@@ -94,9 +99,29 @@ export interface FormField {
   options?: string[]; // For Dropdown
   radioValue?: string; // For Radio Button (legacy/alias for exportValue)
 
-  // Signature specific
-  signatureData?: string; // Base64 image data
-  imageScaleMode?: "contain" | "fill"; // Scaling mode for signature images
+  // Standard pushbutton caption/icon settings (/MK), independent of signature values.
+  buttonCaption?: string;
+  buttonLayout?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** undefined retains the native icon; null explicitly clears it. Only PNG/JPEG data URLs are accepted. */
+  buttonImage?: string | null;
+  buttonImageFit?: {
+    scaleMode: "contain" | "fill";
+    alignment: [number, number];
+    when: "always" | "bigger" | "smaller" | "never";
+    fitBounds: boolean;
+  };
+  /** Import-only preview. Export retains the original (possibly vector) icon unless explicitly replaced. */
+  buttonIconPreview?: string;
+  sourceAppearance?: string;
+  sourceAppearanceKey?: string;
+  /** Signature dictionary metadata, NOT a certificate-verification result. Never exported as a new signature. */
+  signature?: {
+    present: boolean;
+    name?: string;
+    reason?: string;
+    location?: string;
+    date?: string;
+  };
 
   // Extended properties
   toolTip?: string;

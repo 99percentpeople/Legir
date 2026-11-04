@@ -970,7 +970,14 @@ const createFormFieldInputSchema = z
   .object({
     page_number: pageNumberSchema,
     name: z.string().trim().min(1),
-    type: z.enum(["text", "checkbox", "radio", "dropdown", "signature"]),
+    type: z.enum([
+      "text",
+      "checkbox",
+      "radio",
+      "dropdown",
+      "button",
+      "signature",
+    ]),
     rect: pageRectArgsSchema,
     required: z.boolean().optional(),
     read_only: z.boolean().optional(),

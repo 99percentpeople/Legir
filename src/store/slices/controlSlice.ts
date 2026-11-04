@@ -203,7 +203,13 @@ export const createControlSlice: EditorStoreSlice<
 
   updateField: (id, updates) => {
     const currentState = get();
-    if (!currentState.fields.some((field) => field.id === id)) return;
+    const originalField = currentState.fields.find((field) => field.id === id);
+    if (
+      !originalField ||
+      (originalField.type === FieldType.SIGNATURE &&
+        originalField.signature?.present)
+    )
+      return;
     if (
       !canUpdateFormFieldWithPdfPermissions(
         currentState.documentPermissions,
@@ -335,8 +341,10 @@ export const createControlSlice: EditorStoreSlice<
           return { value: targetField.defaultValue ?? "" };
         case FieldType.CHECKBOX:
           return { isChecked: !!targetField.isDefaultChecked };
+        case FieldType.BUTTON:
+          return { buttonImage: undefined };
         case FieldType.SIGNATURE:
-          return { signatureData: undefined };
+          return {};
         default:
           return {};
       }
@@ -631,7 +639,13 @@ export const createControlSlice: EditorStoreSlice<
   deleteSelection: () => {
     const selectedId = get().selectedId;
     if (!selectedId) return;
-    const isField = get().fields.some((field) => field.id === selectedId);
+    const selectedField = get().fields.find((field) => field.id === selectedId);
+    if (
+      selectedField?.type === FieldType.SIGNATURE &&
+      selectedField.signature?.present
+    )
+      return;
+    const isField = !!selectedField;
     const isAnnotation = get().annotations.some(
       (annotation) => annotation.id === selectedId,
     );

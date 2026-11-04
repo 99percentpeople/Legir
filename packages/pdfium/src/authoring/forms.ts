@@ -31,6 +31,16 @@ import {
   setStrokingColor,
 } from "./operators.js";
 import type { PDFDocument, PDFPage } from "./document.js";
+import type { PDFImage } from "./images.js";
+import {
+  readButtonLayout,
+  readButtonImageFit,
+  writeButtonAppearance,
+  type PDFButtonLayout,
+  type PDFButtonImageFit,
+} from "./buttonAppearance.js";
+export type { PDFButtonLayout, PDFButtonImageFit } from "./buttonAppearance.js";
+export { getButtonIconBounds } from "./buttonAppearance.js";
 const key = PDFName.of;
 function inherited(dict: PDFDict, name: string): PDFObject | undefined {
   const seen = new Set<PDFDict>();
@@ -899,19 +909,160 @@ export class PDFOptionList extends PDFChoiceField {
   }
 }
 export class PDFButton extends PDFField {
+  private widgets(widget?: PDFWidgetAnnotation) {
+    return widget ? [widget] : this.acroField.getWidgets();
+  }
+  getCaption(widget = this.acroField.getWidgets()[0]) {
+    return widget
+      ? (stringValue(
+          widget.getAppearanceCharacteristics()?.dict.lookup(key("CA")),
+        ) ?? "")
+      : "";
+  }
+  setCaption(caption: string, widget?: PDFWidgetAnnotation) {
+    for (const w of this.widgets(widget))
+      w.getOrCreateAppearanceCharacteristics().setCaptions({ normal: caption });
+    this.doc.getForm().markFieldAsDirty(this.ref);
+  }
+  getLayout(widget = this.acroField.getWidgets()[0]): PDFButtonLayout {
+    return widget ? readButtonLayout(widget) : 0;
+  }
+  setLayout(layout: PDFButtonLayout, widget?: PDFWidgetAnnotation) {
+    if (!Number.isInteger(layout) || layout < 0 || layout > 6)
+      throw new Error("Invalid button layout");
+    for (const w of this.widgets(widget))
+      w.getOrCreateAppearanceCharacteristics().dict.set(
+        key("TP"),
+        PDFNumber.of(layout),
+      );
+    this.doc.getForm().markFieldAsDirty(this.ref);
+  }
+  getIcon(widget = this.acroField.getWidgets()[0]) {
+    const icon = widget?.getAppearanceCharacteristics()?.dict.lookup(key("I"));
+    return icon instanceof PDFStream ? icon : undefined;
+  }
+  getImageFit(widget = this.acroField.getWidgets()[0]): PDFButtonImageFit {
+    return widget
+      ? readButtonImageFit(widget)
+      : {
+          scaleMode: "contain",
+          alignment: [0.5, 0.5],
+          when: "always",
+          fitBounds: false,
+        };
+  }
+  setImageFit(fit: Partial<PDFButtonImageFit>, widget?: PDFWidgetAnnotation) {
+    if (
+      fit.alignment &&
+      (fit.alignment.length !== 2 ||
+        fit.alignment.some((v) => !Number.isFinite(v) || v < 0 || v > 1))
+    )
+      throw new Error("Button icon alignment must be between zero and one");
+    for (const w of this.widgets(widget)) {
+      const mk = w.getOrCreateAppearanceCharacteristics().dict;
+      let dict = mk.lookupMaybe(key("IF"), PDFDict);
+      if (!dict) {
+        dict = this.doc.context.obj({});
+        mk.set(key("IF"), dict);
+      }
+      if (fit.scaleMode)
+        dict.set(key("S"), key(fit.scaleMode === "fill" ? "A" : "P"));
+      if (fit.alignment)
+        dict.set(key("A"), this.doc.context.obj(fit.alignment));
+      if (fit.when)
+        dict.set(
+          key("SW"),
+          key({ always: "A", bigger: "B", smaller: "S", never: "N" }[fit.when]),
+        );
+      if (fit.fitBounds !== undefined)
+        dict.set(key("FB"), this.doc.context.obj(fit.fitBounds));
+    }
+    this.doc.getForm().markFieldAsDirty(this.ref);
+  }
+  /** Uses a standard Form XObject icon, not a nonstandard image field or page overlay. */
+  setImage(image: PDFImage | undefined, widget?: PDFWidgetAnnotation) {
+    const icon =
+      image &&
+      this.doc.context.register(
+        this.doc.context.formXObject(
+          [
+            op("q"),
+            op("cm", image.width, 0, 0, image.height, 0, 0),
+            op("Do", key("Image")),
+            op("Q"),
+          ],
+          {
+            BBox: [0, 0, image.width, image.height],
+            Resources: { XObject: { Image: image.ref } },
+          },
+        ),
+      );
+    for (const w of this.widgets(widget)) {
+      const mk = w.getOrCreateAppearanceCharacteristics().dict;
+      if (icon) mk.set(key("I"), icon);
+      else mk.delete(key("I"));
+    }
+    this.doc.getForm().markFieldAsDirty(this.ref);
+  }
   addToPage(caption: string, page: PDFPage, options: FieldOptions = {}) {
     const widget = this.widget(page, options);
-    widget
-      .getOrCreateAppearanceCharacteristics()
-      .setCaptions({ normal: caption });
-    const proxy = new PDFTextField(this.acroField.dict, this.ref, this.doc);
-    proxy.getText = () => caption;
-    proxy.updateAppearances(
+    this.setCaption(caption, widget);
+    this.updateWidgetAppearance(
+      widget,
       options.font ?? this.doc.getForm().getDefaultFont(),
     );
   }
+  updateWidgetAppearance(
+    widget: PDFWidgetAnnotation,
+    font = this.doc.getForm().getDefaultFont(),
+  ) {
+    writeButtonAppearance(
+      this,
+      widget,
+      font,
+      this.getCaption(widget),
+      this.getLayout(widget),
+    );
+    this.doc.getForm().registerFont(font);
+    this.doc.getForm().markFieldAsClean(this.ref);
+  }
+  updateAppearances(font = this.doc.getForm().getDefaultFont()) {
+    for (const widget of this.acroField.getWidgets())
+      this.updateWidgetAppearance(widget, font);
+  }
 }
-export class PDFSignature extends PDFField {}
+export class PDFSignature extends PDFField {
+  /** Detects a signature value; deliberately does not assert certificate validity. */
+  getSignatureInfo() {
+    const value = inherited(this.acroField.dict, "V");
+    if (!(value instanceof PDFDict)) return undefined;
+    return {
+      present: true as const,
+      name: stringValue(value.lookup(key("Name"))),
+      reason: stringValue(value.lookup(key("Reason"))),
+      location: stringValue(value.lookup(key("Location"))),
+      date: stringValue(value.lookup(key("M"))),
+    };
+  }
+  addToPage(page: PDFPage, options: FieldOptions = {}) {
+    if (this.getSignatureInfo())
+      throw new Error("Cannot add a widget to a populated signature field");
+    const widget = this.widget(page, options);
+    this.updateWidgetAppearance(widget);
+  }
+  needsAppearancesUpdate() {
+    return !this.getSignatureInfo() && super.needsAppearancesUpdate();
+  }
+  updateWidgetAppearance(widget: PDFWidgetAnnotation) {
+    // A cryptographic signature appearance is owned by its signer, never rebuilt from a string.
+    if (!this.getSignatureInfo()) writeButtonAppearance(this, widget);
+    this.doc.getForm().markFieldAsClean(this.ref);
+  }
+  updateAppearances() {
+    for (const widget of this.acroField.getWidgets())
+      this.updateWidgetAppearance(widget);
+  }
+}
 export class PDFForm {
   readonly acroForm: {
     dict: PDFDict;
@@ -1081,6 +1232,9 @@ export class PDFForm {
   }
   createButton(name: string) {
     return this.create(name, PDFButton, "Btn", 1 << 16);
+  }
+  createSignature(name: string) {
+    return this.create(name, PDFSignature, "Sig");
   }
   getDefaultFont() {
     return (this.defaultFont ??= this.doc.embedStandardFont(

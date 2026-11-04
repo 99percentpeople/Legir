@@ -171,7 +171,7 @@ export const isFormFieldValueUpdate = (
   const keys = Object.keys(updates);
   if (keys.length === 0) return false;
   return keys.every((key) =>
-    ["value", "isChecked", "signatureData"].includes(key),
+    ["value", "isChecked", "buttonImage"].includes(key),
   );
 };
 

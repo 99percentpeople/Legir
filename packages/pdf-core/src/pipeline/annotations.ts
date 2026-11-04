@@ -1,4 +1,13 @@
 import {
+  PDFButton,
+  PDFSignature,
+  PDFWidgetAnnotation,
+} from "@legir/pdfium/authoring";
+import {
+  renderButtonIcon,
+  renderWidgetAppearance,
+} from "../engine/widgetAppearance.js";
+import {
   buildFullFieldNameFromChain,
   collectFieldFlagsFromChain,
   createPdfStreamTextReader,
@@ -546,7 +555,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
         const isPushButton = (fieldFlags & (1 << 16)) !== 0;
         const isBtn = fieldType === "Btn";
         const checkBox = isBtn && !isRadio && !isPushButton;
-        const radioButton = isBtn && isRadio;
+        const radioButton = isBtn && isRadio && !isPushButton;
 
         const buttonValue = isBtn ? extractWidgetOnValue(annot) : undefined;
         const rawWidgetRotation = (() => {
@@ -580,7 +589,58 @@ export const buildPdfLibAnnotsByPageIndex = async (
           rawWidgetRotation ?? 0,
         );
 
+        const special: Partial<PdfJsAnnotation> = {};
+        if ((isBtn && isPushButton) || fieldType === "Sig") {
+          const widget = PDFWidgetAnnotation.fromDict(annot);
+          const ref = sourcePdfRef
+            ? PDFRef.of(
+                sourcePdfRef.objectNumber,
+                sourcePdfRef.generationNumber,
+              )
+            : undefined;
+          if (isBtn && isPushButton) {
+            const button = new PDFButton(annot, ref ?? PDFRef.of(0), pdfDoc);
+            special.pushButton = true;
+            special.buttonCaption = button.getCaption(widget);
+            special.buttonLayout = button.getLayout(widget);
+            special.buttonImageFit = button.getImageFit(widget);
+            const icon = button.getIcon(widget);
+            if (icon)
+              try {
+                special.buttonIconPreview = await renderButtonIcon(
+                  pdfDoc,
+                  pageIndex,
+                  icon,
+                );
+              } catch (error) {
+                pdfDebug("import:controls", "buttonIconPreviewFailed", () => ({
+                  fieldName,
+                  error,
+                }));
+              }
+          } else
+            special.signature = new PDFSignature(
+              annot,
+              ref ?? PDFRef.of(0),
+              pdfDoc,
+            ).getSignatureInfo();
+          if (ref)
+            try {
+              special.sourceAppearance = await renderWidgetAppearance(
+                pdfDoc,
+                pageIndex,
+                widget,
+                ref,
+              );
+            } catch (error) {
+              pdfDebug("import:controls", "widgetPreviewFailed", () => ({
+                fieldName,
+                error,
+              }));
+            }
+        }
         pushForPage({
+          ...special,
           subtype: "Widget",
           rect,
           sourcePdfRef,

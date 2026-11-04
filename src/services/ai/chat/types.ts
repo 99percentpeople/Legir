@@ -485,6 +485,7 @@ export type AiFormFieldKind =
   | "checkbox"
   | "radio"
   | "dropdown"
+  | "button"
   | "signature";
 
 export type AiFormFieldValue = string | string[] | boolean | null;

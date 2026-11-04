@@ -813,8 +813,14 @@ EMSCRIPTEN_KEEPALIVE void LPDF_End(Document *doc, int rollback) {
     for (auto it = doc->undo.rbegin(); it != doc->undo.rend(); ++it)
       (*it)();
     const auto last = doc->core()->GetLastObjNum();
-    for (auto n = doc->first_new_object; n <= last; n++)
+    for (auto n = doc->first_new_object; n <= last; n++) {
+      // Temporary preview images are cached by object number, unlike resources
+      // keyed by retained dictionaries. Drop released images before rollback
+      // recycles those numbers for an unrelated image or a non-image object.
+      // Render jobs/pages must already be closed by the transaction owner.
+      doc->core()->GetPageData()->MaybePurgeImage(n);
       doc->core()->DeleteIndirectObject(n);
+    }
     doc->core()->SetLastObjNum(doc->first_new_object - 1);
     doc->modified = std::move(doc->modified_before);
     doc->replaced = std::move(doc->replaced_before);

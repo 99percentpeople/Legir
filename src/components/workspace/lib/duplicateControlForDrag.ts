@@ -1,3 +1,4 @@
+import { detachFormFieldSource } from "@legir/pdf-model/formAppearance";
 import { Annotation, FieldType, FormField } from "@/types";
 import { cloneAnnotationReplies } from "@legir/pdf-model/annotationReplies";
 
@@ -23,7 +24,7 @@ const getDuplicatedFieldName = (field: FormField) => {
 };
 
 export const duplicateFieldForDrag = (field: FormField): FormField => ({
-  ...field,
+  ...detachFormFieldSource(field),
   id: createDuplicateId("field"),
   name: getDuplicatedFieldName(field),
   // Keep radio groups aligned while avoiding an immediate duplicate selection.

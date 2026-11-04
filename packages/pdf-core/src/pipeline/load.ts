@@ -48,6 +48,7 @@ import {
   RadioControlParser,
   DropdownControlParser,
   SignatureControlParser,
+  ButtonControlParser,
 } from "../parsers/ControlParsers.js";
 import { createPdfLibViewport, pdfJsRectToUiRect } from "../lib/coords.js";
 import {
@@ -94,6 +95,7 @@ export const controlParsers: IControlParser[] = [
   new RadioControlParser(),
   new DropdownControlParser(),
   new SignatureControlParser(),
+  new ButtonControlParser(),
 ];
 
 export const STAMP_RENDER_FALLBACK_SCALE = 2;

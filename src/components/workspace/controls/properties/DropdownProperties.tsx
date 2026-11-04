@@ -14,16 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Database,
-  MousePointer2,
-  Save,
-  ArrowUp,
-  ArrowDown,
-  Plus,
-  Minus,
-} from "lucide-react";
+import { Database, MousePointer2, Save, Plus } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
+import { isListBoxField } from "@legir/pdf-model/choiceFields";
+import { ChoiceOptionsList } from "./ChoiceOptionsList";
 
 export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,
@@ -32,6 +26,7 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
 }) => {
   const { t } = useLanguage();
   const idPrefix = React.useId();
+  const listBox = isListBoxField(data);
   const [newOption, setNewOption] = useState("");
   const [isBulkEdit, setIsBulkEdit] = useState(false);
   const [bulkText, setBulkText] = useState("");
@@ -49,23 +44,6 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
     onTriggerHistorySave();
     const currentOptions = data.options || [];
     onChange({ options: currentOptions.filter((_, i) => i !== idx) });
-  };
-
-  const handleMoveOption = (index: number, direction: "up" | "down") => {
-    onTriggerHistorySave();
-    const currentOptions = [...(data.options || [])];
-    if (direction === "up" && index > 0) {
-      [currentOptions[index], currentOptions[index - 1]] = [
-        currentOptions[index - 1],
-        currentOptions[index],
-      ];
-    } else if (direction === "down" && index < currentOptions.length - 1) {
-      [currentOptions[index], currentOptions[index + 1]] = [
-        currentOptions[index + 1],
-        currentOptions[index],
-      ];
-    }
-    onChange({ options: currentOptions });
   };
 
   const startBulkEdit = () => {
@@ -92,6 +70,47 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
           {t("properties.values_defaults")}
         </h4>
         <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-choice-display`}>
+              {t("properties.choice_display")}
+            </Label>
+            <Select
+              value={listBox ? "listbox" : "dropdown"}
+              onValueChange={(value) => {
+                const isListBox = value === "listbox";
+                onTriggerHistorySave();
+                onChange({
+                  isListBox,
+                  ...(isListBox
+                    ? { allowCustomValue: false }
+                    : {
+                        isMultiSelect: false,
+                        value: data.isMultiSelect
+                          ? (data.value ?? "").split("\n")[0]
+                          : data.value,
+                        defaultValue: data.isMultiSelect
+                          ? (data.defaultValue ?? "").split("\n")[0]
+                          : data.defaultValue,
+                      }),
+                });
+              }}
+            >
+              <SelectTrigger
+                id={`${idPrefix}-choice-display`}
+                className="w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dropdown">
+                  {t("properties.choice_dropdown")}
+                </SelectItem>
+                <SelectItem value="listbox">
+                  {t("properties.choice_listbox")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center justify-between">
             <Label
               htmlFor={`${idPrefix}-multiselect-switch`}
@@ -102,14 +121,16 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
             <Switch
               id={`${idPrefix}-multiselect-switch`}
               checked={data.isMultiSelect || false}
-              onMouseDown={onTriggerHistorySave}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked) => {
+                onTriggerHistorySave();
                 onChange({
+                  isListBox: listBox || checked,
                   isMultiSelect: checked,
-                  value: "",
-                  defaultValue: "",
-                })
-              }
+                  ...(checked ? { allowCustomValue: false } : {}),
+                  value: (data.value ?? "").split("\n")[0],
+                  defaultValue: (data.defaultValue ?? "").split("\n")[0],
+                });
+              }}
             />
           </div>
 
@@ -267,42 +288,15 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
           </div>
         ) : (
           <>
-            <div className="scrollbar-thumb-border mb-2 max-h-40 scrollbar-thin space-y-2 overflow-y-auto pr-1">
-              {(data.options || []).map((opt, idx) => (
-                <div key={idx} className="group flex items-center gap-1">
-                  <div className="text-muted-foreground flex flex-col gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      onClick={() => handleMoveOption(idx, "up")}
-                      disabled={idx === 0}
-                      className="hover:text-foreground disabled:opacity-30"
-                    >
-                      <ArrowUp size={10} />
-                    </button>
-                    <button
-                      onClick={() => handleMoveOption(idx, "down")}
-                      disabled={idx === (data.options?.length || 0) - 1}
-                      className="hover:text-foreground disabled:opacity-30"
-                    >
-                      <ArrowDown size={10} />
-                    </button>
-                  </div>
-                  <div className="bg-muted/50 border-border flex-1 truncate rounded border px-2 py-1.5 text-sm">
-                    {opt}
-                  </div>
-                  <button
-                    onClick={() => handleRemoveOption(idx)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded p-1.5 opacity-0 transition-opacity group-hover:opacity-100"
-                  >
-                    <Minus size={14} />
-                  </button>
-                </div>
-              ))}
-              {(data.options?.length || 0) === 0 && (
-                <div className="text-muted-foreground py-2 text-center text-xs italic">
-                  {t("properties.no_options")}
-                </div>
-              )}
-            </div>
+            <ChoiceOptionsList
+              key={data.id}
+              options={data.options ?? []}
+              onRemove={handleRemoveOption}
+              onReorder={(options) => {
+                onTriggerHistorySave();
+                onChange({ options });
+              }}
+            />
             <div className="flex gap-2">
               <Input
                 type="text"

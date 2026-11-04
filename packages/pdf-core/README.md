@@ -42,6 +42,50 @@ fonts. It is not a general PDF sanitization or digital-signature service.
 Unknown image-stamp fallback parsing can require a browser image/canvas host;
 the callback above intentionally supplies no raster stamp fallback.
 
+## List boxes and dropdowns
+
+Choice controls share `FieldType.DROPDOWN`, but `isListBox` preserves the PDF
+`/Combo` distinction independently of `isMultiSelect`. Import, export, field-type
+conversion and font selection support both single- and multi-select lists.
+Reordering options retains the selected values and rewrites their `/I` indexes;
+clearing a list removes its selection rather than restoring an old `/V`.
+
+## Button images and real signature fields
+
+`FieldType.BUTTON` represents a standard AcroForm pushbutton, not a page image
+or a signature. Its `buttonCaption`, `buttonLayout` (standard `/MK /TP` values
+0–6) and `buttonImageFit` configure caption/icon presentation. Set `buttonImage`
+to a PNG/JPEG data URL to replace the icon, `null` to clear it, or leave it
+`undefined` to retain the original native icon. File data is validated before
+pixel decoding (20 MiB and 32 megapixels); no external image URLs are fetched.
+The shared validators live in `@legir/pdf-model/buttonImage`.
+
+Imported `buttonIconPreview` and `sourceAppearance` are bounded native-rendered
+previews, not replacement assets. A no-op save or move retains the original
+appearance and icon (including vectors) and action dictionaries. The library
+never executes embedded button JavaScript. Copying a control into another
+source-independent document promotes the icon preview to portable PNG data;
+page imports retain the native objects through the existing graft mechanism.
+Button images and captions are painted into the page when fields are flattened,
+rather than being deleted as unsupported buttons.
+
+`FieldType.SIGNATURE` now creates and edits a real unsigned `/FT /Sig` field.
+It has no image-upload value and does not synthesize `/V`. Custom unsigned
+signature appearances survive no-op saves and moves; editing one widget does
+not regenerate other widgets belonging to the same field. Import-only
+`signature` metadata reports a dictionary's **presence**, not cryptographic
+validity. Existing populated signature widgets/appearances are not regenerated,
+and converting them to another field type is rejected. The editor also locks
+such fields against direct alteration/deletion. Other document edits can still
+affect signature validity; flattening removes the signature field and retains
+only its appearance. Certificate signing, validation and timestamp services are
+outside this library's scope.
+
+The former `signatureData`/`imageScaleMode` image-signature model is no longer a
+signature feature. Legir converts legacy image-signature clipboard payloads to
+image buttons. Existing PDFs whose old image signatures were already flattened
+remain ordinary page content; they cannot be recovered as cryptographic signatures.
+
 ## Ownership and concurrency
 
 A `DocumentSession` owns one native document. Parsing and exporting borrow an

@@ -5,6 +5,8 @@ import {
   type PDFFont,
 } from "@legir/pdfium/authoring";
 import type { Annotation } from "@legir/pdf-model";
+import { detachFormFieldSource } from "@legir/pdf-model/formAppearance";
+import { preserveNativeSignature } from "./thumbnailSourceAnnotations.js";
 import type { ThumbnailContent } from "../types.js";
 import { annotationExporters, controlExporters } from "../exporters/index.js";
 import {
@@ -20,7 +22,7 @@ const preserveAppearance = (annotation: Annotation) =>
   annotation.type !== "comment" && canPreserveSourceAnnotation(annotation);
 
 export const hasThumbnailOverlay = (content: ThumbnailContent) =>
-  content.fields.length > 0 ||
+  content.fields.some((field) => !preserveNativeSignature(field)) ||
   content.annotations.some((annotation) => !preserveAppearance(annotation));
 
 /** Reuse save appearances on a tiny, transparent single-page PDF in the render worker.
@@ -40,11 +42,14 @@ export async function drawThumbnailOverlay(
       pageIndex,
       sourcePdfRef: undefined,
     }));
-  const fields = content.fields.map((field) => ({
-    ...field,
-    pageIndex,
-    sourcePdfRef: undefined,
-  }));
+  const fields = content.fields
+    .filter((field) => !preserveNativeSignature(field))
+    .map((field) => ({
+      // A thumbnail uses a temporary form tree. Native button icons must be carried
+      // over as bounded preview pixels; the real export keeps the original XObject.
+      ...detachFormFieldSource(field),
+      pageIndex,
+    }));
   if (!annotations.length && !fields.length) return null;
   const page = pdfDoc.addPage([content.width, content.height]);
   const viewport = createPdfLibViewport(page, { scale: 1 });

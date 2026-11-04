@@ -88,3 +88,63 @@ it("does not generate overlays for untouched native appearances or empty pages",
   snapshot.annotations[0] = { ...snapshot.annotations[0], isEdited: true };
   expect(await createThumbnailOverlay(snapshot)).toBeInstanceOf(Uint8Array);
 });
+
+it("keeps native button icons in regenerated thumbnails after saving and reopening", async () => {
+  const snapshot = content();
+  snapshot.fields = [
+    field("photo", {
+      type: FieldType.BUTTON,
+      rect: { x: 20, y: 20, width: 180, height: 100 },
+      buttonCaption: "Photo",
+      buttonLayout: 2,
+      buttonIconPreview:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAGUlEQVR4nD3BMQEAAAjAILR/5/kJJIi28Q5Y5gT/nBWRrgAAAABJRU5ErkJggg==",
+      sourcePdfRef: { objectNumber: 100, generationNumber: 0 },
+    }),
+  ];
+  const bytes = await createThumbnailOverlay(snapshot);
+  const doc = await PDFDocument.load(bytes!);
+  expect(doc.getForm().getButton("photo").getIcon()).toBeDefined();
+  const page = doc.nativeView!.native.loadPage(0);
+  try {
+    const bitmap = page.toPixmap([1, 0, 0, 1, 0, 0]);
+    try {
+      const pixels = bitmap.getPixels();
+      let blue = 0;
+      for (let i = 0; i < pixels.length; i += 4)
+        if (pixels[i] < 80 && pixels[i + 1] < 80 && pixels[i + 2] > 200) blue++;
+      expect(blue).toBeGreaterThan(100);
+    } finally {
+      bitmap.destroy();
+    }
+  } finally {
+    page.destroy();
+  }
+  expect(snapshot.fields[0].buttonImage).toBeUndefined();
+  snapshot.fields[0] = { ...snapshot.fields[0], buttonImage: null };
+  const cleared = await PDFDocument.load(
+    (await createThumbnailOverlay(snapshot))!,
+  );
+  expect(cleared.getForm().getButton("photo").getIcon()).toBeUndefined();
+});
+
+it("uses populated signature source appearances rather than constructing blank replacement fields in thumbnails", async () => {
+  const snapshot = content();
+  snapshot.fields = [
+    field("signed", {
+      type: FieldType.SIGNATURE,
+      signature: { present: true },
+      sourcePdfRef: { objectNumber: 42, generationNumber: 0 },
+    }),
+  ];
+  expect([...getThumbnailSourceAnnotations(snapshot)]).toEqual([42]);
+  expect(await createThumbnailOverlay(snapshot)).toBeNull();
+  snapshot.fields.push(field("unsigned", { type: FieldType.SIGNATURE }));
+  const doc = await PDFDocument.load((await createThumbnailOverlay(snapshot))!);
+  expect(
+    doc
+      .getForm()
+      .getFields()
+      .map((f) => f.getName()),
+  ).toEqual(["unsigned"]);
+});

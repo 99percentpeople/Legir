@@ -26,7 +26,7 @@ export const prepareExportFonts = async (args: {
     if (
       field.type !== FieldType.TEXT &&
       field.type !== FieldType.DROPDOWN &&
-      !(field.type === FieldType.SIGNATURE && !field.signatureData)
+      field.type !== FieldType.BUTTON
     )
       continue;
     requests.push({

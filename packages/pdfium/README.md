@@ -59,8 +59,11 @@ its own assets. A host should serialize document jobs in one worker.
   strings or `newByteString` for exact bytes.
 - `beginOperation`, `endOperation` and `abandonOperation` implement one active
   transaction per document. Rollback covers edited dictionaries, arrays,
-  streams, new objects and native annotation appearance generation. Release
-  cached pages and obtain fresh views after mutations or a rollback of mutations.
+  streams, new objects and native annotation appearance generation. Close active
+  render jobs/pages before rolling back a rendered edit; rollback purges released
+  temporary images before reusing their object numbers, without clearing the
+  original document's image cache. Release cached pages and obtain fresh views
+  after mutations or a rollback of mutations.
   `operationHasChanges()` reports journaled writes/new objects in the active
   transaction, so hosts can retain render pages after a read-only operation.
   A true result is conservative; it does not identify individual dirty pages.
@@ -172,6 +175,31 @@ masks and gradient paints are rejected so callers can supply a raster appearance
 this is not a general browser SVG renderer. Custom fonts require a supplied
 font shaper/subsetter; the package does not fetch fonts or embed a second PDF
 engine. `fast-png` and `@xmldom/xmldom` are image/XML codecs only.
+
+## Pushbuttons and signature fields
+
+`PDFForm.createButton(name)` creates a standard `/FT /Btn` pushbutton. Add its
+widget first with `button.addToPage(caption, page, options)`, then use
+`setCaption`, `setLayout`, `setImage` and `setImageFit`. The optional widget
+argument targets one widget when a field occurs more than once. `getIcon`
+returns the original Form XObject; `setImage(image)` wraps an embedded PNG/JPEG
+in a Form XObject and stores it in `/MK /I`. Passing `undefined` to `setImage`
+clears the icon. `updateWidgetAppearance` and `updateAppearances` write normal
+appearance streams; they never execute or create PDF actions.
+
+Layout values are the standard `/MK /TP` values: `0` label, `1` icon, `2` icon
+above label, `3` label above icon, `4` icon left of label, `5` label left of icon,
+and `6` label over icon. Image fitting supports proportional/anamorphic scaling,
+when-to-scale, alignment and fit-to-bounds through `/MK /IF`.
+
+`PDFForm.createSignature(name)` followed by `signature.addToPage(page, options)`
+creates a genuine **unsigned** `/FT /Sig` field, with no `/V`. It does not stamp a
+picture, generate CMS data, manage private keys or validate certificates.
+`getSignatureInfo()` reports whether a signature dictionary is present and its
+declared name/reason/location/time. Presence is **not** a verification result.
+Existing populated signature appearances are never regenerated. Editing a signed
+PDF may affect signature validation; flattening retains visible appearance only,
+not a verifiable signature field.
 
 ## Build
 

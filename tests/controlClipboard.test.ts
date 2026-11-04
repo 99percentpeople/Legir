@@ -55,7 +55,7 @@ describe("control clipboard across documents", () => {
         options: ["filled", "other"],
         radioValue: "yes",
         exportValue: "yes",
-        signatureData: "data:image/png;base64,c2lnbmF0dXJl",
+        buttonImage: "data:image/png;base64,c2lnbmF0dXJl",
         style: { fontSize: 18, textColor: "#ff0000" },
         sourcePdfRef: { objectNumber: 6, generationNumber: 0 },
       });

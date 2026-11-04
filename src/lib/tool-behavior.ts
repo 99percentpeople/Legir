@@ -18,6 +18,7 @@ const TOOL_BEHAVIORS: Record<Tool, ToolBehavior> = {
   draw_checkbox: { isContinuous: false },
   draw_radio: { isContinuous: false },
   draw_dropdown: { isContinuous: false },
+  draw_button: { isContinuous: false },
   draw_signature: { isContinuous: false },
   draw_ink: { isContinuous: true },
   draw_highlight: { isContinuous: true, textLayerSelection: "always" },

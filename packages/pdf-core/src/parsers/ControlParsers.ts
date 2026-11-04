@@ -1,3 +1,4 @@
+import { getFormAppearanceKey } from "@legir/pdf-model/formAppearance";
 import { FormField, FieldType } from "@legir/pdf-model";
 import { IControlParser, ParserContext, ViewportLike } from "../types.js";
 import {
@@ -309,6 +310,7 @@ export class DropdownControlParser implements IControlParser {
               ? annotation.fieldValue
               : undefined,
           options: options,
+          isListBox: !(fieldFlags & (1 << 17)),
           isMultiSelect: isMultiSelect,
           allowCustomValue: allowCustomValue,
           alignment: alignment,
@@ -362,11 +364,13 @@ export class SignatureControlParser implements IControlParser {
         );
         const fieldFlags = annotation.fieldFlags ?? 0;
 
-        fields.push({
+        const field: FormField = {
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
           pageIndex: pageIndex,
           layerOrder: index,
           type: FieldType.SIGNATURE,
+          signature: annotation.signature,
+          sourceAppearance: annotation.sourceAppearance,
           name: annotation.fieldName,
           sourcePdfRef: annotation.sourcePdfRef,
           rect: { x, y, width, height },
@@ -379,9 +383,55 @@ export class SignatureControlParser implements IControlParser {
             Number.isFinite(annotation.rotation)
               ? annotation.rotation
               : undefined,
-        });
+        };
+        field.sourceAppearanceKey = getFormAppearanceKey(field);
+        fields.push(field);
       }
     });
     return fields;
+  }
+}
+
+export class ButtonControlParser implements IControlParser {
+  parse(context: ParserContext): FormField[] {
+    const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
+    const { fontMap, globalDA } = getStyleParsingResources(context);
+    return pageAnnotations.flatMap((annotation, index) => {
+      if (
+        annotation.subtype !== "Widget" ||
+        !annotation.fieldName ||
+        annotation.fieldType !== "Btn" ||
+        !annotation.pushButton
+      )
+        return [];
+      const { style } = parseFieldStyle(
+        annotation,
+        pdfDoc,
+        fontMap,
+        globalDA,
+        context.systemFontFamilies,
+      );
+      const field: FormField = {
+        id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
+        pageIndex,
+        layerOrder: index,
+        type: FieldType.BUTTON,
+        name: annotation.fieldName,
+        sourcePdfRef: annotation.sourcePdfRef,
+        rect: pdfJsWidgetRectToUiRect(annotation.rect, viewport),
+        style,
+        required: !!((annotation.fieldFlags ?? 0) & 2),
+        readOnly: !!((annotation.fieldFlags ?? 0) & 1),
+        toolTip: annotation.alternativeText,
+        rotationDeg: annotation.rotation,
+        buttonCaption: annotation.buttonCaption ?? "",
+        buttonLayout: annotation.buttonLayout ?? 0,
+        buttonImageFit: annotation.buttonImageFit,
+        buttonIconPreview: annotation.buttonIconPreview,
+        sourceAppearance: annotation.sourceAppearance,
+      };
+      field.sourceAppearanceKey = getFormAppearanceKey(field);
+      return [field];
+    });
   }
 }

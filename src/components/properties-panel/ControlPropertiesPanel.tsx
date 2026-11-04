@@ -1,5 +1,5 @@
 import React from "react";
-import { FormField, Annotation } from "@/types";
+import { FormField, Annotation, FieldType } from "@/types";
 import { SlidersHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -39,12 +39,19 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
     onCollapse,
     isFloating,
     onTriggerHistorySave,
-    canEdit,
+    canEdit: hostCanEdit,
     restrictedTitle,
     width,
     onResize,
   }) => {
     const { t } = useLanguage();
+    const canEdit =
+      hostCanEdit &&
+      !(
+        data.type === FieldType.SIGNATURE &&
+        "signature" in data &&
+        data.signature?.present
+      );
 
     const controlConfig = React.useMemo(
       () => registry.get(data.type),

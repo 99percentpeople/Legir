@@ -1,5 +1,6 @@
 import {
   CheckSquare,
+  RectangleHorizontal,
   CircleDot,
   Eraser,
   Hand,
@@ -54,6 +55,11 @@ export const TOOL_DEFINITIONS: Record<Tool, ToolDefinition> = {
   },
   draw_radio: { Icon: CircleDot, labelKey: "toolbar.radio", style: "none" },
   draw_dropdown: { Icon: List, labelKey: "toolbar.dropdown", style: "none" },
+  draw_button: {
+    Icon: RectangleHorizontal,
+    labelKey: "toolbar.button",
+    style: "none",
+  },
   draw_signature: {
     Icon: PenLine,
     labelKey: "toolbar.signature",
@@ -102,6 +108,7 @@ export const FORM_TOOLS: Tool[] = [
   "draw_checkbox",
   "draw_radio",
   "draw_dropdown",
+  "draw_button",
   "draw_signature",
 ];
 

@@ -123,7 +123,9 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </div>
 
         {/* Text Settings (For Text and Dropdown) */}
-        {(data.type === FieldType.TEXT || data.type === FieldType.DROPDOWN) && (
+        {(data.type === FieldType.TEXT ||
+          data.type === FieldType.DROPDOWN ||
+          data.type === FieldType.BUTTON) && (
           <>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

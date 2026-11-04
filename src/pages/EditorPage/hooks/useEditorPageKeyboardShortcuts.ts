@@ -151,10 +151,11 @@ export function useEditorPageKeyboardShortcuts({
 
       // The DnD sensor owns keyboard input until the preview ends.
       if (
-        currentState.mode === "pages" &&
-        document.querySelector(
-          '[data-editor-active="true"] [data-page-dragging="true"]',
-        )
+        (currentState.mode === "pages" &&
+          document.querySelector(
+            '[data-editor-active="true"] [data-page-dragging="true"]',
+          )) ||
+        document.querySelector('[data-app-keyboard-dragging="true"]')
       )
         return;
 

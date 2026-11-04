@@ -1,3 +1,4 @@
+import { detachFormFieldSource } from "@legir/pdf-model/formAppearance";
 import { cloneAnnotationReplies } from "@legir/pdf-model/annotationReplies";
 import {
   getMovedAnnotationUpdates,
@@ -30,7 +31,9 @@ export function copySelectedControl(
   const annotation = state.annotations.find((item) => item.id === id);
   if (!field && !annotation) return null;
   assertPdfPermissionOperation("copy_text", state.documentPermissions);
-  const data = field ?? prepareInkAnnotationForStore(annotation!);
+  const data = field
+    ? detachFormFieldSource(field)
+    : prepareInkAnnotationForStore(annotation!);
   const result = controlClipboardSchema.safeParse({
     version: 1,
     sourceDocumentId: getDocumentId(state.pdfBytes),

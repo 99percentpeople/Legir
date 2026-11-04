@@ -565,7 +565,7 @@ describe("exportPDF form handling", () => {
     expect(visualCenter).toBeLessThan(139.1);
   });
 
-  it("does not flatten unsupported source buttons into print output", async () => {
+  it("flattens supported source buttons into visible print content", async () => {
     const sourceDoc = await PDFDocument.create();
     const page = sourceDoc.addPage([200, 200]);
     const font = await sourceDoc.embedFont(StandardFonts.Helvetica);
@@ -590,12 +590,14 @@ describe("exportPDF form handling", () => {
 
     expect(exportedDoc.getForm().getFields()).toHaveLength(0);
     expect(getPageAnnotationCount(exportedDoc)).toBe(0);
-    await expect(getPageContentText(exportedDoc)).resolves.not.toContain(
-      "FlatWidget",
-    );
+    expect(await getPageContentText(exportedDoc)).toContain("Do");
+    const text = (await readPageText(exportedBytes))
+      .map((item) => ("str" in item ? item.str : ""))
+      .join(" ");
+    expect(text).toContain("Clear All");
   });
 
-  it("preserves source field appearances while removing source buttons for print output", async () => {
+  it("preserves source field and button appearances for print output", async () => {
     const sourceDoc = await PDFDocument.create();
     const page = sourceDoc.addPage([240, 200]);
     const font = await sourceDoc.embedFont(StandardFonts.Helvetica);
@@ -638,7 +640,7 @@ describe("exportPDF form handling", () => {
       .map((item) => ("str" in item ? item.str : ""))
       .join(" ");
     expect(text).toContain("Source Alice");
-    expect(text).not.toContain("Clear All");
+    expect(text).toContain("Clear All");
     expect(
       (await renderPageBody(exportedBytes!)).coloredPixels,
     ).toBeGreaterThan(0);

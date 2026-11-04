@@ -1,3 +1,4 @@
+import { RectangleHorizontal } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import { FormField, FieldType, PageData } from "../../types";
 import {
@@ -96,6 +97,8 @@ const FieldTreePanel: React.FC<FieldTreePanelProps> = ({
         return CircleDot;
       case FieldType.DROPDOWN:
         return List;
+      case FieldType.BUTTON:
+        return RectangleHorizontal;
       case FieldType.SIGNATURE:
         return PenLine;
       default:

@@ -38,6 +38,7 @@ interface StampStyleEditorProps {
   onChange: (updates: Partial<StampStyleEditorValue>) => void;
   onInteractionStart?: () => void;
   showDisplayMode?: boolean;
+  selectionKey?: string;
   className?: string;
 }
 
@@ -46,6 +47,7 @@ export const StampStyleEditor: React.FC<StampStyleEditorProps> = ({
   onChange,
   onInteractionStart,
   showDisplayMode = false,
+  selectionKey,
   className,
 }) => {
   const { t } = useLanguage();
@@ -112,6 +114,7 @@ export const StampStyleEditor: React.FC<StampStyleEditorProps> = ({
         <TabsContent value="image" className="space-y-4">
           <StampImageLibrary
             image={value?.image}
+            selectionKey={selectionKey}
             onSelect={(image) => {
               onInteractionStart?.();
               onChange({

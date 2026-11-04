@@ -1,3 +1,10 @@
+import { isListBoxField } from "@legir/pdf-model/choiceFields";
+import { PDFButton, PDFSignature } from "@legir/pdfium/authoring";
+import {
+  updateButtonWidget,
+  applyFieldMetadata,
+  applyFieldWidgetStyle,
+} from "./button-field.js";
 import {
   PDFArray,
   PDFCheckBox,
@@ -18,6 +25,7 @@ import {
   TextAlignment,
 } from "@legir/pdfium/authoring";
 import { FieldType, type FormField } from "@legir/pdf-model";
+import { canPreserveFormAppearance } from "@legir/pdf-model/formAppearance";
 import type {
   ControlExportOptions,
   FormExportContext,
@@ -31,11 +39,7 @@ import {
   applyWidgetExportRotation,
   getCommonControlExportOpts,
 } from "./control-export.js";
-import {
-  collectFieldFlagsFromChain,
-  lookupInFieldChain,
-  pdfObjToString,
-} from "./pdf-import-utils.js";
+import { lookupInFieldChain, pdfObjToString } from "./pdf-import-utils.js";
 
 type CapturedXfaEntry = {
   acroForm: PDFDict;
@@ -192,9 +196,7 @@ const isSupportedSourceWidget = (widget: PDFDict) => {
   }
   if (fieldType !== "Btn") return false;
 
-  const fieldFlags = collectFieldFlagsFromChain(widget);
-  const isPushButton = (fieldFlags & (1 << 16)) !== 0;
-  return !isPushButton;
+  return true;
 };
 
 const removeRefFromPdfArray = (array: PDFArray, refKey: string) => {
@@ -398,12 +400,19 @@ export const safeRemovePdfField = (
   }
 };
 
-export const updateExistingSourceField = (
+export const updateExistingSourceField = async (
   form: PDFForm,
   field: FormField,
   fontMap?: Map<string, PDFFont>,
   options?: ControlExportOptions & { viewport?: ViewportLike },
 ) => {
+  const initialField =
+    options?.context?.findField(field) ?? findFieldBySourcePdfRef(form, field);
+  if (initialField instanceof PDFSignature && initialField.getSignatureInfo()) {
+    if (field.type !== FieldType.SIGNATURE)
+      throw new Error("Cannot convert a populated signature field");
+    return true; // Never rewrite a signer's /V, widget geometry or appearance.
+  }
   const didUpdateSourceWidget = updateSourcePdfFieldWidget(
     form,
     field,
@@ -429,9 +438,71 @@ export const updateExistingSourceField = (
       name: field.name,
       type: field.type,
     }));
-    return didUpdateSourceWidget || !!field.sourcePdfRef;
+    return didUpdateSourceWidget;
   }
 
+  if (field.sourcePdfRef && !didUpdateSourceWidget) {
+    const source = form.doc.context.lookup(
+      PDFRef.of(
+        field.sourcePdfRef.objectNumber,
+        field.sourcePdfRef.generationNumber,
+      ),
+    );
+    if (!(source instanceof PDFDict)) return false;
+  }
+  if (existingField instanceof PDFButton && field.type === FieldType.BUTTON) {
+    const dict =
+      field.sourcePdfRef &&
+      form.doc.context.lookup(
+        PDFRef.of(
+          field.sourcePdfRef.objectNumber,
+          field.sourcePdfRef.generationNumber,
+        ),
+      );
+    const widget =
+      dict instanceof PDFDict &&
+      dict.lookup(PDFName.of("Subtype")) === PDFName.of("Widget")
+        ? PDFWidgetAnnotation.fromDict(dict)
+        : existingField.acroField.getWidgets()[0];
+    if (widget)
+      await updateButtonWidget(
+        existingField,
+        widget,
+        field,
+        fontMap,
+        options?.viewport,
+      );
+    return true;
+  }
+  if (
+    existingField instanceof PDFSignature &&
+    field.type === FieldType.SIGNATURE
+  ) {
+    applyFieldMetadata(existingField, field);
+    const dict =
+      field.sourcePdfRef &&
+      form.doc.context.lookup(
+        PDFRef.of(
+          field.sourcePdfRef.objectNumber,
+          field.sourcePdfRef.generationNumber,
+        ),
+      );
+    const widget =
+      dict instanceof PDFDict &&
+      dict.lookup(PDFName.of("Subtype")) === PDFName.of("Widget")
+        ? PDFWidgetAnnotation.fromDict(dict)
+        : existingField.acroField.getWidgets()[0];
+    if (widget) {
+      if (canPreserveFormAppearance(field) && widget.getAppearances().normal) {
+        // Unsigned signature widgets can also carry a custom author-provided appearance.
+        form.markFieldAsClean(existingField.ref);
+      } else {
+        applyFieldWidgetStyle(widget, field, existingField, options?.viewport);
+        existingField.updateWidgetAppearance(widget);
+      }
+    }
+    return true;
+  }
   const runExistingFieldUpdate = (step: string, update: () => void) => {
     try {
       update();
@@ -543,7 +614,7 @@ export const updateExistingSourceField = (
     }
 
     if (field.type === FieldType.DROPDOWN) {
-      if (field.isMultiSelect) {
+      if (isListBoxField(field)) {
         if (
           !(existingField instanceof PDFOptionList) &&
           existingTypeName !== "PDFOptionList"
@@ -551,15 +622,23 @@ export const updateExistingSourceField = (
           return true;
         }
         const optionList = existingField as PDFOptionList;
+        if (field.isMultiSelect) optionList.enableMultiselect();
+        else optionList.disableMultiselect();
         if (field.options) {
           runExistingFieldUpdate("setOptions", () =>
             optionList.setOptions(field.options!),
           );
         }
-        if (field.value) {
-          runExistingFieldUpdate("select", () =>
-            optionList.select(field.value!.split("\n").filter(Boolean)),
-          );
+        if (field.value !== undefined) {
+          runExistingFieldUpdate("select", () => {
+            if (!field.value) optionList.clear();
+            else
+              optionList.select(
+                field.isMultiSelect
+                  ? field.value.split("\n").filter(Boolean)
+                  : field.value,
+              );
+          });
         }
         updateAppearances(() =>
           optionList.updateAppearances(

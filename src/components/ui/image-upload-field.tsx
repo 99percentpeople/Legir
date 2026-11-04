@@ -1,187 +1,245 @@
 import React from "react";
-import { ImageUpIcon, Trash2, Upload } from "lucide-react";
+import { ImageUpIcon, LoaderCircle, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/cn";
 
-interface ImageUploadFieldProps {
+export interface ImageUploadContext {
+  /** Ignore results after the upload target changes or the component unmounts. */
+  signal: AbortSignal;
+}
+
+interface ImageUploadFieldBaseProps {
   imageData?: string;
   alt: string;
   accept?: string;
   uploadLabel: string;
   replaceLabel?: string;
+  clearLabel?: string;
   emptyState?: React.ReactNode;
   preview?: React.ReactNode;
-  onUpload: (file: File) => void | Promise<void>;
+  /** Optional image library; file drops anywhere in this area use the same uploader. */
+  children?: React.ReactNode;
   onClear?: () => void;
+  onUploadError?: (error: unknown) => void;
+  disabled?: boolean;
+  selectionKey?: string;
   className?: string;
   previewFrameClassName?: string;
   imageClassName?: string;
   triggerClassName?: string;
 }
 
-export const ImageUploadField: React.FC<ImageUploadFieldProps> = ({
-  imageData,
-  alt,
-  accept = "image/*",
-  uploadLabel,
-  replaceLabel,
-  emptyState,
-  preview,
-  onUpload,
-  onClear,
-  className,
-  previewFrameClassName,
-  imageClassName,
-  triggerClassName,
-}) => {
+export type ImageUploadFieldProps = ImageUploadFieldBaseProps &
+  (
+    | {
+        multiple?: false;
+        onUpload: (
+          file: File,
+          context: ImageUploadContext,
+        ) => void | Promise<void>;
+      }
+    | {
+        multiple: true;
+        onUpload: (
+          files: File[],
+          context: ImageUploadContext,
+        ) => void | Promise<void>;
+      }
+  );
+
+/** Shared upload UI. File decoding, validation and persistence belong to the caller. */
+export const ImageUploadField: React.FC<ImageUploadFieldProps> = (props) => {
+  const {
+    imageData,
+    alt,
+    accept = "image/*",
+    uploadLabel,
+    replaceLabel,
+    clearLabel,
+    emptyState,
+    preview,
+    children,
+    onClear,
+    onUploadError,
+    disabled = false,
+    selectionKey,
+    className,
+    previewFrameClassName,
+    imageClassName,
+    triggerClassName,
+  } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const dragDepthRef = React.useRef(0);
+  const pending = React.useRef<AbortController | null>(null);
+  const dragDepth = React.useRef(0);
+  const [busy, setBusy] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const openPicker = React.useCallback(() => {
-    inputRef.current?.click();
-  }, []);
+  React.useEffect(() => {
+    setBusy(false);
+    setIsDragging(false);
+    setError(null);
+    return () => {
+      pending.current?.abort();
+      pending.current = null;
+      dragDepth.current = 0;
+    };
+  }, [selectionKey, disabled]);
 
-  const handleFileUpload = React.useCallback(
-    async (file: File | undefined) => {
-      if (!file) return;
-      await onUpload(file);
-    },
-    [onUpload],
-  );
-
-  const handleChange = React.useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      try {
-        await handleFileUpload(event.target.files?.[0]);
-      } finally {
-        event.target.value = "";
+  // :disabled includes an enclosing permission fieldset, not just our own prop.
+  const isDisabled = () => disabled || !!inputRef.current?.matches(":disabled");
+  const openPicker = () => {
+    if (!pending.current && !isDisabled()) inputRef.current?.click();
+  };
+  const upload = async (files: File[]) => {
+    if (!files.length || pending.current || isDisabled()) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setError(null);
+    try {
+      const context = { signal: controller.signal };
+      if (props.multiple) await props.onUpload(files, context);
+      else await props.onUpload(files[0], context);
+    } catch (cause) {
+      if (pending.current !== controller || controller.signal.aborted) return;
+      if (onUploadError) onUploadError(cause);
+      else setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (pending.current === controller) {
+        pending.current = null;
+        setBusy(false);
       }
-    },
-    [handleFileUpload],
-  );
-
-  const handleDragEnter = React.useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      if (!event.dataTransfer.types.includes("Files")) return;
-      event.preventDefault();
-      dragDepthRef.current += 1;
-      setIsDragging(true);
-    },
-    [],
-  );
-
-  const handleDragOver = React.useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      if (!event.dataTransfer.types.includes("Files")) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "copy";
-    },
-    [],
-  );
-
-  const handleDragLeave = React.useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      if (!event.dataTransfer.types.includes("Files")) return;
-      event.preventDefault();
-      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-      if (dragDepthRef.current === 0) {
-        setIsDragging(false);
-      }
-    },
-    [],
-  );
-
-  const handleDrop = React.useCallback(
-    async (event: React.DragEvent<HTMLDivElement>) => {
-      if (!event.dataTransfer.types.includes("Files")) return;
-      event.preventDefault();
-      dragDepthRef.current = 0;
-      setIsDragging(false);
-      await handleFileUpload(event.dataTransfer.files?.[0]);
-    },
-    [handleFileUpload],
-  );
+    }
+  };
+  const isFileDrag = (event: React.DragEvent) =>
+    Array.from(event.dataTransfer.types).includes("Files");
 
   return (
-    <div
-      className={cn(
-        "border-input bg-muted/20 flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-2",
-        className,
-      )}
+    <fieldset
+      data-slot="image-upload-field"
+      disabled={disabled || busy}
+      aria-busy={busy}
+      className={cn("m-0 min-w-0 space-y-2 border-0 p-0", className)}
+      onDragEnter={(event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (isDisabled()) return;
+        dragDepth.current += 1;
+        setIsDragging(true);
+      }}
+      onDragOver={(event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = isDisabled() ? "none" : "copy";
+      }}
+      onDragLeave={(event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setIsDragging(false);
+      }}
+      onDrop={(event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dragDepth.current = 0;
+        setIsDragging(false);
+        void upload(Array.from(event.dataTransfer.files));
+      }}
     >
       <div
         className={cn(
-          "relative flex aspect-video w-full items-center justify-center overflow-hidden",
+          "border-input bg-muted/20 flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-2",
           isDragging && "border-primary/60 ring-primary/20 ring-2",
-          previewFrameClassName,
         )}
-        onDragEnter={handleDragEnter}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
       >
-        {imageData ? (
-          (preview ?? (
-            <img
-              src={imageData}
-              alt={alt}
-              className={cn(
-                "max-h-full max-w-full object-contain",
-                imageClassName,
-              )}
-            />
-          ))
-        ) : (
-          <div className="flex flex-col items-center gap-3 px-4 text-center">
-            {emptyState ?? <div className="text-muted-foreground text-xs" />}
+        <div
+          className={cn(
+            "relative flex aspect-video w-full items-center justify-center overflow-hidden",
+            previewFrameClassName,
+          )}
+        >
+          {imageData ? (
+            (preview ?? (
+              <img
+                src={imageData}
+                alt={alt}
+                draggable={false}
+                className={cn("h-full w-full object-contain", imageClassName)}
+              />
+            ))
+          ) : (
+            <div className="flex flex-col items-center gap-3 px-4 text-center">
+              {emptyState}
+              <Button
+                type="button"
+                variant="secondary"
+                className={triggerClassName}
+                onClick={openPicker}
+              >
+                {busy ? (
+                  <LoaderCircle className="animate-spin" />
+                ) : (
+                  <ImageUpIcon />
+                )}
+                {uploadLabel}
+              </Button>
+            </div>
+          )}
+          {imageData && onClear && (
             <Button
               type="button"
-              variant="secondary"
-              className={cn(triggerClassName)}
-              onClick={openPicker}
+              variant="destructive"
+              size="icon"
+              aria-label={clearLabel ?? alt}
+              title={clearLabel}
+              className="absolute top-1 right-1 h-6 w-6"
+              onClick={() => {
+                if (!isDisabled()) onClear();
+              }}
             >
-              <ImageUpIcon />
-              {uploadLabel}
+              <Trash2 size={12} />
             </Button>
-          </div>
-        )}
-
-        {imageData && onClear ? (
+          )}
+        </div>
+        <Input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          multiple={props.multiple}
+          aria-label={uploadLabel}
+          className="hidden"
+          onChange={(event) => {
+            const files = Array.from(event.currentTarget.files ?? []);
+            // Clear immediately, including on rejection, so the same file can be retried.
+            event.currentTarget.value = "";
+            void upload(files);
+          }}
+        />
+        {imageData && (
           <Button
             type="button"
-            variant="destructive"
-            size="icon"
-            className="absolute top-1 right-1 h-6 w-6"
-            onClick={onClear}
-          >
-            <Trash2 size={12} />
-          </Button>
-        ) : null}
-      </div>
-
-      <Input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={handleChange}
-      />
-
-      {imageData ? (
-        <label className="cursor-pointer">
-          <Button
             variant="outline"
-            className={cn(triggerClassName)}
+            className={triggerClassName}
             onClick={openPicker}
           >
-            <Upload />
+            {busy ? <LoaderCircle className="animate-spin" /> : <Upload />}
             {replaceLabel ?? uploadLabel}
           </Button>
-        </label>
-      ) : null}
-    </div>
+        )}
+        {error && (
+          <p role="alert" className="text-destructive text-xs">
+            {error}
+          </p>
+        )}
+      </div>
+      {children}
+    </fieldset>
   );
 };

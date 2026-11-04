@@ -35,40 +35,83 @@ const base = z.object({
 
 // Strip unknown properties, particularly source PDF refs and appearance operators.
 // All nested values are validated before they can reach rendering/export code.
-const field = base.extend({
-  type: z.nativeEnum(FieldType),
-  name: z.string(),
-  required: flag,
-  isMultiSelect: flag,
-  allowCustomValue: flag,
-  style: z
-    .object({
-      borderColor: text,
-      backgroundColor: text,
-      borderWidth: numeric,
-      borderStyle,
-      textColor: text,
-      fontSize: numeric,
-      fontFamily: text,
-      isTransparent: flag,
-    })
-    .optional(),
-  value: text,
-  defaultValue: text,
-  placeholder: text,
-  isChecked: flag,
-  isDefaultChecked: flag,
-  exportValue: text,
-  options: z.array(z.string()).optional(),
-  radioValue: text,
-  signatureData: image.optional(),
-  imageScaleMode: scaleMode,
-  toolTip: text,
-  readOnly: flag,
-  multiline: flag,
-  maxLength: numeric,
-  alignment,
-});
+const field = base
+  .extend({
+    type: z.nativeEnum(FieldType),
+    name: z.string(),
+    required: flag,
+    isListBox: flag,
+    isMultiSelect: flag,
+    allowCustomValue: flag,
+    style: z
+      .object({
+        borderColor: text,
+        backgroundColor: text,
+        borderWidth: numeric,
+        borderStyle,
+        textColor: text,
+        fontSize: numeric,
+        fontFamily: text,
+        isTransparent: flag,
+      })
+      .optional(),
+    value: text,
+    defaultValue: text,
+    placeholder: text,
+    isChecked: flag,
+    isDefaultChecked: flag,
+    exportValue: text,
+    options: z.array(z.string()).optional(),
+    radioValue: text,
+    signatureData: image.optional(), // Legacy clipboard input only; transformed below.
+    imageScaleMode: scaleMode,
+    buttonCaption: text,
+    buttonLayout: z
+      .union([
+        z.literal(0),
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+        z.literal(5),
+        z.literal(6),
+      ])
+      .optional(),
+    buttonImage: z
+      .string()
+      .regex(/^data:image\/(png|jpe?g);base64,/i)
+      .nullable()
+      .optional(),
+    buttonImageFit: z
+      .object({
+        scaleMode: z.enum(["contain", "fill"]),
+        alignment: z.tuple([number.min(0).max(1), number.min(0).max(1)]),
+        when: z.enum(["always", "bigger", "smaller", "never"]),
+        fitBounds: z.boolean(),
+      })
+      .optional(),
+    toolTip: text,
+    readOnly: flag,
+    multiline: flag,
+    maxLength: numeric,
+    alignment,
+  })
+  .transform(({ signatureData, imageScaleMode, ...value }) =>
+    signatureData && value.type === FieldType.SIGNATURE
+      ? {
+          ...value,
+          type: FieldType.BUTTON,
+          buttonLayout: 1 as const,
+          buttonImage: signatureData,
+          buttonImageFit: {
+            scaleMode: imageScaleMode ?? "contain",
+            alignment: [0.5, 0.5] as [number, number],
+            when: "always" as const,
+            fitBounds: false,
+          },
+        }
+      : value,
+  );
 
 const annotation = base.extend({
   type: z.enum([

@@ -430,7 +430,7 @@ it.each([
 const signature =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAGUlEQVR4nD3BMQEAAAjAILR/5/kJJIi28Q5Y5gT/nBWRrgAAAABJRU5ErkJggg==";
 describe.each(["contain", "fill"] as const)(
-  "%s image signature",
+  "%s pushbutton image",
   (imageScaleMode) => {
     it.each(
       [0, 90, 180, 270].flatMap((page) =>
@@ -444,12 +444,19 @@ describe.each(["contain", "fill"] as const)(
           {
             id: "signature",
             name: "signature",
-            type: FieldType.SIGNATURE,
+            type: FieldType.BUTTON,
             pageIndex: 0,
             rect,
             rotationDeg,
-            signatureData: signature,
-            imageScaleMode,
+            buttonImage: signature,
+            buttonLayout: 1,
+            style: { borderWidth: 0, isTransparent: true },
+            buttonImageFit: {
+              scaleMode: imageScaleMode,
+              alignment: [0.5, 0.5],
+              when: "always",
+              fitBounds: true,
+            },
           },
         ]);
         const bitmap = await raster(output);
@@ -479,7 +486,7 @@ describe.each(["contain", "fill"] as const)(
           expect
             .soft(
               [...bitmap.rgba.slice(offset, offset + 3)],
-              `signature at ${px},${py}`,
+              `button image at ${px},${py}`,
             )
             .toEqual(rgb);
         }

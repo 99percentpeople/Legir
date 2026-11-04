@@ -97,6 +97,21 @@ const CONTROL_CONFIGS: ControlConfig[] = [
     supportsGeometrySizeEdit: true,
   },
   {
+    type: FieldType.BUTTON,
+    component: preload(() =>
+      import("./form/ButtonControl").then((module) => ({
+        default: module.ButtonControl,
+      })),
+    ),
+    propertiesComponent: preload(() =>
+      import("./properties/ButtonProperties").then((module) => ({
+        default: module.ButtonProperties,
+      })),
+    ),
+    label: "Button",
+    supportsGeometrySizeEdit: true,
+  },
+  {
     type: FieldType.SIGNATURE,
     component: preload(() =>
       import("./form/SignatureControl").then((module) => ({

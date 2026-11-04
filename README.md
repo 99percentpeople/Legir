@@ -8,7 +8,9 @@ It is built for practical document work rather than generic file preview. You ca
 
 - Read and navigate PDFs in a focused workspace
 - Add annotations such as highlight, ink, comment, free text, and shapes
-- Create and edit form controls such as text, checkbox, radio, dropdown, and signature
+- Create and edit text, checkbox, radio, dropdown, pushbutton and native signature fields
+- Use pushbuttons as image placeholders with PNG/JPEG upload, seven caption/icon layouts and editable or flattened PDF output
+- Inspect existing signature metadata without claiming certificate verification; signature fields are not image uploads
 - Reopen recent files and restore the last editor UI state
 - Run in the browser or as a Tauri desktop app
 - Keep the main workflow local-first

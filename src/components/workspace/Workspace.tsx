@@ -2865,6 +2865,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           else if (editorState.tool === "draw_radio") type = FieldType.RADIO;
           else if (editorState.tool === "draw_dropdown")
             type = FieldType.DROPDOWN;
+          else if (editorState.tool === "draw_button") type = FieldType.BUTTON;
           else if (editorState.tool === "draw_signature")
             type = FieldType.SIGNATURE;
           else if (editorState.tool === "draw_text") type = FieldType.TEXT;
@@ -2876,6 +2877,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
               pageIndex: activePageIndex,
               type,
               name: `${type}_${editorState.fields.length + 1}`,
+              ...(type === FieldType.BUTTON
+                ? {
+                    buttonCaption: t("toolbar.button"),
+                    buttonLayout: 0 as const,
+                  }
+                : {}),
               rect: { x, y, width, height },
               style: { ...DEFAULT_FIELD_STYLE },
               options:

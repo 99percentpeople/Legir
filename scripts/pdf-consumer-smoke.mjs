@@ -61,12 +61,36 @@ try {
   form
     .createCheckBox("completed")
     .addToPage(page, { x: 35, y: 95, width: 18, height: 18 });
+  const photo = form.createButton("site_photo");
+  photo.addToPage("", page, {
+    x: 80,
+    y: 20,
+    width: 100,
+    height: 90,
+    borderWidth: 0,
+  });
+  photo.setLayout(1);
+  const icon = await source.document.embedPng(
+    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAGUlEQVR4nD3BMQEAAAjAILR/5/kJJIi28Q5Y5gT/nBWRrgAAAABJRU5ErkJggg==",
+  );
+  photo.setImage(icon);
+  form
+    .createSignature("approval")
+    .addToPage(page, { x: 205, y: 20, width: 120, height: 50 });
   const template = await source.document.save();
   close(source);
   session = new DocumentSession(engine, template);
   const originalRaster = rasterHash(session.document);
   const parsed = await session.parse({}, async () => undefined);
-  assert.equal(parsed.fields.length, 2);
+  assert.equal(parsed.fields.length, 4);
+  assert.equal(
+    parsed.fields.find((field) => field.name === "site_photo")?.type,
+    FieldType.BUTTON,
+  );
+  assert.equal(
+    parsed.fields.find((field) => field.name === "approval")?.type,
+    FieldType.SIGNATURE,
+  );
   assert.equal(
     parsed.fields.find((field) => field.name === "project_name")?.type,
     FieldType.TEXT,
@@ -74,7 +98,9 @@ try {
   const fields = parsed.fields.map((field) =>
     field.name === "project_name"
       ? { ...field, value: "Independent package consumer" }
-      : { ...field, isChecked: true },
+      : field.type === FieldType.CHECKBOX
+        ? { ...field, isChecked: true }
+        : field,
   );
   const request = {
     fields,
@@ -98,6 +124,11 @@ try {
     filled.document.getForm().getCheckBox("completed").isChecked(),
     true,
   );
+  assert.ok(filled.document.getForm().getButton("site_photo").getIcon());
+  assert.equal(
+    filled.document.getForm().getSignature("approval").getSignatureInfo(),
+    undefined,
+  );
   const filledRaster = rasterHash(filled.native);
   assert.notEqual(filledRaster, originalRaster);
   close(filled);
@@ -119,7 +150,8 @@ try {
   console.log(
     JSON.stringify({
       standalone: true,
-      fields: 2,
+      fields: 4,
+      buttonImageAndNativeSignature: true,
       editableAndFlattened: true,
       identicalFlattenedPixels: true,
       sourceUnchanged: true,
