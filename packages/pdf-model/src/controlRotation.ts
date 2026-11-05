@@ -177,11 +177,12 @@ export const getResizeCursorForHandle = (
   })();
 
   const snapped =
-    (((Math.round((handleAngleDeg + rotationDeg) / 45) * 45) % 360) + 360) %
+    // Handle angles above are counterclockwise; screen rotations are clockwise.
+    (((Math.round((handleAngleDeg - rotationDeg) / 45) * 45) % 360) + 360) %
     360;
 
-  if (snapped === 0 || snapped === 180) return "ns-resize";
-  if (snapped === 90 || snapped === 270) return "ew-resize";
+  if (snapped === 0 || snapped === 180) return "ew-resize";
+  if (snapped === 90 || snapped === 270) return "ns-resize";
   if (snapped === 45 || snapped === 225) return "nesw-resize";
   return "nwse-resize";
 };
