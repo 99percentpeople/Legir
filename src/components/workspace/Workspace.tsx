@@ -23,6 +23,8 @@ import {
   WORKSPACE_BOTTOM_PADDING_PX,
   WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES,
   WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES,
+  MIN_EDITOR_SCALE,
+  MAX_EDITOR_SCALE,
 } from "@/constants";
 import { cn } from "@/utils/cn";
 import FileDragOverlay from "@/components/FileDragOverlay";
@@ -50,7 +52,9 @@ import {
 } from "./hooks/useWorkspaceTextSelection";
 import { useWorkspaceViewport } from "./hooks/useWorkspaceViewport";
 import { useWorkspaceRenderActivity } from "./hooks/useWorkspaceRenderActivity";
-import { useWorkspaceTouchPinch } from "./hooks/useWorkspaceTouchPinch";
+import { useViewportTouchGestures } from "@/hooks/useViewportTouchGestures";
+import { stepViewportScale } from "@/lib/viewportZoom";
+import { getPreviewDoubleTapTarget } from "./lib/previewTouchZoom";
 import { useWorkspacePointerCoords } from "./hooks/useWorkspacePointerCoords";
 import { useWorkspaceStampDrop } from "./hooks/useWorkspaceStampDrop";
 import { useWorkspaceEraser } from "./hooks/useWorkspaceEraser";
@@ -1378,7 +1382,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     handleViewportScroll,
     panViewportBy,
     zoomAtClientPoint,
-    zoomBetweenClientPoints,
+    beginPinchZoom,
+    updatePinchZoom,
   } = useWorkspaceViewport({
     containerRef,
     contentRef,
@@ -1394,43 +1399,28 @@ const Workspace: React.FC<WorkspaceProps> = ({
     updateTextSelectionToolbar,
   });
 
-  useWorkspaceTouchPinch({
+  useViewportTouchGestures({
     containerRef,
-    enabled: editorState.pages.length > 0,
+    enabled: editorState.pages.length > 0 && editorState.mode !== "pages",
     scale: editorState.scale,
-    tool: editorState.tool,
+    minScale: MIN_EDITOR_SCALE,
+    maxScale: MAX_EDITOR_SCALE,
+    panEnabled: editorState.tool === "select" || editorState.tool === "pan",
     onPinchStart: abortActiveInteractions,
     onPinchStateChange: updatePinchGestureActive,
-    onPinchZoom: ({
-      clientX,
-      clientY,
-      previousClientX,
-      previousClientY,
-      newScale,
-    }) => {
-      if (
-        typeof previousClientX === "number" &&
-        typeof previousClientY === "number"
-      ) {
-        void zoomBetweenClientPoints({
-          anchorClientX: previousClientX,
-          anchorClientY: previousClientY,
-          targetClientX: clientX,
-          targetClientY: clientY,
-          newScale,
-          source: "pinch",
-        });
-        return;
-      }
-
+    onPinchBegin: beginPinchZoom,
+    onPinchZoom: updatePinchZoom,
+    onPinchPan: panViewportBy,
+    getDoubleTapTarget: (target) =>
+      getPreviewDoubleTapTarget(target, editorState),
+    onDoubleTap: ({ clientX, clientY }) => {
       void zoomAtClientPoint({
         clientX,
         clientY,
-        newScale,
-        source: "pinch",
+        newScale: stepViewportScale(editorState.scale, 1),
+        source: "double-tap",
       });
     },
-    onPinchPan: panViewportBy,
   });
   const workspaceZoomJankDebugEnabled =
     editorState.options.debugOptions.workspaceZoomJank;

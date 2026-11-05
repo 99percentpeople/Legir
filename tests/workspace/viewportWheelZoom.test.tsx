@@ -1,4 +1,4 @@
-import React, { act } from "react";
+import React, { act, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceViewport } from "@/components/workspace/hooks/useWorkspaceViewport";
@@ -12,6 +12,7 @@ let content: HTMLDivElement;
 let store: ReturnType<typeof createTestEditorStore>;
 let frames: Map<number, FrameRequestCallback>;
 const changeScale = vi.fn();
+let controller: ReturnType<typeof useWorkspaceViewport>;
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -39,7 +40,7 @@ beforeEach(() => {
   );
   store = createTestEditorStore({ scale: 1 });
   root = createRoot(host);
-  changeScale.mockClear();
+  changeScale.mockReset();
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -53,10 +54,11 @@ const mount = async () => {
   const containerRef = { current: viewport };
   const contentRef = { current: content };
   function Probe() {
-    useWorkspaceViewport({
+    const editorState = useSyncExternalStore(store.subscribe, store.getState);
+    controller = useWorkspaceViewport({
       containerRef,
       contentRef,
-      editorState: store.getState(),
+      editorState,
       onScaleChange: changeScale,
       isPanning: false,
       textSelectionToolbarVisible: false,
@@ -110,6 +112,26 @@ it("keeps ordinary wheel scrolling and accumulates rapid zoom input in one frame
   expect(changeScale).toHaveBeenCalledExactlyOnceWith(1.563);
 });
 
+it("keeps the initial pinch anchor across rapid inputs, later frames, and constant-scale panning", async () => {
+  store.setState({ pageLayout: "single", pageFlow: "vertical" });
+  changeScale.mockImplementation((scale: number) => store.setState({ scale }));
+  await mount();
+  controller.beginPinchZoom({ clientX: 300, clientY: 300 });
+  controller.updatePinchZoom({ clientX: 300, clientY: 310, newScale: 1.25 });
+  controller.updatePinchZoom({ clientX: 300, clientY: 320, newScale: 1.5 });
+  await flush();
+  expect(changeScale).toHaveBeenCalledExactlyOnceWith(1.5);
+  // The fixed outer padding stays 32px; the original content point scales.
+  expect(viewport.scrollTop).toBeCloseTo(32 + (300 - 32) * 1.5 - 320);
+  controller.updatePinchZoom({ clientX: 300, clientY: 330, newScale: 2 });
+  await flush();
+  expect(viewport.scrollTop).toBeCloseTo(32 + (300 - 32) * 2 - 330);
+  controller.updatePinchZoom({ clientX: 300, clientY: 350, newScale: 2 });
+  await flush();
+  expect(viewport.scrollTop).toBeCloseTo(32 + (300 - 32) * 2 - 350);
+  expect(changeScale).toHaveBeenCalledTimes(2);
+});
+
 it.each([
   [-10000, MAX_EDITOR_SCALE],
   [10000, MIN_EDITOR_SCALE],
@@ -120,4 +142,11 @@ it.each([
   expect(changeScale).toHaveBeenCalledExactlyOnceWith(
     Number(expected.toFixed(3)),
   );
+});
+
+it("matches page-grid precision for many small wheel deltas in one frame", async () => {
+  await mount();
+  for (let i = 0; i < 20; i++) wheel({ ctrlKey: true, deltaY: -5 });
+  await flush();
+  expect(changeScale).toHaveBeenCalledExactlyOnceWith(1.25);
 });

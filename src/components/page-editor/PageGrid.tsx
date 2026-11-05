@@ -89,6 +89,7 @@ const PageCard = memo(function PageCard({
   selected,
   allSelected,
   moving,
+  pinching,
   canSelectRange,
   enabled,
   onSelect,
@@ -103,6 +104,7 @@ const PageCard = memo(function PageCard({
   selected: boolean;
   allSelected: boolean;
   moving: boolean;
+  pinching: boolean;
   canSelectRange: () => boolean;
   enabled: boolean;
   onSelect: (page: PageData, intent: PageSelectionIntent) => void;
@@ -125,7 +127,7 @@ const PageCard = memo(function PageCard({
   const { ref, sourceRef, handleRef } = useSortable({
     id,
     index,
-    disabled: !enabled,
+    disabled: !enabled || pinching,
     plugins: sortablePlugins,
     // Moving placeholders must reach their slots before drop geometry is read.
     transition: { duration: moving ? 0 : 200, easing: "ease-out" },
@@ -152,7 +154,7 @@ const PageCard = memo(function PageCard({
           <PageSelectionMenu
             selected={selected}
             canSelectRange={canSelectRange}
-            disabled={moving}
+            disabled={moving || pinching}
             onSelect={select}
             onCopy={
               onCopy ? () => onCopy(selected ? undefined : ids) : undefined
@@ -255,8 +257,15 @@ export const PageGrid = memo(function PageGrid({
   const [overlay, setOverlay] = useState<PageDragPreviewData | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const transitions = useRef<PageGridTransitions>(null);
-  const { scrollRef, viewport, layout, layoutRef, updateScroll } =
-    usePageGridViewport(dragRef);
+  const {
+    scrollRef,
+    viewport,
+    layout,
+    layoutRef,
+    updateScroll,
+    isPinching,
+    shouldSuppressClick,
+  } = usePageGridViewport(dragRef);
   useThumbnailViewport(scrollRef);
   useEffect(() => {
     if (workerService) store.getState().warmupThumbnails(workerService);
@@ -362,6 +371,9 @@ export const PageGrid = memo(function PageGrid({
         ...defaults.filter((sensor) => sensor !== PointerSensor),
         pointerSensor,
       ]}
+      onBeforeDragStart={(event) => {
+        if (shouldSuppressClick()) event.preventDefault();
+      }}
       onDragStart={(event) => {
         const source = pages.find(
           (page) => getPageId(page) === event.operation.source?.id,
@@ -472,12 +484,28 @@ export const PageGrid = memo(function PageGrid({
         disabled={dragging}
       >
         <ContextMenu modal={false}>
-          <ContextMenuTrigger asChild disabled={!onPaste || dragging}>
+          <ContextMenuTrigger
+            asChild
+            disabled={!onPaste || dragging || isPinching}
+          >
             <div
               ref={scrollRef}
-              className="group/page-grid relative min-h-0 flex-1 overflow-auto"
+              className="group/page-grid relative min-h-0 flex-1 touch-pan-y overflow-auto"
               style={layout.style}
               data-page-grid
+              data-page-pinching={isPinching || undefined}
+              onClickCapture={(event) => {
+                if (shouldSuppressClick()) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }
+              }}
+              onDoubleClickCapture={(event) => {
+                if (shouldSuppressClick()) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }
+              }}
               data-grid-dense={layout.dense || undefined}
               data-grid-columns={columns}
               data-grid-row-height={rowHeight}
@@ -497,7 +525,7 @@ export const PageGrid = memo(function PageGrid({
                 );
               }}
               onContextMenuCapture={(event) => {
-                if (dragRef.current) {
+                if (dragRef.current || shouldSuppressClick()) {
                   event.preventDefault();
                   event.stopPropagation();
                 }
@@ -551,6 +579,7 @@ export const PageGrid = memo(function PageGrid({
                           moving={(drag?.ids ?? dropping)?.has(id) ?? false}
                           canSelectRange={canSelectRange}
                           enabled={enabled}
+                          pinching={isPinching}
                           onSelect={selectPage}
                           onOpen={onOpen}
                           onCopy={onCopy}

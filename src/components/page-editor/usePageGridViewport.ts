@@ -10,10 +10,22 @@ import {
 import {
   MIN_PAGE_THUMBNAIL_SCALE,
   MAX_PAGE_THUMBNAIL_SCALE,
-  ZOOM_BASE,
 } from "@/constants";
 import { useEditorView, useEditorViewApi } from "@/store/useEditorView";
+import { useViewportTouchGestures } from "@/hooks/useViewportTouchGestures";
+import {
+  clampViewportScale,
+  normalizeViewportScale,
+  wheelViewportScale,
+} from "@/lib/viewportZoom";
 import { getPageGridLayout } from "./pageGridLayout";
+
+type GridZoomAnchor = { index: number; fraction: number; offset: number };
+type PendingZoom = { base: number; scale: number; anchor: GridZoomAnchor };
+const bounds = {
+  minScale: MIN_PAGE_THUMBNAIL_SCALE,
+  maxScale: MAX_PAGE_THUMBNAIL_SCALE,
+};
 
 export function usePageGridViewport(dragRef: RefObject<unknown>) {
   const store = useEditorViewApi();
@@ -27,11 +39,11 @@ export function usePageGridViewport(dragRef: RefObject<unknown>) {
   const layoutRef = useRef(layout);
   const previous = useRef<typeof layout | null>(null);
   const scrollTop = useRef(0);
-  const zoomAnchor = useRef<{
-    index: number;
-    fraction: number;
-    offset: number;
-  } | null>(null);
+  const zoomAnchor = useRef<GridZoomAnchor | null>(null);
+  const pinchAnchor = useRef<GridZoomAnchor | null>(null);
+  const pending = useRef<PendingZoom | null>(null);
+  const frame = useRef<number | null>(null);
+  const [isPinching, setIsPinching] = useState(false);
   const updateScroll = useCallback((top: number) => {
     scrollTop.current = top;
     setViewport((current) => {
@@ -107,24 +119,10 @@ export function usePageGridViewport(dragRef: RefObject<unknown>) {
     zoomAnchor.current = null;
   }, [layout, reflowing, top, updateScroll]);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    let frame: number | undefined;
-    let pending: { scale: number; base: number; x: number; y: number } | null =
-      null;
-    const zoom = () => {
-      frame = undefined;
-      const next = pending;
-      pending = null;
-      const current = store.getState();
-      if (
-        !next ||
-        dragRef.current ||
-        current.pageThumbnailScale !== next.base ||
-        next.scale === next.base
-      )
-        return;
+  const captureAnchor = useCallback(
+    (x: number, y: number): GridZoomAnchor | null => {
+      const el = scrollRef.current;
+      if (!el) return null;
       const {
         columns,
         rowHeight,
@@ -133,70 +131,129 @@ export function usePageGridViewport(dragRef: RefObject<unknown>) {
         columnGap,
       } = layoutRef.current;
       const rect = el.getBoundingClientRect();
-      const offset = Math.max(0, Math.min(el.clientHeight, next.y - rect.top));
+      const offset = Math.max(0, Math.min(el.clientHeight, y - rect.top));
       const row = Math.floor((el.scrollTop + offset) / rowHeight);
       const column = Math.max(
         0,
         Math.min(
           columns - 1,
-          Math.floor(
-            (next.x - rect.left - gridOffset) / (cardWidth + columnGap),
-          ),
+          Math.floor((x - rect.left - gridOffset) / (cardWidth + columnGap)),
         ),
       );
-      zoomAnchor.current = {
-        index: Math.min(current.pages.length - 1, row * columns + column),
+      return {
+        index: Math.min(
+          store.getState().pages.length - 1,
+          row * columns + column,
+        ),
         fraction: ((el.scrollTop + offset) % rowHeight) / rowHeight,
         offset,
       };
-      current.setPageThumbnailScale(next.scale);
-    };
+    },
+    [store],
+  );
+
+  const queueZoom = useCallback(
+    (scale: number, anchor: GridZoomAnchor) => {
+      const current = store.getState();
+      if (dragRef.current) return;
+      current.deferThumbnailWarmup();
+      pending.current = {
+        scale: clampViewportScale(scale, bounds),
+        base: current.pageThumbnailScale,
+        anchor,
+      };
+      if (frame.current !== null) return;
+      frame.current = requestAnimationFrame(() => {
+        frame.current = null;
+        const next = pending.current;
+        pending.current = null;
+        const current = store.getState();
+        const el = scrollRef.current;
+        if (
+          !next ||
+          !el ||
+          dragRef.current ||
+          current.pageThumbnailScale !== next.base
+        )
+          return;
+        const scale = normalizeViewportScale(next.scale, bounds);
+        if (scale === next.base) {
+          const { columns, rowHeight } = layoutRef.current;
+          el.scrollTop =
+            (Math.floor(next.anchor.index / columns) + next.anchor.fraction) *
+              rowHeight -
+            next.anchor.offset;
+          updateScroll(el.scrollTop);
+        } else {
+          zoomAnchor.current = next.anchor;
+          current.setPageThumbnailScale(scale);
+        }
+      });
+    },
+    [dragRef, store, updateScroll],
+  );
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
     const onWheel = (event: WheelEvent) => {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       event.stopPropagation();
       if (dragRef.current) {
-        pending = null;
+        pending.current = null;
         return;
       }
-      store.getState().deferThumbnailWarmup();
-      const current = store.getState();
-      const scale =
-        pending?.base === current.pageThumbnailScale
-          ? pending.scale
-          : current.pageThumbnailScale;
-      const pixels =
-        event.deltaY *
-        (event.deltaMode === 1
-          ? 16
-          : event.deltaMode === 2
-            ? el.clientHeight
-            : 1);
-      const next = Math.max(
-        MIN_PAGE_THUMBNAIL_SCALE,
-        Math.min(
-          MAX_PAGE_THUMBNAIL_SCALE,
-          scale *
-            Math.pow(ZOOM_BASE, -Math.max(-200, Math.min(200, pixels)) / 100),
-        ),
-      );
-      pending = {
-        scale: next,
-        base: current.pageThumbnailScale,
-        x: event.clientX,
-        y: event.clientY,
-      };
-      if (frame === undefined) frame = requestAnimationFrame(zoom);
+      const current = store.getState().pageThumbnailScale;
+      const base =
+        pending.current?.base === current ? pending.current.scale : current;
+      const anchor = captureAnchor(event.clientX, event.clientY);
+      if (anchor)
+        queueZoom(wheelViewportScale(base, event, el.clientHeight), anchor);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       el.removeEventListener("wheel", onWheel);
-      if (frame !== undefined) cancelAnimationFrame(frame);
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+      pending.current = null;
     };
-  }, [dragRef, store]);
+  }, [captureAnchor, dragRef, queueZoom, store]);
+
+  const { shouldSuppressClick } = useViewportTouchGestures({
+    containerRef: scrollRef,
+    enabled: true,
+    scale,
+    ...bounds,
+    // Native one-finger scrolling and long-press sorting remain available.
+    panEnabled: false,
+    canStartPinch: () => !dragRef.current,
+    onPinchStateChange: setIsPinching,
+    onPinchBegin: ({ clientX, clientY }) => {
+      pinchAnchor.current = captureAnchor(clientX, clientY);
+    },
+    onPinchZoom: ({ clientY, newScale }) => {
+      const el = scrollRef.current;
+      const anchor = pinchAnchor.current;
+      if (!el || !anchor) return;
+      queueZoom(newScale, {
+        ...anchor,
+        offset: clientY - el.getBoundingClientRect().top,
+      });
+    },
+    onPinchPan: (_dx, dy) => {
+      const el = scrollRef.current;
+      if (el) {
+        el.scrollTop -= dy;
+        updateScroll(el.scrollTop);
+      }
+    },
+  });
 
   return {
     scrollRef,
+    isPinching,
+    shouldSuppressClick,
     viewport: { ...viewport, top },
     layout,
     layoutRef,

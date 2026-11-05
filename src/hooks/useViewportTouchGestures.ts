@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { MAX_EDITOR_SCALE, MIN_EDITOR_SCALE } from "@/constants";
+import { normalizeViewportScale, type ZoomBounds } from "@/lib/viewportZoom";
 import { useEventListeners } from "@/hooks/useEventListener";
-import type { Tool } from "@/types";
 
-type TouchPoint = {
+export type TouchPoint = {
   clientX: number;
   clientY: number;
 };
@@ -28,10 +27,6 @@ const TOUCH_PAN_INERTIA_MIN_SPEED_PX_PER_MS = 0.08;
 const TOUCH_PAN_INERTIA_STOP_SPEED_PX_PER_MS = 0.015;
 const TOUCH_PAN_INERTIA_DECAY_PER_FRAME = 0.94;
 
-const clampWorkspaceScale = (scale: number) => {
-  return Math.max(MIN_EDITOR_SCALE, Math.min(MAX_EDITOR_SCALE, scale));
-};
-
 const touchListToArray = (touches: TouchList) => {
   const result: Touch[] = [];
   for (let i = 0; i < touches.length; i += 1) {
@@ -45,23 +40,6 @@ const touchToPoint = (touch: Touch): TouchPoint => ({
   clientX: touch.clientX,
   clientY: touch.clientY,
 });
-
-const getTouchesWithinContainer = (
-  touches: TouchList,
-  container: HTMLElement,
-) => {
-  const rect = container.getBoundingClientRect();
-  const hitSlop = 24;
-
-  return touchListToArray(touches).filter((touch) => {
-    return (
-      touch.clientX >= rect.left - hitSlop &&
-      touch.clientX <= rect.right + hitSlop &&
-      touch.clientY >= rect.top - hitSlop &&
-      touch.clientY <= rect.bottom + hitSlop
-    );
-  });
-};
 
 const getTouchDistance = (a: TouchPoint, b: TouchPoint) => {
   return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
@@ -79,7 +57,7 @@ const stopTouchEvent = (event: TouchEvent) => {
   event.stopPropagation();
 };
 
-const canStartViewportGestureFromTarget = (
+export const canPanViewportFromTarget = (
   target: EventTarget | null,
   container: HTMLElement,
 ) => {
@@ -104,22 +82,26 @@ const canStartViewportGestureFromTarget = (
   );
 };
 
-export const useWorkspaceTouchPinch = (opts: {
-  containerRef: RefObject<HTMLElement | null>;
-  enabled: boolean;
-  scale: number;
-  tool: Tool;
-  onPinchStart?: () => void;
-  onPinchStateChange?: (active: boolean) => void;
-  onPinchZoom: (args: {
-    clientX: number;
-    clientY: number;
-    previousClientX?: number;
-    previousClientY?: number;
-    newScale: number;
-  }) => void;
-  onPinchPan: (deltaX: number, deltaY: number) => void;
-}) => {
+export const useViewportTouchGestures = (
+  opts: ZoomBounds & {
+    containerRef: RefObject<HTMLElement | null>;
+    enabled: boolean;
+    scale: number;
+    panEnabled: boolean;
+    canStartPinch?: () => boolean;
+    onPinchBegin?: (point: TouchPoint) => void;
+    getDoubleTapTarget?: (target: EventTarget | null) => Element | null;
+    onDoubleTap?: (point: TouchPoint) => void;
+    onPinchStart?: () => void;
+    onPinchStateChange?: (active: boolean) => void;
+    onPinchZoom: (args: {
+      clientX: number;
+      clientY: number;
+      newScale: number;
+    }) => void;
+    onPinchPan: (deltaX: number, deltaY: number) => void;
+  },
+) => {
   const activeTouchPointsRef = useRef(new Map<number, TouchPoint>());
   const pinchSessionRef = useRef<PinchSession | null>(null);
   const singleTouchSessionRef = useRef<SingleTouchSession | null>(null);
@@ -133,6 +115,23 @@ export const useWorkspaceTouchPinch = (opts: {
   const inertiaLastFrameTimeRef = useRef<number | null>(null);
   const liveScaleRef = useRef(opts.scale);
   const gestureActiveRef = useRef(false);
+  const suppressClickUntilRef = useRef(0);
+  const tapRef = useRef<{
+    point: TouchPoint;
+    target: Element;
+    time: number;
+  } | null>(null);
+  const lastTapRef = useRef<{
+    point: TouchPoint;
+    target: Element;
+    time: number;
+  } | null>(null);
+  const shouldSuppressClick = useCallback(
+    () =>
+      gestureActiveRef.current ||
+      performance.now() < suppressClickUntilRef.current,
+    [],
+  );
 
   useEffect(() => {
     liveScaleRef.current = opts.scale;
@@ -142,6 +141,7 @@ export const useWorkspaceTouchPinch = (opts: {
     (active: boolean) => {
       if (gestureActiveRef.current === active) return;
       gestureActiveRef.current = active;
+      if (!active) suppressClickUntilRef.current = performance.now() + 350;
       opts.onPinchStateChange?.(active);
     },
     [opts.onPinchStateChange],
@@ -225,7 +225,11 @@ export const useWorkspaceTouchPinch = (opts: {
 
   const startPinchSession = useCallback(
     (event?: TouchEvent) => {
-      if (!opts.enabled || activeTouchPointsRef.current.size < 2) {
+      if (
+        !opts.enabled ||
+        opts.canStartPinch?.() === false ||
+        activeTouchPointsRef.current.size < 2
+      ) {
         return false;
       }
 
@@ -233,7 +237,10 @@ export const useWorkspaceTouchPinch = (opts: {
       if (!first || !second) return false;
       const midpoint = getTouchMidpoint(first, second);
 
+      tapRef.current = null;
+      lastTapRef.current = null;
       beginViewportGesture();
+      opts.onPinchBegin?.(midpoint);
       clearSingleTouchSession();
       pinchSessionRef.current = {
         initialDistance: Math.max(
@@ -248,19 +255,25 @@ export const useWorkspaceTouchPinch = (opts: {
       if (event) stopTouchEvent(event);
       return true;
     },
-    [beginViewportGesture, clearSingleTouchSession, opts.enabled],
+    [
+      beginViewportGesture,
+      clearSingleTouchSession,
+      opts.enabled,
+      opts.canStartPinch,
+      opts.onPinchBegin,
+    ],
   );
 
-  const syncTrackedTouches = useCallback(
-    (touches: TouchList, container: HTMLElement) => {
-      const nextMap = new Map<number, TouchPoint>();
-      for (const touch of getTouchesWithinContainer(touches, container)) {
+  const syncTrackedTouches = useCallback((touches: TouchList) => {
+    const nextMap = new Map<number, TouchPoint>();
+    for (const touch of touchListToArray(touches)) {
+      // Track only fingers that started here; keep them when they leave the
+      // viewport. A finger on a toolbar or another editor is not a pinch.
+      if (activeTouchPointsRef.current.has(touch.identifier))
         nextMap.set(touch.identifier, touchToPoint(touch));
-      }
-      activeTouchPointsRef.current = nextMap;
-    },
-    [],
-  );
+    }
+    activeTouchPointsRef.current = nextMap;
+  }, []);
 
   const handleTouchStart = useCallback(
     (event: TouchEvent) => {
@@ -268,20 +281,29 @@ export const useWorkspaceTouchPinch = (opts: {
 
       const container = opts.containerRef.current;
       if (!container) return;
-      cancelSingleTouchInertia();
-
       for (const touch of touchListToArray(event.changedTouches)) {
         const target = touch.target;
         if (!(target instanceof Node) || !container.contains(target)) {
           continue;
         }
 
+        cancelSingleTouchInertia();
         activeTouchPointsRef.current.set(touch.identifier, touchToPoint(touch));
+        const tapTarget = opts.getDoubleTapTarget?.(target);
+        tapRef.current =
+          activeTouchPointsRef.current.size === 1 && tapTarget
+            ? {
+                point: touchToPoint(touch),
+                target: tapTarget,
+                time: performance.now(),
+              }
+            : null;
+        if (!tapRef.current) lastTapRef.current = null;
 
         if (
-          (opts.tool === "select" || opts.tool === "pan") &&
+          opts.panEnabled &&
           activeTouchPointsRef.current.size === 1 &&
-          canStartViewportGestureFromTarget(target, container)
+          canPanViewportFromTarget(target, container)
         ) {
           const point = touchToPoint(touch);
           singleTouchSessionRef.current = {
@@ -299,9 +321,9 @@ export const useWorkspaceTouchPinch = (opts: {
         }
       }
 
-      syncTrackedTouches(event.touches, container);
+      syncTrackedTouches(event.touches);
 
-      if (activeTouchPointsRef.current.size >= 2) {
+      if (activeTouchPointsRef.current.size >= 2 && !pinchSessionRef.current) {
         startPinchSession(event);
       }
     },
@@ -309,7 +331,8 @@ export const useWorkspaceTouchPinch = (opts: {
       cancelSingleTouchInertia,
       opts.containerRef,
       opts.enabled,
-      opts.tool,
+      opts.panEnabled,
+      opts.getDoubleTapTarget,
       startPinchSession,
       syncTrackedTouches,
     ],
@@ -318,9 +341,20 @@ export const useWorkspaceTouchPinch = (opts: {
   const handleTouchMove = useCallback(
     (event: TouchEvent) => {
       const container = opts.containerRef.current;
-      if (!container) return;
-      syncTrackedTouches(event.touches, container);
+      if (!opts.enabled || !container || !activeTouchPointsRef.current.size)
+        return;
+      syncTrackedTouches(event.touches);
 
+      const tap = tapRef.current;
+      const touch = activeTouchPointsRef.current.values().next().value;
+      if (
+        tap &&
+        touch &&
+        getTouchDistance(tap.point, touch) >= SINGLE_TOUCH_PAN_THRESHOLD_PX
+      ) {
+        tapRef.current = null;
+        lastTapRef.current = null;
+      }
       const pinchSession = pinchSessionRef.current;
       if (pinchSession && activeTouchPointsRef.current.size >= 2) {
         stopTouchEvent(event);
@@ -336,32 +370,20 @@ export const useWorkspaceTouchPinch = (opts: {
         );
         const deltaX = midpoint.clientX - pinchSession.lastMidpoint.clientX;
         const deltaY = midpoint.clientY - pinchSession.lastMidpoint.clientY;
-        const nextScale = Number(
-          clampWorkspaceScale(
-            pinchSession.initialScale *
-              (distance / pinchSession.initialDistance),
-          ).toFixed(3),
+        const nextScale = normalizeViewportScale(
+          pinchSession.initialScale * (distance / pinchSession.initialDistance),
+          opts,
         );
         const scaleChanged =
           Math.abs(nextScale - pinchSession.lastScale) >= 0.001;
-        const previousMidpoint = pinchSession.lastMidpoint;
-
-        if (scaleChanged) {
+        if (
+          scaleChanged ||
+          Math.abs(deltaX) >= 0.5 ||
+          Math.abs(deltaY) >= 0.5
+        ) {
           pinchSession.lastScale = nextScale;
           liveScaleRef.current = nextScale;
-          opts.onPinchZoom({
-            clientX: midpoint.clientX,
-            clientY: midpoint.clientY,
-            previousClientX: previousMidpoint.clientX,
-            previousClientY: previousMidpoint.clientY,
-            newScale: nextScale,
-          });
-          pinchSession.lastMidpoint = midpoint;
-          return;
-        }
-
-        if (Math.abs(deltaX) >= 0.5 || Math.abs(deltaY) >= 0.5) {
-          opts.onPinchPan(deltaX, deltaY);
+          opts.onPinchZoom({ ...midpoint, newScale: nextScale });
         }
         pinchSession.lastMidpoint = midpoint;
         return;
@@ -420,6 +442,9 @@ export const useWorkspaceTouchPinch = (opts: {
     [
       beginViewportGesture,
       opts.containerRef,
+      opts.enabled,
+      opts.minScale,
+      opts.maxScale,
       opts.onPinchPan,
       opts.onPinchZoom,
       startPinchSession,
@@ -430,8 +455,55 @@ export const useWorkspaceTouchPinch = (opts: {
   const handleTouchEnd = useCallback(
     (event: TouchEvent) => {
       const container = opts.containerRef.current;
-      if (!container) return;
-      syncTrackedTouches(event.touches, container);
+      if (!opts.enabled || !container || !activeTouchPointsRef.current.size)
+        return;
+      if (
+        !touchListToArray(event.changedTouches).some((touch) =>
+          activeTouchPointsRef.current.has(touch.identifier),
+        )
+      )
+        return;
+      syncTrackedTouches(event.touches);
+      if (event.type === "touchcancel") {
+        if (gestureActiveRef.current) stopTouchEvent(event);
+        activeTouchPointsRef.current.clear();
+        tapRef.current = null;
+        lastTapRef.current = null;
+        cancelSingleTouchInertia();
+        endViewportGesture();
+        return;
+      }
+      const tap = tapRef.current;
+      if (activeTouchPointsRef.current.size === 0) {
+        tapRef.current = null;
+        const ended = touchListToArray(event.changedTouches)[0];
+        const now = performance.now();
+        if (
+          event.type === "touchend" &&
+          tap &&
+          ended &&
+          now - tap.time <= 250 &&
+          getTouchDistance(tap.point, touchToPoint(ended)) <
+            SINGLE_TOUCH_PAN_THRESHOLD_PX &&
+          opts.getDoubleTapTarget?.(ended.target) === tap.target
+        ) {
+          const lastTap = lastTapRef.current;
+          if (
+            lastTap &&
+            lastTap.target === tap.target &&
+            now - lastTap.time <= 300 &&
+            getTouchDistance(lastTap.point, tap.point) <= 24
+          ) {
+            lastTapRef.current = null;
+            suppressClickUntilRef.current = now + 350;
+            stopTouchEvent(event);
+            opts.onDoubleTap?.(touchToPoint(ended));
+          } else {
+            lastTapRef.current = { ...tap, time: now };
+          }
+        } else lastTapRef.current = null;
+      }
+      if (gestureActiveRef.current) stopTouchEvent(event);
       const shouldStartSingleTouchInertia =
         event.type === "touchend" &&
         !!singleTouchSessionRef.current?.isActive &&
@@ -487,6 +559,9 @@ export const useWorkspaceTouchPinch = (opts: {
       clearPinchSession,
       endViewportGesture,
       opts.containerRef,
+      opts.enabled,
+      opts.getDoubleTapTarget,
+      opts.onDoubleTap,
       startPinchSession,
       startSingleTouchInertia,
       syncTrackedTouches,
@@ -519,6 +594,8 @@ export const useWorkspaceTouchPinch = (opts: {
   useEffect(() => {
     if (opts.enabled) return;
     activeTouchPointsRef.current.clear();
+    tapRef.current = null;
+    lastTapRef.current = null;
     cancelSingleTouchInertia();
     endViewportGesture();
   }, [cancelSingleTouchInertia, endViewportGesture, opts.enabled]);
@@ -530,4 +607,6 @@ export const useWorkspaceTouchPinch = (opts: {
       endViewportGesture();
     };
   }, [cancelSingleTouchInertia, endViewportGesture]);
+
+  return { shouldSuppressClick };
 };

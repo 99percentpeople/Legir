@@ -84,7 +84,7 @@ export type AppEventMap = {
   };
   "workspace:zoomInput": {
     at: number;
-    source: "wheel" | "pinch";
+    source: "wheel" | "pinch" | "double-tap";
     fromScale: number;
     targetScale: number;
   };

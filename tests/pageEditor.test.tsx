@@ -5,6 +5,7 @@ import PageEditor from "@/components/page-editor/PageEditor";
 import { EditorViewContext } from "@/store/useEditorView";
 import { LanguageProvider } from "@/components/language-provider";
 import { createTestEditorStore, page } from "./helpers/editorStore";
+import { dispatchTouches, touch } from "./helpers/touch";
 
 // dnd-kit creates its shared observer when the module loads.
 vi.hoisted(() => {
@@ -461,4 +462,106 @@ it("validates bulk selection in linear work and skips identical selections", () 
   expect(changed).toHaveBeenCalledTimes(1);
   expect(store.getState().past).toHaveLength(0);
   unsubscribe();
+});
+
+it("anchors page-mode pinch through column reflow and cancels pending long-press actions", async () => {
+  const frames = new Map<number, FrameRequestCallback>();
+  let serial = 0;
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    frames.set(++serial, callback);
+    return serial;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+  const flush = () =>
+    act(async () => {
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(0));
+    });
+  await act(async () =>
+    root.render(
+      <EditorViewContext.Provider value={store}>
+        <LanguageProvider defaultLanguage="en">
+          <PageEditor />
+        </LanguageProvider>
+      </EditorViewContext.Provider>,
+    ),
+  );
+  const viewport = host.querySelector<HTMLDivElement>("[data-page-grid]")!;
+  await act(async () => {
+    viewport.scrollTop = 878;
+    viewport.dispatchEvent(new Event("scroll"));
+  });
+  const card = viewport.querySelector<HTMLButtonElement>(
+    '[data-page-index="21"] [data-page-drag-handle]',
+  )!;
+  expect(card).not.toBeNull();
+  const pointerDown = new MouseEvent("pointerdown", {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    clientX: 250,
+    clientY: 200,
+  });
+  Object.defineProperties(pointerDown, {
+    pointerType: { value: "touch" },
+    pointerId: { value: 1 },
+    isPrimary: { value: true },
+  });
+  const point = (id: number, x: number, y = 200) => touch(card, id, x, y);
+  await act(async () => {
+    card.dispatchEvent(pointerDown);
+    dispatchTouches(card, "touchstart", [point(1, 250)]);
+  });
+  await act(async () => {
+    dispatchTouches(
+      card,
+      "touchstart",
+      [point(1, 250), point(2, 350)],
+      [point(2, 350)],
+    );
+    dispatchTouches(card, "touchmove", [point(1, 237.5), point(2, 362.5)]);
+    dispatchTouches(card, "touchmove", [
+      point(1, 225, 230),
+      point(2, 375, 230),
+    ]);
+  });
+  expect(store.getState().pageThumbnailScale).toBe(1);
+  expect(viewport.dataset.pagePinching).toBe("true");
+  await flush();
+  expect(store.getState().pageThumbnailScale).toBe(1.5);
+  expect(viewport.dataset.gridColumns).toBe("3");
+  expect(viewport.scrollTop).toBeCloseTo(1870);
+  await act(async () => {
+    dispatchTouches(viewport, "touchmove", [
+      point(1, 100, 220),
+      point(2, 500, 220),
+    ]);
+  });
+  await flush();
+  expect(store.getState().pageThumbnailScale).toBe(2);
+  expect(viewport.dataset.gridColumns).toBe("2");
+  expect(viewport.scrollTop).toBeCloseTo(3602);
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 800)));
+  expect(viewport.dataset.pageDragging).toBeUndefined();
+  expect(
+    document.querySelector(
+      '[data-slot="context-menu-content"][data-state="open"]',
+    ),
+  ).toBeNull();
+  await act(async () =>
+    dispatchTouches(
+      viewport,
+      "touchend",
+      [],
+      [point(1, 100, 220), point(2, 500, 220)],
+    ),
+  );
+  expect(viewport.dataset.pagePinching).toBeUndefined();
+  await act(async () =>
+    viewport
+      .querySelector<HTMLButtonElement>("[data-page-drag-handle]")!
+      .click(),
+  );
+  expect(store.getState().selectedPageIds).toEqual([]);
 });

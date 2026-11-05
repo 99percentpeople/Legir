@@ -10,8 +10,12 @@ import {
   MIN_EDITOR_SCALE,
   WORKSPACE_BASE_PAGE_GAP_PX,
   WORKSPACE_BASE_PADDING_PX,
-  ZOOM_BASE,
 } from "@/constants";
+import {
+  clampViewportScale,
+  normalizeViewportScale,
+  wheelViewportScale,
+} from "@/lib/viewportZoom";
 import type { WorkspaceEditorState } from "@/types";
 import { useEventListener } from "@/hooks/useEventListener";
 import { pickClosestRectCandidate } from "@legir/pdf-model/viewportMath";
@@ -22,8 +26,10 @@ import {
 
 type WorkspaceContentZoomAnchor = {
   kind: "content";
-  targetX: number;
-  targetY: number;
+  contentX: number;
+  contentY: number;
+  fixedX: number;
+  fixedY: number;
   mouseX: number;
   mouseY: number;
 };
@@ -41,7 +47,7 @@ export type WorkspaceZoomAnchor =
   | WorkspaceContentZoomAnchor
   | WorkspacePageZoomAnchor;
 
-type WorkspaceZoomSource = "wheel" | "pinch";
+type WorkspaceZoomSource = "wheel" | "pinch" | "double-tap";
 
 type PendingZoomCommit = {
   scale: number;
@@ -49,7 +55,10 @@ type PendingZoomCommit = {
 };
 
 const clampWorkspaceScale = (scale: number) => {
-  return Math.max(MIN_EDITOR_SCALE, Math.min(MAX_EDITOR_SCALE, scale));
+  return clampViewportScale(scale, {
+    minScale: MIN_EDITOR_SCALE,
+    maxScale: MAX_EDITOR_SCALE,
+  });
 };
 
 export const useWorkspaceViewport = (opts: {
@@ -74,6 +83,9 @@ export const useWorkspaceViewport = (opts: {
   const appEventBus = useEditorEventBus();
   const getElementById = useEditorElementById();
   const zoomAnchorRef = useRef<WorkspaceZoomAnchor | null>(null);
+  const pinchAnchorRef = useRef<WorkspaceZoomAnchor | null>(null);
+  const renderedScaleRef = useRef(opts.editorState.scale);
+  renderedScaleRef.current = opts.editorState.scale;
 
   const viewportAnchorRef = useRef<{
     scale: number;
@@ -159,8 +171,10 @@ export const useWorkspaceViewport = (opts: {
         );
       }
 
-      container.scrollLeft = anchor.targetX - anchor.mouseX;
-      container.scrollTop = anchor.targetY - anchor.mouseY;
+      container.scrollLeft =
+        anchor.contentX * scale + anchor.fixedX - anchor.mouseX;
+      container.scrollTop =
+        anchor.contentY * scale + anchor.fixedY - anchor.mouseY;
       return true;
     },
     [applyPageAnchor, opts.containerRef],
@@ -316,7 +330,6 @@ export const useWorkspaceViewport = (opts: {
       clientX: number,
       clientY: number,
       currentScale: number,
-      newScale: number,
     ): WorkspaceContentZoomAnchor | null => {
       const container = opts.containerRef.current;
       const content = opts.contentRef.current;
@@ -329,23 +342,20 @@ export const useWorkspaceViewport = (opts: {
       const relX = clientX - contentRect.left;
       const relY = clientY - contentRect.top;
 
-      let targetX = 0;
-      let targetY = 0;
+      let fixedX = 0;
+      let fixedY = 0;
+      let scaledX = relX;
+      let scaledY = relY;
 
-      if (opts.editorState.pageLayout !== "single") {
-        const scaleRatio = newScale / currentScale;
-        targetX = relX * scaleRatio;
-        targetY = relY * scaleRatio;
-      } else if (opts.editorState.pageFlow === "horizontal") {
-        const scaleRatio = newScale / currentScale;
-        targetX = relX * scaleRatio;
-        targetY = relY * scaleRatio;
-      } else {
+      if (
+        opts.editorState.pageLayout === "single" &&
+        opts.editorState.pageFlow !== "horizontal"
+      ) {
         const paddingPx = WORKSPACE_BASE_PADDING_PX;
         const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * currentScale;
         let accumulatedH = paddingPx;
-        let fixedY = paddingPx;
-        let scaledY = 0;
+        fixedY = paddingPx;
+        scaledY = 0;
 
         if (relY < paddingPx) {
           fixedY = relY;
@@ -381,8 +391,8 @@ export const useWorkspaceViewport = (opts: {
         }
 
         const fixedXPadding = WORKSPACE_BASE_PADDING_PX;
-        let fixedX = fixedXPadding;
-        let scaledX = 0;
+        fixedX = fixedXPadding;
+        scaledX = 0;
         if (relX < fixedXPadding) {
           fixedX = relX;
           scaledX = 0;
@@ -390,16 +400,14 @@ export const useWorkspaceViewport = (opts: {
           fixedX = fixedXPadding;
           scaledX = relX - fixedXPadding;
         }
-
-        const scaleRatio = newScale / currentScale;
-        targetX = scaledX * scaleRatio + fixedX;
-        targetY = scaledY * scaleRatio + fixedY;
       }
 
       return {
         kind: "content",
-        targetX,
-        targetY,
+        contentX: scaledX / currentScale,
+        contentY: scaledY / currentScale,
+        fixedX,
+        fixedY,
         mouseX,
         mouseY,
       };
@@ -431,7 +439,6 @@ export const useWorkspaceViewport = (opts: {
       clientX: number,
       clientY: number,
       currentScale: number,
-      newScale: number,
     ): WorkspaceZoomAnchor | null => {
       const container = opts.containerRef.current;
       if (!container) return null;
@@ -466,7 +473,7 @@ export const useWorkspaceViewport = (opts: {
         };
       }
 
-      return getContentZoomAnchor(clientX, clientY, currentScale, newScale);
+      return getContentZoomAnchor(clientX, clientY, currentScale);
     },
     [
       findPageNearPointByDom,
@@ -484,8 +491,8 @@ export const useWorkspaceViewport = (opts: {
       source: WorkspaceZoomSource;
       fromScale: number;
     }) => {
-      const nextScale = Number(clampWorkspaceScale(options.scale).toFixed(3));
-      if (Math.abs(nextScale - options.fromScale) < 0.001) {
+      const nextScale = clampWorkspaceScale(options.scale);
+      if (options.source !== "pinch" && nextScale === options.fromScale) {
         return false;
       }
 
@@ -508,9 +515,20 @@ export const useWorkspaceViewport = (opts: {
           zoomCommitRafRef.current = null;
           const pending = pendingZoomCommitRef.current;
           if (!pending) return;
-          zoomAnchorRef.current = pending.anchor;
           pendingZoomCommitRef.current = null;
-          opts.onScaleChange(pending.scale);
+          // Keep fractional wheel input until the frame commits, just as the
+          // page grid does. Rounding every event loses small trackpad deltas.
+          const scale = normalizeViewportScale(pending.scale, {
+            minScale: MIN_EDITOR_SCALE,
+            maxScale: MAX_EDITOR_SCALE,
+          });
+          if (scale === renderedScaleRef.current) {
+            // Moving a pinch midpoint must still pan at the zoom limits.
+            applyZoomAnchor(pending.anchor, scale);
+          } else {
+            zoomAnchorRef.current = pending.anchor;
+            opts.onScaleChange(scale);
+          }
         });
       }
 
@@ -519,6 +537,7 @@ export const useWorkspaceViewport = (opts: {
     [
       opts.editorState.options.debugOptions.workspaceZoomJank,
       opts.onScaleChange,
+      applyZoomAnchor,
     ],
   );
 
@@ -534,15 +553,12 @@ export const useWorkspaceViewport = (opts: {
       // on screen right now. A pending zoom commit may already have a newer
       // target scale, but the DOM/page rects still reflect the rendered scale.
       const currentScale = opts.editorState.scale;
-      const nextScale = Number(
-        clampWorkspaceScale(options.newScale).toFixed(3),
-      );
+      const nextScale = clampWorkspaceScale(options.newScale);
       const fromScale = options.fromScale ?? currentScale;
       const anchor = getZoomAnchorAtClientPoint(
         options.clientX,
         options.clientY,
         currentScale,
-        nextScale,
       );
       if (!anchor) return false;
 
@@ -556,51 +572,32 @@ export const useWorkspaceViewport = (opts: {
     [getZoomAnchorAtClientPoint, opts.editorState.scale, queueZoomCommit],
   );
 
-  const zoomBetweenClientPoints = useCallback(
-    (options: {
-      anchorClientX: number;
-      anchorClientY: number;
-      targetClientX: number;
-      targetClientY: number;
-      newScale: number;
-      source: WorkspaceZoomSource;
-      fromScale?: number;
-    }) => {
-      const currentScale =
-        pendingZoomCommitRef.current?.scale ?? opts.editorState.scale;
-      const nextScale = Number(
-        clampWorkspaceScale(options.newScale).toFixed(3),
+  const beginPinchZoom = useCallback(
+    (point: { clientX: number; clientY: number }) => {
+      // Capture once against rendered geometry. Later touch events can arrive
+      // before a queued scale has reached the DOM.
+      pinchAnchorRef.current = getZoomAnchorAtClientPoint(
+        point.clientX,
+        point.clientY,
+        opts.editorState.scale,
       );
-      const fromScale = options.fromScale ?? currentScale;
-      const anchor = getZoomAnchorAtClientPoint(
-        options.anchorClientX,
-        options.anchorClientY,
-        currentScale,
-        nextScale,
-      );
-      const mousePosition = getContainerMousePosition(
-        options.targetClientX,
-        options.targetClientY,
-      );
-      if (!anchor || !mousePosition) return false;
+    },
+    [getZoomAnchorAtClientPoint, opts.editorState.scale],
+  );
 
-      return queueZoomCommit({
-        scale: nextScale,
-        anchor: {
-          ...anchor,
-          mouseX: mousePosition.mouseX,
-          mouseY: mousePosition.mouseY,
-        },
-        source: options.source,
-        fromScale,
+  const updatePinchZoom = useCallback(
+    (point: { clientX: number; clientY: number; newScale: number }) => {
+      const anchor = pinchAnchorRef.current;
+      const mouse = getContainerMousePosition(point.clientX, point.clientY);
+      if (!anchor || !mouse) return;
+      queueZoomCommit({
+        scale: point.newScale,
+        anchor: { ...anchor, ...mouse },
+        source: "pinch",
+        fromScale: opts.editorState.scale,
       });
     },
-    [
-      getContainerMousePosition,
-      getZoomAnchorAtClientPoint,
-      opts.editorState.scale,
-      queueZoomCommit,
-    ],
+    [getContainerMousePosition, queueZoomCommit, opts.editorState.scale],
   );
 
   const panViewportBy = useCallback(
@@ -697,15 +694,11 @@ export const useWorkspaceViewport = (opts: {
         e.preventDefault();
         const currentScale = opts.editorState.scale;
         const baseScale = pendingZoomCommitRef.current?.scale ?? currentScale;
-        const delta =
-          e.deltaY *
-          (e.deltaMode === 1
-            ? 16
-            : e.deltaMode === 2
-              ? container.clientHeight
-              : 1);
-        const steps = -delta / 100;
-        const newScale = baseScale * Math.pow(ZOOM_BASE, steps);
+        const newScale = wheelViewportScale(
+          baseScale,
+          e,
+          container.clientHeight,
+        );
 
         void zoomAtClientPoint({
           clientX: e.clientX,
@@ -952,6 +945,7 @@ export const useWorkspaceViewport = (opts: {
     handleViewportScroll,
     panViewportBy,
     zoomAtClientPoint,
-    zoomBetweenClientPoints,
+    beginPinchZoom,
+    updatePinchZoom,
   };
 };
