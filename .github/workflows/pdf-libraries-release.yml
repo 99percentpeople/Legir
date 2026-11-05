@@ -1,0 +1,81 @@
+name: publish-pdf-libraries
+
+on:
+  push:
+    tags: ["pdf-libs-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing library tag, e.g. pdf-libs-v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pdf-libraries-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: tooling
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          path: source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile --ignore-scripts
+        working-directory: source
+      - run: bun run build:packages && bun run check:boundaries
+        working-directory: source
+      - run: bun x vitest run tests/controlResizeCursor.test.ts
+        working-directory: source
+      - name: Build release assets from the exact tagged source
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: bun tooling/scripts/release-pdf-libraries.ts source "$RELEASE_TAG" release-assets
+      - name: Check the packaged consumer outside the source repository
+        run: node tooling/scripts/check-package-consumer.mjs release-assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdf-libraries
+          path: release-assets/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: pdf-libraries
+          path: release-assets
+      - name: Verify and publish complete library assets
+        run: |
+          set -euo pipefail
+          (cd release-assets && sha256sum -c SHA256SUMS.txt)
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > /tmp/library-is-draft; then
+            test "$(cat /tmp/library-is-draft)" = true || { echo "Release already published; use a new version tag." >&2; exit 1; }
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --latest=false \
+              --title "Legir PDF libraries $RELEASE_TAG" --notes-file release-assets/release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/*.tgz release-assets/legir-libraries.json release-assets/SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest=false

@@ -2,6 +2,29 @@
 
 Legir is the application host, not a dependency of its PDF libraries.
 
+## Install from GitHub Releases
+
+The four libraries are distributed independently from desktop releases. Pin a
+library release URL, for example:
+
+```sh
+bun add @legir/pdf-core@https://github.com/99percentpeople/Legir/releases/download/pdf-libs-v0.1.0/legir-pdf-core-0.1.0.tgz
+```
+
+Internal library dependencies point to the same release automatically. Packages
+include compiled JavaScript, declarations, licenses and the PDFium WASM assets;
+consumers do not clone Legir, build its application or run dependency build scripts.
+Keep `bun.lock` committed. `legir-libraries.json` records the source commit and
+SHA-256 of all four assets, also listed in `SHA256SUMS.txt`.
+
+To publish, first give all four packages the same version and commit the change,
+then push a matching `pdf-libs-vX.Y.Z` tag. The `publish-pdf-libraries` workflow
+builds the exact tagged source, checks package boundaries and an isolated consumer,
+and publishes only after every asset is uploaded. For an existing tag that predates
+the workflow, use its manual dispatch with that tag. Published assets are never
+overwritten; fixes require a new version. These releases do not replace the latest
+desktop installer release.
+
 | Package               | Owns                                                                                                       | Does not own                                                              |
 | --------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `@legir/pdf-model`    | Document/field/annotation contracts, coordinates, geometry, stamp data and editing policies                | React, AI settings, Tauri, persistence, WASM                              |
