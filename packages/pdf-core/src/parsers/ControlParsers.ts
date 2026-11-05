@@ -80,6 +80,7 @@ export class TextControlParser implements IControlParser {
               ? annotation.placeholder
               : undefined,
           alignment: alignment,
+          verticalAlignment: annotation.verticalAlignment,
           multiline: !!(fieldFlags & 4096),
           maxLength: annotation.maxLen,
           toolTip: annotation.alternativeText || undefined,

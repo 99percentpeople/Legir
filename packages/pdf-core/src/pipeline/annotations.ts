@@ -416,6 +416,15 @@ export const buildPdfLibAnnotsByPageIndex = async (
         const rawQ = lookupInFieldChain(annot, "Q");
         const textAlignment =
           rawQ instanceof PDFNumber ? rawQ.asNumber() : undefined;
+        const rawVerticalAlignment = pdfObjToString(
+          lookupInFieldChain(annot, "LegirVAlign"),
+        );
+        const verticalAlignment =
+          rawVerticalAlignment === "top" ||
+          rawVerticalAlignment === "middle" ||
+          rawVerticalAlignment === "bottom"
+            ? rawVerticalAlignment
+            : undefined;
 
         const rawTu = lookupInFieldChain(annot, "TU");
         const tu = pdfObjToString(rawTu);
@@ -661,6 +670,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
           defaultAppearance: da,
           DA: da,
           textAlignment,
+          verticalAlignment,
           rotation,
           checkBox: checkBox || undefined,
           radioButton: radioButton || undefined,

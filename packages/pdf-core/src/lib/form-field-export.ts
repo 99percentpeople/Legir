@@ -552,7 +552,14 @@ export const updateExistingSourceField = async (
         runExistingFieldUpdate("setAlignment", () =>
           textField.setAlignment(TextAlignment.Right),
         );
+      } else if (field.alignment === "left") {
+        runExistingFieldUpdate("setAlignment", () =>
+          textField.setAlignment(TextAlignment.Left),
+        );
       }
+      runExistingFieldUpdate("setVerticalAlignment", () =>
+        textField.setVerticalAlignment(field.verticalAlignment),
+      );
       if (field.multiline) {
         runExistingFieldUpdate("enableMultiline", () =>
           textField.enableMultiline(),

@@ -1,6 +1,6 @@
 {
   "name": "@legir/pdf-renderer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Host-injected PDF worker client and browser rendering runtime",
   "type": "module",
   "license": "AGPL-3.0-or-later",

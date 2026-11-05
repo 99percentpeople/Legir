@@ -42,6 +42,33 @@ fonts. It is not a general PDF sanitization or digital-signature service.
 Unknown image-stamp fallback parsing can require a browser image/canvas host;
 the callback above intentionally supplies no raster stamp fallback.
 
+## Text alignment
+
+Text fields accept `alignment: "left" | "center" | "right"` and
+`verticalAlignment: "top" | "middle" | "bottom"`. The latter places the entire
+text block inside the control, including wrapped lines, explicit line breaks,
+font metrics, border padding and quarter-turn rotations. Explicit vertical
+alignment uses the same appearance for editable and flattened exports.
+
+Omit `verticalAlignment` to preserve the legacy layout: single-line text is
+centered vertically and multiline text starts at the top. The optional value
+round-trips through `/LegirVAlign`, a Legir extension; the saved `/AP` appearance
+is ordinary PDF. Other readers display it, but editing the field in a reader
+that regenerates appearances without understanding this extension can reset its
+vertical placement. Flatten for a fixed final layout.
+
+```ts
+const fields = model.fields.map((field) =>
+  field.type === FieldType.TEXT
+    ? {
+        ...field,
+        alignment: "center" as const,
+        verticalAlignment: "middle" as const,
+      }
+    : field,
+);
+```
+
 ## List boxes and dropdowns
 
 Choice controls share `FieldType.DROPDOWN`, but `isListBox` preserves the PDF

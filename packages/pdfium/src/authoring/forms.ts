@@ -42,6 +42,8 @@ import {
 export type { PDFButtonLayout, PDFButtonImageFit } from "./buttonAppearance.js";
 export { getButtonIconBounds } from "./buttonAppearance.js";
 const key = PDFName.of;
+/** Legir extension persisted in /LegirVAlign; PDF appearances remain standard. */
+export type TextVerticalAlignment = "top" | "middle" | "bottom";
 function inherited(dict: PDFDict, name: string): PDFObject | undefined {
   const seen = new Set<PDFDict>();
   let current: PDFDict | undefined = dict;
@@ -435,7 +437,7 @@ export class PDFField {
     this.doc.getForm().markFieldAsDirty(this.ref);
   }
 }
-function defaultTextAppearance(
+export function defaultTextFieldAppearanceProvider(
   field: PDFTextField,
   widget: PDFWidgetAnnotation,
   font: PDFFont,
@@ -482,6 +484,27 @@ function defaultTextAppearance(
       : "cells" in layout
         ? layout.cells
         : [layout.line];
+  const verticalAlignment = field.getVerticalAlignment();
+  if (verticalAlignment && lines.length) {
+    const ascent = font.heightAtSize(layout.fontSize, { descender: false });
+    const descent = font.heightAtSize(layout.fontSize) - ascent;
+    let bottom = Infinity;
+    let top = -Infinity;
+    for (const line of lines) {
+      bottom = Math.min(bottom, line.y - descent);
+      top = Math.max(top, line.y + ascent);
+    }
+    const freeSpace = bounds.height - (top - bottom);
+    const offset =
+      bounds.y -
+      bottom +
+      (verticalAlignment === "top"
+        ? freeSpace
+        : verticalAlignment === "middle"
+          ? freeSpace / 2
+          : 0);
+    for (const line of lines) line.y += offset;
+  }
   field.acroField.setDefaultAppearance(
     `/${font.name} ${layout.fontSize} Tf ${setFillingColor(textColor)}`,
   );
@@ -525,6 +548,22 @@ export class PDFTextField extends PDFField {
   }
   setAlignment(value: TextAlignment) {
     this.acroField.dict.set(key("Q"), PDFNumber.of(value));
+    this.doc.getForm().markFieldAsDirty(this.ref);
+  }
+  getVerticalAlignment(): TextVerticalAlignment | undefined {
+    const value = stringValue(inherited(this.acroField.dict, "LegirVAlign"));
+    return value === "top" || value === "middle" || value === "bottom"
+      ? value
+      : undefined;
+  }
+  setVerticalAlignment(value: TextVerticalAlignment | undefined) {
+    if (value === undefined) this.acroField.dict.delete(key("LegirVAlign"));
+    else {
+      if (value !== "top" && value !== "middle" && value !== "bottom")
+        throw new Error("Invalid text vertical alignment");
+      this.acroField.dict.set(key("LegirVAlign"), PDFName.of(value));
+    }
+    this.doc.getForm().markFieldAsDirty(this.ref);
   }
   isMultiline() {
     return !!(this.acroField.getFlags() & (1 << 12));
@@ -566,7 +605,7 @@ export class PDFTextField extends PDFField {
   }
   updateAppearances(
     font = this.doc.getForm().getDefaultFont(),
-    provider: AppearanceProviderFor<PDFTextField> = defaultTextAppearance,
+    provider: AppearanceProviderFor<PDFTextField> = defaultTextFieldAppearanceProvider,
   ) {
     for (const widget of this.acroField.getWidgets()) {
       const appearance = provider(this, widget, font);

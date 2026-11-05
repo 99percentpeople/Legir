@@ -83,6 +83,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   defaultAppearance?: string;
   DA?: string;
   textAlignment?: number;
+  verticalAlignment?: FormField["verticalAlignment"];
   rotation?: number;
 
   checkBox?: boolean;

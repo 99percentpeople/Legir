@@ -1,6 +1,6 @@
 {
   "name": "@legir/pdf-model",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Portable PDF document models, geometry and editing policies",
   "type": "module",
   "license": "AGPL-3.0-or-later",

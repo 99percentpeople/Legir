@@ -39,7 +39,7 @@ jobs:
         working-directory: source
       - run: bun run build:packages && bun run check:boundaries
         working-directory: source
-      - run: bun x vitest run tests/controlResizeCursor.test.ts
+      - run: bun x vitest run tests/controlResizeCursor.test.ts tests/pdf/textVerticalAlignment.test.ts
         working-directory: source
       - run: bun run --cwd packages/pdfium test tests/attachments.test.ts
         working-directory: source

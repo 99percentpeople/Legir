@@ -1,6 +1,7 @@
 import {
   cmyk,
   componentsToColor,
+  defaultTextFieldAppearanceProvider,
   drawTextField,
   grayscale,
   layoutCombedText,
@@ -114,6 +115,10 @@ const liftMultilineBaselines = <T extends { text?: string; y: number }>(
 export const flattenTextFieldAppearanceProvider: AppearanceProviderFor<
   PDFTextField
 > = (textField, widget: PDFWidgetAnnotation, font) => {
+  // Explicit alignment uses the same layout for editable and flattened output.
+  // Keep legacy baseline adjustments for fields without the extension.
+  if (textField.getVerticalAlignment())
+    return defaultTextFieldAppearanceProvider(textField, widget, font);
   const widgetColor = getDefaultColor(widget);
   const fieldColor = getDefaultColor(textField.acroField);
   const widgetFontSize = getDefaultFontSize(widget);

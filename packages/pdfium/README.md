@@ -53,6 +53,15 @@ its own assets. A host should serialize document jobs in one worker.
 
 ## Editing API
 
+The authoring entry point exposes `PDFTextField.setVerticalAlignment("top" |
+"middle" | "bottom" | undefined)` and `getVerticalAlignment()`. Alignment moves
+the whole text block within the widget's padded, rotated content box; it works
+with single-line, multiline, wrapped and combed text. Setting it marks the
+appearance dirty. `undefined` restores the previous default layout. The optional
+value is stored as `/LegirVAlign`; other PDF readers can display its normal
+appearance, but may reset placement when they regenerate it after editing.
+`defaultTextFieldAppearanceProvider` is available for custom export pipelines.
+
 - `getTrailer`, `findPage`, `PDFObject.get/put/delete/push`, `readStream` and
   `writeStream` expose the native object graph without a second PDF parser.
   Plain strings in object literals are PDF **names**; use `newString` for text

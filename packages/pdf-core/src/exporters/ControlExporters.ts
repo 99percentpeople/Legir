@@ -78,6 +78,8 @@ export class TextControlExporter implements IControlExporter {
 
     if (field.alignment === "center") tf.setAlignment(TextAlignment.Center);
     else if (field.alignment === "right") tf.setAlignment(TextAlignment.Right);
+    else if (field.alignment === "left") tf.setAlignment(TextAlignment.Left);
+    tf.setVerticalAlignment(field.verticalAlignment);
 
     if (field.multiline) tf.enableMultiline();
 

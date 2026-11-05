@@ -103,7 +103,11 @@ try {
   );
   const fields = parsed.fields.map((field) =>
     field.name === "project_name"
-      ? { ...field, value: "Independent package consumer" }
+      ? {
+          ...field,
+          value: "Independent package consumer",
+          verticalAlignment: "bottom",
+        }
       : field.type === FieldType.CHECKBOX
         ? { ...field, isChecked: true }
         : field,
@@ -131,6 +135,24 @@ try {
     filled.document.getForm().getTextField("project_name").getText(),
     "Independent package consumer",
   );
+  assert.equal(
+    filled.document
+      .getForm()
+      .getTextField("project_name")
+      .getVerticalAlignment(),
+    "bottom",
+  );
+  const reopened = new DocumentSession(engine, completed);
+  try {
+    assert.equal(
+      (await reopened.parse({}, async () => undefined)).fields.find(
+        (field) => field.name === "project_name",
+      ).verticalAlignment,
+      "bottom",
+    );
+  } finally {
+    reopened.dispose();
+  }
   assert.equal(
     filled.document.getForm().getCheckBox("completed").isChecked(),
     true,
@@ -181,6 +203,7 @@ try {
       buttonImageAndNativeSignature: true,
       editableAndFlattened: true,
       identicalFlattenedPixels: true,
+      verticalAlignmentRoundTrip: true,
       sourceUnchanged: true,
       attachmentReadEditAndPreservation: true,
       liveDocuments: engine.liveDocuments(),

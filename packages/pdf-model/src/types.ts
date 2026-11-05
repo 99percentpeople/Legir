@@ -129,6 +129,8 @@ export interface FormField {
   multiline?: boolean; // For Text
   maxLength?: number; // For Text
   alignment?: "left" | "center" | "right"; // For Text
+  /** Text block placement. Omit to retain legacy single-line/multiline layout. */
+  verticalAlignment?: "top" | "middle" | "bottom";
   rotationDeg?: number;
   sourcePdfRef?: { objectNumber: number; generationNumber: number };
 }
