@@ -757,16 +757,16 @@ capability precedence and model-cache ownership.
 
 Update the control system rather than adding one-off rendering branches:
 
-- control types in `src/types.ts`
+- portable control types in `packages/pdf-model/src/types.ts`
 - control components under `src/components/workspace/controls/`
 - registration in the control registry
-- parser/exporter support in `src/services/pdfService/` if round-trip PDF support is required
+- parser/exporter support in `packages/pdf-core/src/{parsers,exporters}/` if round-trip PDF support is required
 
 ### Add a New Annotation-Like Tool
 
 Touch the same broad areas:
 
-- tool type definitions in `src/types.ts`
+- tool type definitions in `packages/pdf-model/src/types.ts`
 - workspace interaction logic
 - control/annotation registry
 - export support if it needs to be written back to PDF

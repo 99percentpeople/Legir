@@ -72,10 +72,10 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
               <Switch
                 id={`${idPrefix}-transparent`}
                 checked={style.isTransparent || false}
-                onMouseDown={onTriggerHistorySave}
-                onCheckedChange={(checked) =>
-                  handleStyleChange("isTransparent", checked)
-                }
+                onCheckedChange={(checked) => {
+                  onTriggerHistorySave();
+                  handleStyleChange("isTransparent", checked);
+                }}
               />
               <Label
                 htmlFor={`${idPrefix}-transparent`}

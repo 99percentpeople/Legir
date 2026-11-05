@@ -101,8 +101,10 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
             <Switch
               id={`${idPrefix}-required-switch`}
               checked={data.required || false}
-              onMouseDown={onTriggerHistorySave}
-              onCheckedChange={(checked) => onChange({ required: checked })}
+              onCheckedChange={(checked) => {
+                onTriggerHistorySave();
+                onChange({ required: checked });
+              }}
             />
           </div>
 
@@ -116,8 +118,10 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
             <Switch
               id={`${idPrefix}-readonly-switch`}
               checked={data.readOnly || false}
-              onMouseDown={onTriggerHistorySave}
-              onCheckedChange={(checked) => onChange({ readOnly: checked })}
+              onCheckedChange={(checked) => {
+                onTriggerHistorySave();
+                onChange({ readOnly: checked });
+              }}
             />
           </div>
 
@@ -131,8 +135,10 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
             <Switch
               id={`${idPrefix}-multiline-switch`}
               checked={data.multiline || false}
-              onMouseDown={onTriggerHistorySave}
-              onCheckedChange={(checked) => onChange({ multiline: checked })}
+              onCheckedChange={(checked) => {
+                onTriggerHistorySave();
+                onChange({ multiline: checked });
+              }}
             />
           </div>
         </div>

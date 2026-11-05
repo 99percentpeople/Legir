@@ -697,7 +697,14 @@ export const useWorkspaceViewport = (opts: {
         e.preventDefault();
         const currentScale = opts.editorState.scale;
         const baseScale = pendingZoomCommitRef.current?.scale ?? currentScale;
-        const steps = -e.deltaY / 100;
+        const delta =
+          e.deltaY *
+          (e.deltaMode === 1
+            ? 16
+            : e.deltaMode === 2
+              ? container.clientHeight
+              : 1);
+        const steps = -delta / 100;
         const newScale = baseScale * Math.pow(ZOOM_BASE, steps);
 
         void zoomAtClientPoint({

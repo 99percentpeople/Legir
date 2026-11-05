@@ -362,13 +362,13 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
                 <Switch
                   id={`${idPrefix}-shapeTransparent`}
                   checked={isTransparent}
-                  onMouseDown={onTriggerHistorySave}
-                  onCheckedChange={(checked) =>
+                  onCheckedChange={(checked) => {
+                    onTriggerHistorySave();
                     onChange({
                       backgroundColor: checked ? undefined : "#ffffff",
                       appearanceStreamContent: undefined,
-                    })
-                  }
+                    });
+                  }}
                 />
                 <Label
                   htmlFor={`${idPrefix}-shapeTransparent`}

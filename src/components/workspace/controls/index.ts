@@ -13,12 +13,12 @@ import {
 // Rendering is dispatched by `data.type` in `ControlRenderer`.
 //
 // To add a new Form control:
-// - Add a `FieldType` in `src/types.ts`
+// - Add a `FieldType` in `packages/pdf-model/src/types.ts`
 // - Create a control component under `./form/`
 // - Create an optional properties panel under `./properties/`
 // - Register it in `registerControls()` below
 //
-// For PDF import/export support, also add parser/exporter implementations under `services/pdf/...`.
+// For PDF import/export support, add parser/exporter implementations in `packages/pdf-core/src/`.
 
 type UnsafeComponent = React.ComponentType<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 

@@ -77,13 +77,17 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
       <div className="space-y-4">
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <Label>{t("properties.flatten")}</Label>
+            <Label htmlFor={`${idPrefix}-freetextFlatten`}>
+              {t("properties.flatten")}
+            </Label>
             <div className="flex items-center gap-2">
               <Switch
                 id={`${idPrefix}-freetextFlatten`}
                 checked={isFlatten}
-                onMouseDown={onTriggerHistorySave}
-                onCheckedChange={(checked) => onChange({ flatten: checked })}
+                onCheckedChange={(checked) => {
+                  onTriggerHistorySave();
+                  onChange({ flatten: checked });
+                }}
               />
             </div>
           </div>
@@ -111,10 +115,12 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
               <Switch
                 id={`${idPrefix}-freetextTransparent`}
                 checked={isTransparent}
-                onMouseDown={onTriggerHistorySave}
-                onCheckedChange={(checked) =>
-                  onChange({ backgroundColor: checked ? undefined : "#ffffff" })
-                }
+                onCheckedChange={(checked) => {
+                  onTriggerHistorySave();
+                  onChange({
+                    backgroundColor: checked ? undefined : "#ffffff",
+                  });
+                }}
               />
               <Label
                 htmlFor={`${idPrefix}-freetextTransparent`}
