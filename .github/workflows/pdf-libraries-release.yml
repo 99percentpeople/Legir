@@ -41,6 +41,8 @@ jobs:
         working-directory: source
       - run: bun x vitest run tests/controlResizeCursor.test.ts
         working-directory: source
+      - run: bun run --cwd packages/pdfium test tests/attachments.test.ts
+        working-directory: source
       - name: Build release assets from the exact tagged source
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}

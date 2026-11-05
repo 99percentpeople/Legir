@@ -8,7 +8,7 @@ The four libraries are distributed independently from desktop releases. Pin a
 library release URL, for example:
 
 ```sh
-bun add @legir/pdf-core@https://github.com/99percentpeople/Legir/releases/download/pdf-libs-v0.1.0/legir-pdf-core-0.1.0.tgz
+bun add @legir/pdf-core@https://github.com/99percentpeople/Legir/releases/download/pdf-libs-v0.2.0/legir-pdf-core-0.2.0.tgz
 ```
 
 Internal library dependencies point to the same release automatically. Packages

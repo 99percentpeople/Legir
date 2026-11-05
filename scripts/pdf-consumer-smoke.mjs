@@ -53,6 +53,12 @@ const rasterHash = (native) => {
 let session;
 try {
   const source = open();
+  const attachmentBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
+  const attachment = source.document.getAttachments().add(attachmentBytes, {
+    name: "原始数据.bin",
+    mimeType: "application/octet-stream",
+    description: "Consumer fixture",
+  });
   const page = source.document.addPage([360, 240]);
   const form = source.document.getForm();
   form
@@ -116,6 +122,11 @@ try {
     "export must roll back the source document",
   );
   const filled = open(completed);
+  assert.deepEqual(filled.document.getAttachments().list(), [attachment]);
+  assert.deepEqual(
+    filled.document.getAttachments().read(attachment.id),
+    attachmentBytes,
+  );
   assert.equal(
     filled.document.getForm().getTextField("project_name").getText(),
     "Independent package consumer",
@@ -137,6 +148,22 @@ try {
     options: { ...request.options, flattenFormFields: true },
   });
   const flat = open(flattened);
+  assert.deepEqual(flat.document.getAttachments().list(), [attachment]);
+  assert.deepEqual(
+    flat.document.getAttachments().read(attachment.id),
+    attachmentBytes,
+  );
+  flat.document
+    .getAttachments()
+    .update(attachment.id, { name: "更新.bin", bytes: Uint8Array.of(0, 255) });
+  const edited = open(await flat.document.save());
+  assert.equal(edited.document.getAttachments().list()[0].name, "更新.bin");
+  assert.deepEqual(
+    edited.document.getAttachments().read(attachment.id),
+    Uint8Array.of(0, 255),
+  );
+  assert.equal(edited.document.getAttachments().remove(attachment.id), true);
+  close(edited);
   assert.equal(flat.document.getForm().getFields().length, 0);
   assert.equal(
     rasterHash(flat.native),
@@ -155,6 +182,7 @@ try {
       editableAndFlattened: true,
       identicalFlattenedPixels: true,
       sourceUnchanged: true,
+      attachmentReadEditAndPreservation: true,
       liveDocuments: engine.liveDocuments(),
     }),
   );

@@ -176,6 +176,50 @@ this is not a general browser SVG renderer. Custom fonts require a supplied
 font shaper/subsetter; the package does not fetch fonts or embed a second PDF
 engine. `fast-png` and `@xmldom/xmldom` are image/XML codecs only.
 
+## Embedded file attachments
+
+The authoring document exposes `getAttachments()` for document-level
+`/Names/EmbeddedFiles`. Files are opaque bytes: PDF, spreadsheets, images and
+other formats do not require another parser or a WASM rebuild.
+
+```ts
+const attachments = view.document.getAttachments();
+const file = attachments.add(fileBytes, {
+  name: "原始数据.xlsx",
+  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  description: "Source data",
+});
+const items = attachments.list();
+const bytes = attachments.read(file.id); // Owned Uint8Array; no file is opened.
+attachments.update(file.id, { name: "更新数据.xlsx", bytes: replacementBytes });
+attachments.update(file.id, { description: null }); // Clear optional metadata.
+attachments.remove(file.id); // false if no such entry exists.
+await view.flush(); // Then save through the document owner as usual.
+```
+
+`list()` returns detached metadata (`id`, `name`, `mimeType`, `description`,
+`size`, `embedded`) without decompressing attachments. `size` is the optional
+declared size, not a verified allocation limit. `read()` throws for missing,
+external-only or undecodable entries. It never follows a URL or filesystem path.
+Hosts must run untrusted PDF operations with appropriate resource limits.
+
+IDs are opaque encodings of existing name-tree keys, stable across edits and
+saves in that document; do not use them as filenames or global document IDs.
+New filenames must be nonempty basenames. Duplicate filenames are rejected on
+add/rename; existing duplicate display names remain individually addressable.
+Renames retain the id. Updating bytes preserves unspecified MIME/description;
+`null` clears MIME/description. Listing understands legacy `/F` and Unicode `/UF`
+names, nested name trees, and compressed streams. Mutations preserve other
+`/Names` entries and existing file-specification metadata, reject malformed or
+cyclic trees, and bound traversal to 10,000 entries/nodes and depth 64.
+
+Edits participate in the owner's native transaction. Flush before native save or
+transaction completion, and recreate authoring views after rollback. Removal
+unlists the name-tree entry: page attachment annotations, associated-file (`/AF`)
+references and incremental-save history are not removed. It is not secure erasure.
+This API does not add page paperclip annotations, launch actions, PDF/A conformance,
+or attachment UI. Consumers retain their own undo, permissions and save policy.
+
 ## Pushbuttons and signature fields
 
 `PDFForm.createButton(name)` creates a standard `/FT /Btn` pushbutton. Add its

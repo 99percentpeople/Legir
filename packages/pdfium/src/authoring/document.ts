@@ -17,6 +17,7 @@ import {
 } from "./objects.js";
 import { PDFFont, StandardFonts, type Fontkit } from "./fonts.js";
 import { PDFForm } from "./forms.js";
+import { PDFAttachments } from "./attachments.js";
 import {
   type Bounds,
   type Color,
@@ -196,6 +197,9 @@ export class PDFDocument {
   }
   getForm() {
     return (this.form ??= new PDFForm(this));
+  }
+  getAttachments() {
+    return new PDFAttachments(this);
   }
   registerFontkit(fontkit: unknown) {
     if (!fontkit || typeof (fontkit as Fontkit).create !== "function")

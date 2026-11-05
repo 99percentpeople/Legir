@@ -1,6 +1,6 @@
 {
   "name": "@legir/pdfium",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Standalone PDFium WebAssembly engine and TypeScript bindings",
   "type": "module",
   "license": "BSD-3-Clause",
