@@ -1,5 +1,9 @@
+import {
+  duplicateFieldForDrag,
+  duplicateAnnotationForDrag,
+} from "@/lib/controlDuplication";
 import { ANNOTATION_STYLES } from "@/constants";
-import { preparePastedControl } from "@/lib/controlClipboard";
+import { preparePastedControls } from "@/lib/controlClipboard";
 import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
   getMoveDelta,
@@ -8,6 +12,7 @@ import {
 } from "@legir/pdf-model/controlMovement";
 import {
   getNextLayerOrderForPage,
+  getOrderedPageControls,
   reorderControlLayer,
 } from "@legir/pdf-model/controlLayerOrder";
 import { shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
@@ -43,6 +48,7 @@ export const createControlSlice: EditorStoreSlice<
     EditorActions,
     | "addField"
     | "pasteControl"
+    | "duplicateControls"
     | "addAnnotation"
     | "addAnnotations"
     | "updateField"
@@ -60,6 +66,7 @@ export const createControlSlice: EditorStoreSlice<
     | "closeDialog"
     | "setKeys"
     | "moveSelectedControl"
+    | "translateSelectedControls"
     | "setAllFreetextFlatten"
   >
 > = (set, get) => ({
@@ -72,16 +79,148 @@ export const createControlSlice: EditorStoreSlice<
     );
     if (!page || state.mode === "pages" || state.documentLoadState !== "ready")
       return false;
-    const control = preparePastedControl(clipboard, page, state, target);
-    if (!control) return false;
-    // addField/addAnnotation own permission checks, one undo checkpoint and dirty scopes.
-    if (control.type === "field") state.addField(control.data);
-    else state.addAnnotation(control.data);
-    set({
-      mode: control.type === "field" ? "form" : "annotation",
-      tool: "select",
-    });
+    const controls = preparePastedControls(clipboard, page, state, target);
+    if (!controls?.length) return false;
+    if (controls.length === 1) {
+      const control = controls[0];
+      if (control.type === "field") state.addField(control.data);
+      else state.addAnnotation(control.data);
+      set({
+        mode: control.type === "field" ? "form" : "annotation",
+        tool: "select",
+        selectedId: control.data.id,
+        selectedControlIds: [control.data.id],
+      });
+    } else {
+      const isField = controls[0].type === "field";
+      assertPdfPermissionOperation(
+        isField ? "edit_form_structure" : "create_annotation",
+        state.documentPermissions,
+      );
+      const fields = [...state.fields];
+      const annotations = [...state.annotations];
+      const updatedAt = new Date().toISOString();
+      for (const control of controls) {
+        const layerOrder = getNextLayerOrderForPage(
+          fields,
+          annotations,
+          page.pageIndex,
+        );
+        if (control.type === "field")
+          fields.push({ ...control.data, layerOrder });
+        else
+          annotations.push({
+            ...control.data,
+            layerOrder,
+            updatedAt,
+            author: control.data.author || state.options.userName,
+          });
+      }
+      state.saveCheckpoint();
+      set({
+        fields,
+        annotations,
+        mode: isField ? "form" : "annotation",
+        tool: "select",
+        selectedId: controls.at(-1)!.data.id,
+        selectedControlIds: controls.map((control) => control.data.id),
+        isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          isField ? { modifyContents: true } : { modifyAnnotations: true },
+        ),
+      });
+    }
     return true;
+  },
+
+  duplicateControls: (ids, dx, dy) => {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+    const state = get();
+    const wanted = new Set(ids);
+    const first = [...state.fields, ...state.annotations].find((control) =>
+      wanted.has(control.id),
+    );
+    if (!first || state.documentLoadState !== "ready") return;
+    const isField = state.fields.some((field) => field.id === first.id);
+    if (state.mode !== (isField ? "form" : "annotation")) return;
+    const originals = getOrderedPageControls(
+      state.fields,
+      state.annotations,
+      first.pageIndex,
+    ).filter(
+      (entry) =>
+        wanted.has(entry.control.id) && (entry.kind === "field") === isField,
+    );
+    if (
+      originals.length !== wanted.size ||
+      originals.some(
+        (entry) =>
+          entry.kind === "field" &&
+          entry.control.type === FieldType.SIGNATURE &&
+          entry.control.signature?.present,
+      )
+    )
+      return;
+    assertPdfPermissionOperation(
+      isField ? "edit_form_structure" : "create_annotation",
+      state.documentPermissions,
+    );
+    const fields = [...state.fields];
+    const annotations = [...state.annotations];
+    const names = new Set(fields.map((field) => field.name));
+    const selectedControlIds: string[] = [];
+    const updatedAt = new Date().toISOString();
+    for (const entry of originals) {
+      const layerOrder = getNextLayerOrderForPage(
+        fields,
+        annotations,
+        first.pageIndex,
+      );
+      if (entry.kind === "field") {
+        const field = duplicateFieldForDrag(entry.control);
+        // Radio widgets intentionally retain their group name; other fields must be independent.
+        if (field.type !== FieldType.RADIO) {
+          const base = field.name.replace(/_\d+$/, "");
+          let suffix = 1;
+          while (names.has(field.name)) field.name = `${base}_${suffix++}`;
+        }
+        names.add(field.name);
+        fields.push({
+          ...field,
+          ...getMovedFieldUpdates(field, dx, dy),
+          layerOrder,
+        });
+        selectedControlIds.push(field.id);
+      } else {
+        const annotation = duplicateAnnotationForDrag(entry.control);
+        annotations.push(
+          prepareInkAnnotationForStore(
+            {
+              ...annotation,
+              ...getMovedAnnotationUpdates(annotation, dx, dy),
+              layerOrder,
+              updatedAt,
+              author: annotation.author || state.options.userName,
+            },
+            { recomputeRect: true, recomputeSvgPath: true },
+          ),
+        );
+        selectedControlIds.push(annotation.id);
+      }
+    }
+    state.saveCheckpoint();
+    set({
+      fields,
+      annotations,
+      selectedControlIds,
+      selectedId: selectedControlIds.at(-1)!,
+      isDirty: true,
+      dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+        state.dirtyPermissionScopes,
+        isField ? { modifyContents: true } : { modifyAnnotations: true },
+      ),
+    });
   },
 
   addField: (field) => {
@@ -637,73 +776,75 @@ export const createControlSlice: EditorStoreSlice<
   },
 
   deleteSelection: () => {
-    const selectedId = get().selectedId;
-    if (!selectedId) return;
-    const selectedField = get().fields.find((field) => field.id === selectedId);
+    const state = get();
+    const ids = new Set(state.selectedControlIds);
+    const fields = state.fields.filter((item) => ids.has(item.id));
+    const annotations = state.annotations.filter((item) => ids.has(item.id));
+    if (!fields.length && !annotations.length) return;
     if (
-      selectedField?.type === FieldType.SIGNATURE &&
-      selectedField.signature?.present
+      fields.some(
+        (field) =>
+          field.type === FieldType.SIGNATURE && field.signature?.present,
+      )
     )
       return;
-    const isField = !!selectedField;
-    const isAnnotation = get().annotations.some(
-      (annotation) => annotation.id === selectedId,
-    );
-    if (!isField && !isAnnotation) return;
-    if (
-      isField
-        ? !canModifyPdfContents(get().documentPermissions)
-        : !canModifyPdfAnnotations(get().documentPermissions)
-    ) {
-      throw new PdfPermissionDeniedError(
-        isField ? "edit_form_structure" : "delete_annotation",
+    if (fields.length)
+      assertPdfPermissionOperation(
+        "edit_form_structure",
+        state.documentPermissions,
       );
-    }
-
-    const { saveCheckpoint } = get();
-    saveCheckpoint();
-    set((state) => {
-      if (state.selectedId) {
-        const isField = state.fields.some(
-          (field) => field.id === state.selectedId,
-        );
-        if (isField) {
-          return {
-            fields: state.fields.filter(
-              (field) => field.id !== state.selectedId,
-            ),
-            selectedId: null,
-            isDirty: true,
-            dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-              state.dirtyPermissionScopes,
-              { modifyContents: true },
-            ),
-          };
-        }
-
-        const isAnnotation = state.annotations.some(
-          (annotation) => annotation.id === state.selectedId,
-        );
-        if (isAnnotation) {
-          return {
-            annotations: state.annotations.filter(
-              (annotation) => annotation.id !== state.selectedId,
-            ),
-            selectedId: null,
-            isDirty: true,
-            dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-              state.dirtyPermissionScopes,
-              { modifyAnnotations: true },
-            ),
-          };
-        }
-      }
-
-      return state;
+    if (annotations.length)
+      assertPdfPermissionOperation(
+        "delete_annotation",
+        state.documentPermissions,
+      );
+    state.saveCheckpoint();
+    set({
+      fields: state.fields.filter((item) => !ids.has(item.id)),
+      annotations: state.annotations.filter((item) => !ids.has(item.id)),
+      selectedId: null,
+      selectedControlIds: [],
+      isDirty: true,
+      dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+        state.dirtyPermissionScopes,
+        {
+          ...(fields.length ? { modifyContents: true } : {}),
+          ...(annotations.length ? { modifyAnnotations: true } : {}),
+        },
+      ),
     });
   },
 
-  selectControl: (id) => set({ selectedId: id }),
+  selectControl: (id, intent = "replace") => {
+    const state = get();
+    if (!id) {
+      set({ selectedId: null, selectedControlIds: [] });
+      return;
+    }
+    const field = state.fields.find((item) => item.id === id);
+    const control = field ?? state.annotations.find((item) => item.id === id);
+    if (!control) return;
+    if (intent === "preserve" && state.selectedControlIds.includes(id)) return;
+    const primary = [...state.fields, ...state.annotations].find(
+      (item) => item.id === state.selectedId,
+    );
+    const sameScope =
+      primary?.pageIndex === control.pageIndex &&
+      state.fields.some((item) => item.id === primary?.id) === !!field;
+    const canToggle =
+      intent === "toggle" &&
+      sameScope &&
+      (field ? state.mode === "form" : state.mode === "annotation");
+    const ids = canToggle
+      ? state.selectedControlIds.includes(id)
+        ? state.selectedControlIds.filter((item) => item !== id)
+        : [...state.selectedControlIds, id]
+      : [id];
+    set({
+      selectedControlIds: ids,
+      selectedId: ids.includes(id) ? id : (ids.at(-1) ?? null),
+    });
+  },
 
   setTool: (tool) =>
     set((state) => {
@@ -763,96 +904,70 @@ export const createControlSlice: EditorStoreSlice<
 
   setKeys: (keys) => set((state) => ({ keys: { ...state.keys, ...keys } })),
 
-  moveSelectedControl: (direction, isFast) => {
-    const selectedId = get().selectedId;
-    if (!selectedId) return;
-    const isField = get().fields.some((field) => field.id === selectedId);
-    const isAnnotation = get().annotations.some(
-      (annotation) => annotation.id === selectedId,
-    );
-    if (!isField && !isAnnotation) return;
+  moveSelectedControl: (direction, isFast, checkpoint = true) => {
+    const { dx, dy } = getMoveDelta(direction, isFast);
+    get().translateSelectedControls(dx, dy, checkpoint);
+  },
+
+  translateSelectedControls: (dx, dy, checkpoint = false) => {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy) || (!dx && !dy)) return;
+    const state = get();
+    const ids = new Set(state.selectedControlIds);
+    const fields = state.fields.filter((item) => ids.has(item.id));
+    const annotations = state.annotations.filter((item) => ids.has(item.id));
+    if (!fields.length && !annotations.length) return;
     if (
-      isField
-        ? !canModifyPdfContents(get().documentPermissions)
-        : !canModifyPdfAnnotations(get().documentPermissions)
-    ) {
-      throw new PdfPermissionDeniedError(
-        isField ? "edit_form_structure" : "edit_annotation",
+      fields.some(
+        (field) =>
+          field.type === FieldType.SIGNATURE && field.signature?.present,
+      )
+    )
+      return;
+    if (fields.length)
+      assertPdfPermissionOperation(
+        "edit_form_structure",
+        state.documentPermissions,
       );
-    }
-
-    set((state) => {
-      if (!state.selectedId) return state;
-      const { dx, dy } = getMoveDelta(direction, isFast);
-
-      const fieldIndex = state.fields.findIndex(
-        (field) => field.id === state.selectedId,
+    if (annotations.length)
+      assertPdfPermissionOperation(
+        "edit_annotation",
+        state.documentPermissions,
       );
-      if (fieldIndex !== -1) {
-        const field = state.fields[fieldIndex];
-        const nextFields = [...state.fields];
-        nextFields[fieldIndex] = {
-          ...field,
-          ...getMovedFieldUpdates(field, dx, dy),
-        };
-
-        return {
-          fields: nextFields,
-          isDirty: true,
-          dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-            state.dirtyPermissionScopes,
-            { modifyContents: true },
-          ),
-        };
-      }
-
-      const annotationIndex = state.annotations.findIndex(
-        (annotation) => annotation.id === state.selectedId,
-      );
-      if (annotationIndex === -1) return state;
-
-      const annotation = state.annotations[annotationIndex];
-      if (!annotation.rect) return state;
-
-      const shouldMarkEdited =
-        !!annotation.sourcePdfRef && annotation.isEdited !== true;
-      const updatedAt = new Date().toISOString();
-      const baseAnnotation = {
-        ...annotation,
-        updatedAt,
-        ...(shouldMarkEdited ? { isEdited: true } : null),
-      } satisfies Annotation;
-
-      let nextAnnotation: Annotation;
-
-      if (annotation.type === "ink") {
-        nextAnnotation = prepareInkAnnotationForStore(
-          {
-            ...baseAnnotation,
-            ...getMovedAnnotationUpdates(annotation, dx, dy),
-          },
-          {
-            recomputeRect: true,
-            recomputeSvgPath: true,
-          },
-        );
-      } else {
-        nextAnnotation = {
-          ...baseAnnotation,
-          ...getMovedAnnotationUpdates(annotation, dx, dy),
-        };
-      }
-
-      const nextAnnotations = [...state.annotations];
-      nextAnnotations[annotationIndex] = nextAnnotation;
-      return {
-        annotations: nextAnnotations,
-        isDirty: true,
-        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-          state.dirtyPermissionScopes,
-          { modifyAnnotations: true },
-        ),
-      };
+    if (checkpoint) state.saveCheckpoint();
+    const updatedAt = new Date().toISOString();
+    set({
+      fields: fields.length
+        ? state.fields.map((field) =>
+            ids.has(field.id)
+              ? { ...field, ...getMovedFieldUpdates(field, dx, dy) }
+              : field,
+          )
+        : state.fields,
+      annotations: annotations.length
+        ? state.annotations.map((annotation) => {
+            if (!ids.has(annotation.id)) return annotation;
+            const next = {
+              ...annotation,
+              ...getMovedAnnotationUpdates(annotation, dx, dy),
+              updatedAt,
+              ...(annotation.sourcePdfRef ? { isEdited: true } : {}),
+            };
+            return annotation.type === "ink"
+              ? prepareInkAnnotationForStore(next, {
+                  recomputeRect: true,
+                  recomputeSvgPath: true,
+                })
+              : next;
+          })
+        : state.annotations,
+      isDirty: true,
+      dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+        state.dirtyPermissionScopes,
+        {
+          ...(fields.length ? { modifyContents: true } : {}),
+          ...(annotations.length ? { modifyAnnotations: true } : {}),
+        },
+      ),
     });
   },
 

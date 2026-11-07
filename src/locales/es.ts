@@ -148,6 +148,9 @@ const es = {
     },
   },
   properties: {
+    multi_selected: "{count} objetos seleccionados",
+    multi_selection_hint:
+      "Arrastra para moverlos juntos. Ctrl/Cmd+C copia la selección y Supr la elimina. Selecciona un solo objeto para editar sus propiedades.",
     stroke_preview: "Vista previa del trazo",
     form_detection: {
       api_key_missing:
@@ -536,7 +539,9 @@ const es = {
     desc: "Atajos esenciales para una edición más rápida.",
     ctrl_create: "Ctrl + Arrastrar (Crear)",
     continuous_mode: "Modo de creación continua",
-    ctrl_drag: "Ctrl + Arrastrar (Seleccionar)",
+    duplicate_drag: "Ctrl/Cmd + Arrastrar (Seleccionar)",
+    multi_select_key: "Ctrl/Cmd + Clic",
+    multi_select: "Añadir o quitar de la selección",
     duplicate: "Duplicar campo",
     shift_drag_create: "Mayús + Arrastrar (Crear)",
     draw_square: "Dibujar cuadrado (Relación de aspecto 1:1)",

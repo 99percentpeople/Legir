@@ -241,7 +241,9 @@ describe("control clipboard across documents", () => {
       if (type === "highlight")
         expect(placed.rects![1]).toMatchObject({ x: 240, y: 312 });
       expect(placed.shapePoints).toEqual(annotation.shapePoints);
-      expect(payload.data.rect).not.toEqual(placed.rect);
+      expect(payload.version).toBe(1);
+      if (payload.version === 1)
+        expect(payload.data.rect).not.toEqual(placed.rect);
     },
   );
 

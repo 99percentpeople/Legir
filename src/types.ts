@@ -243,7 +243,9 @@ export interface DocumentState {
   documentLoadError: string | null;
   mode: EditorMode;
   tool: Tool;
+  /** Primary control; always belongs to selectedControlIds when selected. */
   selectedId: string | null;
+  selectedControlIds: string[];
   scale: number;
   /** Page editor thumbnail zoom, independent of PDF reading zoom. */
   pageThumbnailScale: number;
@@ -398,6 +400,7 @@ export type WorkspaceEditorState = Pick<
   | "scale"
   | "viewRotation"
   | "selectedId"
+  | "selectedControlIds"
   | "tool"
 >;
 

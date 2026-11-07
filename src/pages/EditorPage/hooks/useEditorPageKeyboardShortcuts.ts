@@ -253,6 +253,7 @@ export function useEditorPageKeyboardShortcuts({
         ) {
           return;
         }
+        if (currentState.selectedId) event.preventDefault();
         currentState.deleteSelection();
         return;
       }
@@ -303,7 +304,7 @@ export function useEditorPageKeyboardShortcuts({
         else if (event.key === "ArrowDown") direction = "DOWN";
         else if (event.key === "ArrowLeft") direction = "LEFT";
         else if (event.key === "ArrowRight") direction = "RIGHT";
-        currentState.moveSelectedControl(direction, isFast);
+        currentState.moveSelectedControl(direction, isFast, !event.repeat);
         return;
       }
 

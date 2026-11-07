@@ -5,6 +5,7 @@ import type {
   EditorState,
 } from "@/types";
 import type { EditorActions, EditorStore } from "./store.types";
+import { normalizeControlSelection } from "./controlSelection";
 import { createEditorActions } from "./createEditorActions";
 import { initialState } from "./helpers";
 import {
@@ -83,7 +84,11 @@ export function createEditorView(
   const preferences = options.preferences ?? preferencesStore;
   const workspace = options.workspace ?? workspaceStore;
   const document = createStore<DocumentState>(() =>
-    pickDocumentState({ ...initialState, ...options.state }),
+    pickDocumentState({
+      ...initialState,
+      ...options.state,
+      ...normalizeControlSelection(initialState, options.state ?? {}),
+    }),
   );
   const resources = createStore<DocumentResourceState>(() => ({
     thumbnailImages: options.state?.thumbnailImages ?? {},
@@ -143,8 +148,13 @@ export function createEditorView(
   }, getState);
   const setState: EditorViewApi["setState"] = (updates) => {
     const previous = getState();
-    const patch = typeof updates === "function" ? updates(previous) : updates;
-    if (patch === previous) return;
+    const requested =
+      typeof updates === "function" ? updates(previous) : updates;
+    if (requested === previous) return;
+    const patch = {
+      ...requested,
+      ...normalizeControlSelection(previous, requested),
+    };
     batching = true;
     try {
       const values = <K extends keyof EditorState>(keys: readonly K[]) =>

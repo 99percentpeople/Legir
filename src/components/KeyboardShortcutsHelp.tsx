@@ -133,12 +133,16 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
     {
       title: t("shortcuts.category.editing"),
       items: [
+        {
+          key: formatShortcut(t("shortcuts.multi_select_key")),
+          action: t("shortcuts.multi_select"),
+        },
         { key: formatShortcut("Ctrl + C"), action: t("shortcuts.copy") },
         { key: formatShortcut("Ctrl + V"), action: t("shortcuts.paste") },
         { key: formatShortcut("Ctrl + X"), action: t("shortcuts.cut") },
         { key: "Delete / Backspace", action: t("shortcuts.delete") },
         {
-          key: formatShortcut(t("shortcuts.ctrl_drag")),
+          key: formatShortcut(t("shortcuts.duplicate_drag")),
           action: t("shortcuts.duplicate"),
         },
       ],

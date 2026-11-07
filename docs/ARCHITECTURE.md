@@ -590,14 +590,34 @@ Important supporting areas:
 
 The control system is registry-driven. New form controls or annotation-like tools should be added through the existing control registration flow instead of introducing special-case rendering paths.
 
+Control selection is document-scoped: `selectedControlIds` contains the selection
+and `selectedId` remains its primary member for existing single-object consumers.
+`store/controlSelection.ts` reconciles legacy selection writes, deleted objects
+and document/mode changes. Groups contain controls of one kind on one page.
+In the select tool, Ctrl/Cmd-click toggles membership; a normal click selects one
+object, while dragging a selected member moves the group. A Ctrl/Cmd gesture toggles
+selection only on release below the drag threshold; dragging instead duplicates
+the clicked object or its selected group. Originals remain visible during the
+preview, and release commits all copies in one undo step. Alt retains its snapping
+behavior for ordinary dragging.
+`useControlMultiSelection` previews group movement in PDF coordinates and commits
+once on pointer-up; Escape, pointer cancellation and tab changes discard the
+preview. Group movement and deletion validate permissions before creating one
+undo checkpoint. Group properties show the selection count and delete action;
+individual resize/rotation handles and property editors appear for single selection.
+
 Control copy/paste uses native clipboard events in `useEditorControlClipboard`.
 Only the active, ready document handles them; focused text editors, dialogs and
 selected PDF text retain native clipboard behavior. `src/lib/controlClipboard/`
 validates a versioned, self-contained payload with a plain-text fallback for
 systems that discard custom MIME types. The system clipboard owns the snapshot,
 so closing the source PDF, changing tabs or undoing an edit does not erase it.
-`pasteControl` creates a new control on the current page through the existing
-permission/history actions, selects it and switches to its editing mode. Copies
+Version 1 represents one control; version 2 contains a same-page group and remains
+compatible with version 1 input. Copying a selected member includes the whole
+group in layer order. `pasteControl` creates controls on the current page through
+permission/history actions, selects them and switches to their editing mode. A
+group paste is one undoable edit and clamps the group's bounds once to preserve
+relative offsets. Copies
 receive new IDs and nonconflicting field names, retain image data and reply
 relationships, and discard source PDF object/font references and raw appearance
 operators. Internal link destinations are retained only within their source

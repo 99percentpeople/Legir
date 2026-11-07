@@ -1,4 +1,5 @@
 import React from "react";
+import { MIN_FIELD_SIZE } from "@/constants";
 import { Annotation, FormField } from "@/types";
 import { PropertyPanelProps } from "./types";
 import { Label } from "@/components/ui/label";
@@ -50,7 +51,7 @@ export const GeometryProperties: React.FC<
       Math.abs(restoredRect.width - rect.width) > 0.01 ||
       Math.abs(restoredRect.height - rect.height) > 0.01)
   );
-  const isFormField = "name" in data && "style" in data;
+  const isFormField = "name" in data;
   const isFreeText = data.type === "freetext";
   const isShape = data.type === "shape";
   const isStamp = data.type === "stamp";
@@ -139,12 +140,23 @@ export const GeometryProperties: React.FC<
           <NumberInput
             aria-label={t("properties.width")}
             value={Math.round(rect.width)}
+            minValue={isFormField ? MIN_FIELD_SIZE : undefined}
             formatOptions={{ maximumFractionDigits: 0 }}
             isReadOnly={!supportsSizeEditing}
             onFocus={supportsSizeEditing ? onTriggerHistorySave : undefined}
             onChange={
               supportsSizeEditing
-                ? (val) => onChange({ rect: { ...rect, width: val } })
+                ? (val) => {
+                    if (!Number.isFinite(val)) return;
+                    onChange({
+                      rect: {
+                        ...rect,
+                        width: isFormField
+                          ? Math.max(MIN_FIELD_SIZE, val)
+                          : val,
+                      },
+                    });
+                  }
                 : undefined
             }
           />
@@ -154,12 +166,23 @@ export const GeometryProperties: React.FC<
           <NumberInput
             aria-label={t("properties.height")}
             value={Math.round(rect.height)}
+            minValue={isFormField ? MIN_FIELD_SIZE : undefined}
             formatOptions={{ maximumFractionDigits: 0 }}
             isReadOnly={!supportsSizeEditing}
             onFocus={supportsSizeEditing ? onTriggerHistorySave : undefined}
             onChange={
               supportsSizeEditing
-                ? (val) => onChange({ rect: { ...rect, height: val } })
+                ? (val) => {
+                    if (!Number.isFinite(val)) return;
+                    onChange({
+                      rect: {
+                        ...rect,
+                        height: isFormField
+                          ? Math.max(MIN_FIELD_SIZE, val)
+                          : val,
+                      },
+                    });
+                  }
                 : undefined
             }
           />

@@ -23,6 +23,7 @@ export const selectEditorPageState = (state: EditorStore) => ({
   documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   selectedId: state.selectedId,
+  selectedControlIds: state.selectedControlIds,
   isPanelFloating: state.isPanelFloating,
   isSidebarOpen: state.isSidebarOpen,
   isRightPanelOpen: state.isRightPanelOpen,
@@ -143,6 +144,7 @@ export const selectEditorCanvasState = (state: EditorStore) => ({
   pendingViewStateRestore: state.pendingViewStateRestore,
   scale: state.scale,
   selectedId: state.selectedId,
+  selectedControlIds: state.selectedControlIds,
   tool: state.tool,
 });
 
@@ -209,6 +211,7 @@ export const selectSidebarState = (state: EditorStore) => ({
   documentPermissions: state.documentPermissions,
   outline: state.outline,
   selectedId: state.selectedId,
+  selectedControlIds: state.selectedControlIds,
   currentPageIndex: state.currentPageIndex,
   closeSidebar: state.closeSidebar,
   setUiState: state.setUiState,
@@ -245,6 +248,11 @@ export const selectPropertiesRightPanelState = (state: EditorStore) => {
     null;
   return {
     selectedControl,
+    selectedControlCount: state.selectedControlIds.length,
+    hasSignedSelection: state.fields.some(
+      (field) =>
+        state.selectedControlIds.includes(field.id) && field.signature?.present,
+    ),
     isSelectedField: !!selectedField,
     metadata: state.metadata,
     filename: state.filename,

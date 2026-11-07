@@ -259,9 +259,9 @@ describe("control clipboard menu actions", () => {
     await act(async () =>
       host.querySelector<HTMLButtonElement>("[data-copy]")!.click(),
     );
-    expect(readControlClipboard(createClipboardData(text))?.data.id).toBe(
-      "clicked",
-    );
+    const copied = readControlClipboard(createClipboardData(text));
+    expect(copied?.version).toBe(1);
+    if (copied?.version === 1) expect(copied.data.id).toBe("clicked");
     await act(async () =>
       host.querySelector<HTMLButtonElement>("[data-paste]")!.click(),
     );

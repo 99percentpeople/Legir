@@ -197,6 +197,9 @@ const zhCN = {
     },
   },
   properties: {
+    multi_selected: "已选择 {count} 个对象",
+    multi_selection_hint:
+      "拖动可整体移动，Ctrl/Cmd+C 复制选区，Delete 删除选区。选择单个对象可编辑其属性。",
     button_caption: "按钮文字",
     button_layout: "按钮布局",
     button_layout_0: "仅文字",
@@ -601,7 +604,9 @@ const zhCN = {
     desc: "提高编辑效率的常用快捷键。",
     ctrl_create: "Ctrl + 拖动 (创建)",
     continuous_mode: "连续添加模式",
-    ctrl_drag: "Ctrl + 拖动 (选中项)",
+    duplicate_drag: "Ctrl/Cmd + 拖动 (选中项)",
+    multi_select_key: "Ctrl/Cmd + 点击",
+    multi_select: "加入或移出选择",
     duplicate: "复制字段",
     shift_drag_create: "Shift + 拖动 (创建)",
     draw_square: "绘制正方形 (比例 1:1)",

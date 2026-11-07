@@ -1,4 +1,7 @@
 import React from "react";
+import { PanelLayout } from "./PanelLayout";
+import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/components/language-provider";
 import { FormField, Annotation, PDFMetadata } from "@/types";
 import { DocumentPropertiesPanel } from "./DocumentPropertiesPanel";
 import { ControlPropertiesPanel } from "./ControlPropertiesPanel";
@@ -15,6 +18,8 @@ import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 // --- Main Container Component ---
 interface PropertiesPanelProps {
   selectedControl: FormField | Annotation | null;
+  selectedControlCount?: number;
+  hasSignedSelection?: boolean;
   activeTab: string;
   metadata: PDFMetadata;
   filename: string;
@@ -34,6 +39,8 @@ interface PropertiesPanelProps {
 export const PropertiesPanel = React.memo<PropertiesPanelProps>(
   ({
     selectedControl,
+    selectedControlCount = 1,
+    hasSignedSelection = false,
     activeTab,
     metadata,
     filename,
@@ -60,8 +67,52 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
       unlockPdfOwnerRestrictions,
       setEditorState,
     } = useEditorView(useShallow(selectPropertiesPanelState));
+    const { t } = useLanguage();
     const permissionUi = usePdfPermissionUi(documentPermissions);
 
+    if (
+      activeTab === "properties" &&
+      selectedControl &&
+      selectedControlCount > 1
+    ) {
+      const canDelete =
+        !hasSignedSelection &&
+        documentLoadState === "ready" &&
+        canPerformPdfPermissionOperation(
+          "name" in selectedControl
+            ? "edit_form_structure"
+            : "delete_annotation",
+          documentPermissions,
+        );
+      return (
+        <PanelLayout
+          title={t("properties.multi_selected", {
+            count: selectedControlCount,
+          })}
+          isFloating={isFloating}
+          isOpen={isOpen}
+          onOpen={onOpen}
+          onClose={onCollapse}
+          onCollapse={onCollapse}
+          width={width}
+          onResize={onResize}
+          footer={
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={!canDelete}
+              onClick={() => onDelete(selectedControl.id)}
+            >
+              {t("common.actions.delete")}
+            </Button>
+          }
+        >
+          <p className="text-muted-foreground p-4 text-sm">
+            {t("properties.multi_selection_hint")}
+          </p>
+        </PanelLayout>
+      );
+    }
     if (activeTab === "properties" && selectedControl) {
       const handleControlChange = (
         updates: Partial<FormField | Annotation>,

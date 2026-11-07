@@ -30,7 +30,7 @@ export function EditorPropertiesRightPanel(props: Props) {
 
   const handlePropertiesChange = (updates: Partial<FormField | Annotation>) => {
     const selected = state.selectedControl;
-    if (!isDocumentReady || !selected) return;
+    if (!isDocumentReady || !selected || state.selectedControlCount > 1) return;
     if (state.isSelectedField) {
       state.updateField(selected.id, updates as Partial<FormField>);
       return;
@@ -79,6 +79,8 @@ export function EditorPropertiesRightPanel(props: Props) {
     <PropertiesPanel
       {...props}
       selectedControl={state.selectedControl}
+      selectedControlCount={state.selectedControlCount}
+      hasSignedSelection={state.hasSignedSelection}
       metadata={state.metadata}
       filename={state.filename}
       onChange={handlePropertiesChange}

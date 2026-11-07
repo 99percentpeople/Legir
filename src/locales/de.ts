@@ -148,6 +148,9 @@ const de = {
     },
   },
   properties: {
+    multi_selected: "{count} Objekte ausgewählt",
+    multi_selection_hint:
+      "Zum gemeinsamen Verschieben ziehen. Strg/Cmd+C kopiert die Auswahl, Entf löscht sie. Ein einzelnes Objekt auswählen, um seine Eigenschaften zu bearbeiten.",
     stroke_preview: "Strichvorschau",
     form_detection: {
       api_key_missing:
@@ -538,7 +541,9 @@ const de = {
     desc: "Wichtige Tastenkürzel für schnelleres Bearbeiten.",
     ctrl_create: "Strg + Ziehen (Erstellen)",
     continuous_mode: "Kontinuierlicher Erstellungsmodus",
-    ctrl_drag: "Strg + Ziehen (Auswählen)",
+    duplicate_drag: "Ctrl/Cmd + Ziehen (Auswählen)",
+    multi_select_key: "Strg/Cmd + Klicken",
+    multi_select: "Zur Auswahl hinzufügen oder daraus entfernen",
     duplicate: "Feld duplizieren",
     shift_drag_create: "Umschalt + Ziehen (Erstellen)",
     draw_square: "Quadrat zeichnen (Seitenverhältnis 1:1)",

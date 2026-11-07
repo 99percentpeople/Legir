@@ -53,6 +53,7 @@ export const documentKeys = [
   "mode",
   "tool",
   "selectedId",
+  "selectedControlIds",
   "scale",
   "viewRotation",
   "isProcessing",

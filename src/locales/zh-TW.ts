@@ -197,6 +197,9 @@ const zhTW = {
     },
   },
   properties: {
+    multi_selected: "已選取 {count} 個物件",
+    multi_selection_hint:
+      "拖動可整體移動，Ctrl/Cmd+C 複製選取項目，Delete 刪除選取項目。選取單一物件可編輯其屬性。",
     button_caption: "按鈕文字",
     button_layout: "按鈕佈局",
     button_layout_0: "僅文字",
@@ -600,7 +603,9 @@ const zhTW = {
     desc: "提高編輯效率的常用快捷鍵。",
     ctrl_create: "Ctrl + 拖動 (建立)",
     continuous_mode: "連續新增模式",
-    ctrl_drag: "Ctrl + 拖動 (選取項)",
+    duplicate_drag: "Ctrl/Cmd + 拖動 (選取項)",
+    multi_select_key: "Ctrl/Cmd + 點擊",
+    multi_select: "加入或移出選取項目",
     duplicate: "複製欄位",
     shift_drag_create: "Shift + 拖動 (建立)",
     draw_square: "繪製正方形 (比例 1:1)",

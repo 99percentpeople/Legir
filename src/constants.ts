@@ -19,7 +19,8 @@ export const MAX_EDITOR_SCALE = pdfViewerScaleToWorkspaceScale(5);
 export const ZOOM_BASE = 1.25;
 export const MIN_PAGE_THUMBNAIL_SCALE = 0.5;
 export const MAX_PAGE_THUMBNAIL_SCALE = 2;
-export const MIN_FIELD_SIZE = 10;
+/** Minimum width/height for interactive form-field editing, in PDF points. */
+export const MIN_FIELD_SIZE = 1;
 export const PAGE_PADDING = 24; // px
 
 export const PDF_TEXT_SELECTION_HANDLE_WIDTH_PX = 14;

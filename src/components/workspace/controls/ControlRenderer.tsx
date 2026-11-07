@@ -1,4 +1,5 @@
 import React from "react";
+import { isContextMenuContentTarget } from "./ControlContextMenu";
 import { registry } from "./registry/ControlRegistry";
 import { BaseControlProps } from "./types";
 import { FormField, Annotation } from "@/types";
@@ -13,6 +14,11 @@ export type ControlRendererProps<T extends FormField | Annotation> = Omit<
   "onPointerDown"
 > & {
   data: T;
+  onSelectionPointerDownCapture?: (
+    event: React.PointerEvent,
+    data: T,
+  ) => boolean;
+  isGroupSelected?: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
   onControlPointerDown?: (e: React.PointerEvent, data: T) => void;
   onControlResizeStart?: (
@@ -27,6 +33,8 @@ const ControlRendererInner = <T extends FormField | Annotation>(
 ) => {
   const {
     data,
+    onSelectionPointerDownCapture,
+    isGroupSelected,
     onControlPointerDown,
     onControlResizeStart,
     onPointerDown,
@@ -34,6 +42,7 @@ const ControlRendererInner = <T extends FormField | Annotation>(
     ...rest
   } = props;
 
+  const consumedPointer = React.useRef(false);
   const controlConfig = registry.get(data.type);
 
   const handlePointerDown = React.useCallback(
@@ -80,7 +89,37 @@ const ControlRendererInner = <T extends FormField | Annotation>(
     onResizeStart: handleResizeStart,
   } as BaseControlProps<T>;
 
-  return <Component {...componentProps} />;
+  return (
+    <div
+      style={{ display: "contents" }}
+      data-control-selection-id={data.id}
+      onPointerDownCapture={(event) => {
+        if (isContextMenuContentTarget(event.target)) {
+          consumedPointer.current = false;
+          return;
+        }
+        consumedPointer.current =
+          onSelectionPointerDownCapture?.(event, data) ?? false;
+      }}
+      onClickCapture={(event) => {
+        if (
+          consumedPointer.current &&
+          !isContextMenuContentTarget(event.target)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+      onDoubleClickCapture={(event) => {
+        if (isGroupSelected) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
+      <Component {...componentProps} />
+    </div>
+  );
 };
 
 export const ControlRenderer = React.memo(

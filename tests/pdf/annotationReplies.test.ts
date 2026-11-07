@@ -12,7 +12,7 @@ import { exportPDF, exportPDFBlob, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createTestEditorStore } from "../helpers/editorStore";
 import { getPageId } from "@legir/pdf-core/lib/pageStructure";
-import { duplicateAnnotationForDrag } from "@/components/workspace/lib/duplicateControlForDrag";
+import { duplicateAnnotationForDrag } from "@/lib/controlDuplication";
 
 const worker = {
   loadDocument: async () => true,

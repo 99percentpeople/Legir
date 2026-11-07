@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type {
-  ControlClipboard,
+  ControlClipboardPayload,
   ControlPasteTarget,
 } from "@/lib/controlClipboard/types";
 
@@ -56,9 +56,10 @@ export type EditorToolStyles = {
 
 export interface EditorActions {
   pasteControl: (
-    clipboard: ControlClipboard,
+    clipboard: ControlClipboardPayload,
     target?: ControlPasteTarget,
   ) => boolean;
+  duplicateControls: (ids: string[], dx: number, dy: number) => void;
   setSelectedPageIds: (ids: string[]) => void;
   rotatePages: (ids: string[], degrees: number) => void;
   deletePages: (ids: string[]) => void;
@@ -153,7 +154,11 @@ export interface EditorActions {
   addField: (field: FormField) => void;
   updateField: (id: string, updates: Partial<FormField>) => void;
   resetFieldToDefault: (id: string) => void;
-  moveSelectedControl: (direction: MoveDirection, isFast?: boolean) => void;
+  moveSelectedControl: (
+    direction: MoveDirection,
+    isFast?: boolean,
+    checkpoint?: boolean,
+  ) => void;
   reorderControlLayer: (id: string, move: ControlLayerMove) => void;
   addAnnotation: (annotation: Annotation, opts?: { select?: boolean }) => void;
   addAnnotations: (
@@ -170,7 +175,15 @@ export interface EditorActions {
   deleteAnnotationReply: (annotationId: string, replyId: string) => void;
   deleteAnnotation: (id: string) => void;
   deleteSelection: () => void;
-  selectControl: (id: string | null) => void;
+  selectControl: (
+    id: string | null,
+    intent?: "replace" | "toggle" | "preserve",
+  ) => void;
+  translateSelectedControls: (
+    dx: number,
+    dy: number,
+    checkpoint?: boolean,
+  ) => void;
   setTool: (tool: Tool) => void;
   saveCheckpoint: () => void;
   undo: () => void;

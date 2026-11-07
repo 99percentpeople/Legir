@@ -201,6 +201,9 @@ const en = {
     },
   },
   properties: {
+    multi_selected: "{count} objects selected",
+    multi_selection_hint:
+      "Drag to move together. Use Ctrl/Cmd+C to copy, or Delete to remove the selection. Select one object to edit its properties.",
     button_caption: "Button label",
     button_layout: "Button layout",
     button_layout_0: "Label only",
@@ -618,7 +621,9 @@ const en = {
     desc: "Essential shortcuts for faster editing.",
     ctrl_create: "Ctrl + Drag (Create)",
     continuous_mode: "Continuous Creation Mode",
-    ctrl_drag: "Ctrl + Drag (Select)",
+    duplicate_drag: "Ctrl/Cmd + Drag (Select)",
+    multi_select_key: "Ctrl/Cmd + Click",
+    multi_select: "Add or remove from selection",
     duplicate: "Duplicate Field",
     shift_drag_create: "Shift + Drag (Create)",
     draw_square: "Draw Square (Aspect Ratio 1:1)",

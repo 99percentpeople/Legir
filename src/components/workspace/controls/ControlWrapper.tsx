@@ -1,4 +1,5 @@
 import React from "react";
+import { MIN_FIELD_SIZE } from "@/constants";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { ControlProps } from "./types";
@@ -277,13 +278,14 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       nextH -= dy;
     }
 
-    if (nextW < 5) {
-      if (handle.includes("w")) nextX = rect.x + rect.width - 5;
-      nextW = 5;
+    const minSize = isFormField ? MIN_FIELD_SIZE : 5;
+    if (nextW < minSize) {
+      if (handle.includes("w")) nextX = rect.x + rect.width - minSize;
+      nextW = minSize;
     }
-    if (nextH < 5) {
-      if (handle.includes("n")) nextY = rect.y + rect.height - 5;
-      nextH = 5;
+    if (nextH < minSize) {
+      if (handle.includes("n")) nextY = rect.y + rect.height - minSize;
+      nextH = minSize;
     }
 
     if (

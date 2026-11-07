@@ -63,6 +63,53 @@ const controlProps = (type: FieldType): FormControlProps => ({
 });
 
 describe("form control interaction", () => {
+  it.each(Object.values(FieldType))(
+    "keyboard resizing allows %s fields down to 1 pt",
+    async (type) => {
+      const props = controlProps(type);
+      props.data.rect = { x: 10, y: 20, width: 2, height: 2 };
+      await render(
+        <ControlWrapper
+          {...props}
+          isSelected
+          isFormMode
+          resizable
+          showBorder
+        />,
+      );
+      const handle = host.querySelector<HTMLElement>(
+        '[aria-label$="resize nw"]',
+      )!;
+      expect(handle).not.toBeNull();
+      await act(async () =>
+        handle.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "ArrowRight",
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+          }),
+        ),
+      );
+      expect(props.onUpdate).toHaveBeenCalledWith("field", {
+        rect: { x: 11, y: 20, width: 1, height: 2 },
+      });
+      await act(async () =>
+        handle.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "ArrowDown",
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+          }),
+        ),
+      );
+      expect(props.onUpdate).toHaveBeenCalledWith("field", {
+        rect: { x: 10, y: 21, width: 2, height: 1 },
+      });
+    },
+  );
+
   it("deletes the right-clicked form control and hides deletion outside form editing or without permission", async () => {
     const props = {
       ...controlProps(FieldType.TEXT),

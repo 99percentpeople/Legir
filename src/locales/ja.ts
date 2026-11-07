@@ -146,6 +146,9 @@ const ja = {
     },
   },
   properties: {
+    multi_selected: "{count} 個のオブジェクトを選択",
+    multi_selection_hint:
+      "ドラッグでまとめて移動、Ctrl/Cmd+C でコピー、Delete で削除できます。プロパティを編集するには、1 つのオブジェクトを選択してください。",
     stroke_preview: "ストロークのプレビュー",
     form_detection: {
       api_key_missing:
@@ -531,7 +534,9 @@ const ja = {
     desc: "編集を高速化するための必須ショートカット。",
     ctrl_create: "Ctrl + ドラッグ (作成)",
     continuous_mode: "連続作成モード",
-    ctrl_drag: "Ctrl + ドラッグ (選択)",
+    duplicate_drag: "Ctrl/Cmd + ドラッグ (選択)",
+    multi_select_key: "Ctrl/Cmd + クリック",
+    multi_select: "選択に追加・選択から除外",
     duplicate: "フィールドを複製",
     shift_drag_create: "Shift + ドラッグ (作成)",
     draw_square: "正方形を描画 (アスペクト比 1:1)",

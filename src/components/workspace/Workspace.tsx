@@ -24,6 +24,7 @@ import {
   WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES,
   WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES,
   MIN_EDITOR_SCALE,
+  MIN_FIELD_SIZE,
   MAX_EDITOR_SCALE,
 } from "@/constants";
 import { cn } from "@/utils/cn";
@@ -45,6 +46,9 @@ import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionP
 import PDFPage from "./layers/PDFPage";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
 import { useWorkspaceDerivedPages } from "./hooks/useWorkspaceDerivedPages";
+import { constrainResizedField } from "./lib/fieldSizing";
+import { previewSelectedControls } from "./lib/controlSelectionPreview";
+import { useControlMultiSelection } from "./hooks/useControlMultiSelection";
 import { useControlTransformFrame } from "./hooks/useControlTransformFrame";
 import {
   useWorkspaceTextSelection,
@@ -108,10 +112,6 @@ import {
   normalizeStampKind,
   normalizeStampOpacity,
 } from "@legir/pdf-model/stamps";
-import {
-  duplicateAnnotationForDrag,
-  duplicateFieldForDrag,
-} from "./lib/duplicateControlForDrag";
 import { canPerformPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
 import { useStampLibraryStore } from "@/store/stampLibraryStore";
 import { useLanguage } from "@/components/language-provider";
@@ -1445,6 +1445,23 @@ const Workspace: React.FC<WorkspaceProps> = ({
     getPageRectByPageIndex,
   });
 
+  const multiSelection = useControlMultiSelection(
+    getRelativeCoordsFromPoint,
+    isPanModeActive,
+  );
+  const selectedControlIds =
+    editorState.selectedControlIds ??
+    (editorState.selectedId ? [editorState.selectedId] : []);
+  const isMultiSelected = selectedControlIds.length > 1;
+  const selectControlPreservingGroup = useCallback(
+    (id: string) => {
+      if (selectedControlIds.length > 1 && selectedControlIds.includes(id))
+        return;
+      onSelectControl(id);
+    },
+    [selectedControlIds, onSelectControl],
+  );
+
   const activatePendingTouchMove = useCallback(
     (e: React.PointerEvent) => {
       const pending = pendingTouchMoveRef.current;
@@ -2056,16 +2073,22 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     // 1. Calculate rough dimensions
     if (resizeHandle.includes("e"))
-      newW = Math.max(10, resizeStart.originalRect.width + dx);
+      newW = Math.max(MIN_FIELD_SIZE, resizeStart.originalRect.width + dx);
     if (resizeHandle.includes("w")) {
-      const effDx = Math.min(dx, resizeStart.originalRect.width - 10);
+      const effDx = Math.min(
+        dx,
+        resizeStart.originalRect.width - MIN_FIELD_SIZE,
+      );
       newX += effDx;
       newW -= effDx;
     }
     if (resizeHandle.includes("s"))
-      newH = Math.max(10, resizeStart.originalRect.height + dy);
+      newH = Math.max(MIN_FIELD_SIZE, resizeStart.originalRect.height + dy);
     if (resizeHandle.includes("n")) {
-      const effDy = Math.min(dy, resizeStart.originalRect.height - 10);
+      const effDy = Math.min(
+        dy,
+        resizeStart.originalRect.height - MIN_FIELD_SIZE,
+      );
       newY += effDy;
       newH -= effDy;
     }
@@ -2303,10 +2326,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
       }
     }
-    setSnapLines(guides);
-    onUpdateField(resizingFieldId, {
-      rect: { x: newX, y: newY, width: newW, height: newH },
-    });
+    const rect = constrainResizedField(
+      { x: newX, y: newY, width: newW, height: newH },
+      resizeHandle,
+      editorState.keys.shift && resizeHandle.length === 2
+        ? resizeStart.originalRect.width / resizeStart.originalRect.height
+        : undefined,
+    );
+    const sizeClamped = rect.width !== newW || rect.height !== newH;
+    setSnapLines(sizeClamped ? [] : guides);
+    onUpdateField(resizingFieldId, { rect });
   };
 
   const transformId =
@@ -2848,7 +2877,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
         ) {
           onToolChange("select");
         }
-      } else if (width > 5 && height > 5) {
+      } else if (
+        editorState.mode === "form"
+          ? width >= MIN_FIELD_SIZE && height >= MIN_FIELD_SIZE
+          : width > 5 && height > 5
+      ) {
         if (editorState.mode === "form") {
           let type = FieldType.TEXT;
           if (editorState.tool === "draw_checkbox") type = FieldType.CHECKBOX;
@@ -3116,25 +3149,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
       // Set Global Cursor
       setGlobalCursor("move");
 
-      let targetFieldId = field.id;
+      const targetFieldId = field.id;
       const targetFieldRect = field.rect;
       const targetPageIndex = field.pageIndex;
 
-      // Check for Duplicate shortcut (Ctrl/Meta + Drag)
-      if (e.ctrlKey || e.metaKey) {
-        const newField = duplicateFieldForDrag(field);
-
-        // Add the new field
-        onAddField(newField);
-
-        // Target the new field for the drag operation
-        targetFieldId = newField.id;
-        // Rect and Page are same as original
-      }
-
-      if (targetFieldId !== field.id) {
-        onSelectControl(targetFieldId);
-      }
       setActivePageIndex(targetPageIndex);
       const coords = getRelativeCoords(e, targetPageIndex);
 
@@ -3239,18 +3257,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       capturePointer(e);
 
       onTriggerHistorySave();
-      let targetAnnotation = annotation;
-      let shouldForceDragMove = false;
-
-      if (e.ctrlKey || e.metaKey) {
-        targetAnnotation = duplicateAnnotationForDrag(annotation);
-        onAddAnnotation(targetAnnotation);
-        shouldForceDragMove = true;
-      }
-
-      if (targetAnnotation.id !== annotation.id) {
-        onSelectControl(targetAnnotation.id);
-      }
+      const targetAnnotation = annotation;
       // App handles clearing the selectedId when needed.
 
       setActivePageIndex(targetAnnotation.pageIndex);
@@ -3264,12 +3271,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
           ? (getAnnotationOuterRect(targetAnnotation) ?? targetAnnotation.rect)
           : targetAnnotation.rect;
 
-      // Keep highlight stationary by default, but allow modifier-drag duplication
-      // to immediately move the newly created copy.
-      if (
-        moveRect &&
-        (targetAnnotation.type !== "highlight" || shouldForceDragMove)
-      ) {
+      // Modifier-drag duplication is handled by the selection gesture above.
+      if (moveRect && targetAnnotation.type !== "highlight") {
         setGlobalCursor("move");
         setMovingAnnotationId(targetAnnotation.id);
         setMoveOffset({ x: coords.x - moveRect.x, y: coords.y - moveRect.y });
@@ -3549,21 +3552,34 @@ const Workspace: React.FC<WorkspaceProps> = ({
             }}
             onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
           >
-            {page.pageControls.map(({ kind, control }) => {
+            {previewSelectedControls(
+              page.pageControls,
+              multiSelection.preview,
+            ).map(({ kind, control }) => {
+              const isDuplicatePreview =
+                control.id.startsWith("duplicate-preview:");
               if (kind === "field") {
                 return (
                   <ControlRenderer
                     key={control.id}
-                    data={control}
+                    data={control as FormField}
                     id={control.id}
-                    isSelected={editorState.selectedId === control.id}
+                    isSelected={
+                      !isMultiSelected && editorState.selectedId === control.id
+                    }
+                    isGroupSelected={
+                      isMultiSelected && selectedControlIds.includes(control.id)
+                    }
+                    onSelectionPointerDownCapture={
+                      multiSelection.onPointerDownCapture
+                    }
                     isAnnotationMode={editorState.mode === "annotation"}
                     isFormMode={editorState.mode === "form"}
-                    isSelectable={isSelectable}
+                    isSelectable={isSelectable && !isDuplicatePreview}
                     canModify={canModifyFormStructure}
                     canFillFormValue={canFillFormValue}
                     onControlPointerDown={handleFieldPointerDown}
-                    onSelect={onSelectControl}
+                    onSelect={selectControlPreservingGroup}
                     onUpdate={onUpdateField}
                     onDelete={
                       editorState.mode === "form" ? onDeleteField : undefined
@@ -3579,7 +3595,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 );
               }
 
-              const annot = control;
+              const annot = control as Annotation;
               const allowSelect = annot.type !== "link";
 
               return (
@@ -3587,15 +3603,23 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   key={annot.id}
                   data={annot}
                   id={annot.id}
-                  isSelected={editorState.selectedId === annot.id}
+                  isSelected={
+                    !isMultiSelected && editorState.selectedId === annot.id
+                  }
+                  isGroupSelected={
+                    isMultiSelected && selectedControlIds.includes(annot.id)
+                  }
+                  onSelectionPointerDownCapture={
+                    multiSelection.onPointerDownCapture
+                  }
                   isAnnotationMode={editorState.mode === "annotation"}
                   isFormMode={editorState.mode === "form"}
-                  isSelectable={isSelectable}
+                  isSelectable={isSelectable && !isDuplicatePreview}
                   canModify={canModifyAnnotations}
                   onControlPointerDown={
                     allowSelect ? handleAnnotationPointerDown : undefined
                   }
-                  onSelect={onSelectControl}
+                  onSelect={selectControlPreservingGroup}
                   onUpdate={onUpdateAnnotation}
                   onDelete={onDeleteAnnotation}
                   onEdit={onEditAnnotation}
@@ -3607,6 +3631,67 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 />
               );
             })}
+
+            {(isMultiSelected || multiSelection.preview?.duplicate) &&
+              (() => {
+                const rects = page.pageControls
+                  .filter(({ control }) =>
+                    multiSelection.preview?.duplicate
+                      ? multiSelection.preview.ids.has(control.id)
+                      : selectedControlIds.includes(control.id),
+                  )
+                  .flatMap(({ kind, control }) => {
+                    const rect =
+                      kind === "annotation"
+                        ? (getAnnotationOuterRect(control) ?? control.rect)
+                        : control.rect;
+                    return rect ? [{ id: control.id, ...rect }] : [];
+                  });
+                if (!rects.length) return null;
+                const dx = multiSelection.preview?.x ?? 0;
+                const dy = multiSelection.preview?.y ?? 0;
+                const x = Math.min(...rects.map((rect) => rect.x)) + dx;
+                const y = Math.min(...rects.map((rect) => rect.y)) + dy;
+                const width =
+                  Math.max(...rects.map((rect) => rect.x + rect.width)) +
+                  dx -
+                  x;
+                const height =
+                  Math.max(...rects.map((rect) => rect.y + rect.height)) +
+                  dy -
+                  y;
+                return (
+                  <svg
+                    className="pointer-events-none absolute inset-0 z-50 overflow-visible"
+                    data-control-selection-count={rects.length}
+                    viewBox={`0 0 ${page.width} ${page.height}`}
+                  >
+                    {rects.map((rect) => (
+                      <rect
+                        key={rect.id}
+                        x={rect.x + dx}
+                        y={rect.y + dy}
+                        width={rect.width}
+                        height={rect.height}
+                        fill="none"
+                        stroke="#3b82f6"
+                        strokeOpacity={0.6}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                    <rect
+                      x={x}
+                      y={y}
+                      width={width}
+                      height={height}
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeDasharray="4 3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                );
+              })()}
 
             {dragStart && dragCurrent && activePageIndex === page.pageIndex && (
               <>

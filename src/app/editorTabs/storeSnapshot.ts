@@ -106,6 +106,7 @@ export const createEditorTabSnapshotFromState = (options: {
     tool: state.tool,
 
     selectedId: state.selectedId,
+    selectedControlIds: [...state.selectedControlIds],
     scale: state.scale,
     viewRotation: state.viewRotation,
     past: createShallowArrayCopy(state.past),

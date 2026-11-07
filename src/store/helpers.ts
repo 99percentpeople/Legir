@@ -255,6 +255,7 @@ export const initialState: EditorState = {
   documentLoadState: "ready",
   documentLoadError: null,
   selectedId: null,
+  selectedControlIds: [],
   scale: DEFAULT_SCALE,
   pageThumbnailScale: 1,
   viewRotation: 0,

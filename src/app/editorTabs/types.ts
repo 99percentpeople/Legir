@@ -36,6 +36,7 @@ export type EditorTabSnapshot = Pick<
   | "mode"
   | "tool"
   | "selectedId"
+  | "selectedControlIds"
   | "scale"
   | "viewRotation"
   | "past"

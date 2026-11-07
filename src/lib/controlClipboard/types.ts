@@ -11,3 +11,10 @@ export type ControlClipboard = {
   | { type: "field"; data: FormField }
   | { type: "annotation"; data: Annotation }
 );
+
+export type ControlClipboardGroup = {
+  version: 2;
+  type: "group";
+  data: ControlClipboard[];
+};
+export type ControlClipboardPayload = ControlClipboard | ControlClipboardGroup;

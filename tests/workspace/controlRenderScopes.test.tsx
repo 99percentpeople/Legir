@@ -366,6 +366,129 @@ it("moves across pages and preserves coordinates on a rotated page", async () =>
   expect(store.getState().annotations[0].pageIndex).toBe(0);
 });
 
+it.each([3, 1, -5])(
+  "mouse resizing clamps to 1 pt rather than 10 pt (target %s)",
+  async (target) => {
+    store.setState({ mode: "form", selectedId: "field" });
+    store.getState().setKeys({ alt: true });
+    await setupDrag();
+    await act(async () =>
+      pointer(
+        control("field").querySelector("button")!,
+        "pointerdown",
+        110,
+        30,
+      ),
+    );
+    await act(async () => {
+      pointer(control("field"), "pointermove", 10 + target, 10 + target);
+      pointer(control("field"), "pointerup", 10 + target, 10 + target);
+    });
+    expect(store.getState().fields[0].rect).toEqual({
+      x: 10,
+      y: 10,
+      width: Math.max(1, target),
+      height: Math.max(1, target),
+    });
+    await act(async () => store.getState().undo());
+    expect(store.getState().fields[0].rect).toEqual({
+      x: 10,
+      y: 10,
+      width: 100,
+      height: 20,
+    });
+  },
+);
+
+it("does not let snapping shrink a field below its minimum", async () => {
+  store.setState({
+    mode: "form",
+    selectedId: "field",
+    fields: [
+      field("field"),
+      field("snap-target", {
+        rect: { x: 10.2, y: 10.2, width: 0.6, height: 0.6 },
+      }),
+    ],
+  });
+  await setupDrag();
+  await act(async () =>
+    pointer(control("field").querySelector("button")!, "pointerdown", 110, 30),
+  );
+  await act(async () => {
+    pointer(control("field"), "pointermove", 11, 11);
+    pointer(control("field"), "pointerup", 11, 11);
+  });
+  expect(store.getState().fields[0].rect).toEqual({
+    x: 10,
+    y: 10,
+    width: 1,
+    height: 1,
+  });
+  expect(store.getState().fields[1].rect).toEqual({
+    x: 10.2,
+    y: 10.2,
+    width: 0.6,
+    height: 0.6,
+  });
+});
+
+it("preserves aspect ratio at the minimum size during corner resize", async () => {
+  store.setState({ mode: "form", selectedId: "field" });
+  store.getState().setKeys({ alt: true, shift: true });
+  await setupDrag();
+  await act(async () =>
+    pointer(control("field").querySelector("button")!, "pointerdown", 110, 30),
+  );
+  await act(async () => {
+    pointer(control("field"), "pointermove", 10, 10);
+    pointer(control("field"), "pointerup", 10, 10);
+  });
+  expect(store.getState().fields[0].rect).toEqual({
+    x: 10,
+    y: 10,
+    width: 5,
+    height: 1,
+  });
+});
+
+it.each([0.5, 1, 3])(
+  "creates small fields only at or above 1 pt (target %s)",
+  async (size) => {
+    store.setState({ mode: "form", tool: "draw_text" });
+    store.getState().setKeys({ alt: true });
+    await setupDrag();
+    const page = host.querySelector<HTMLElement>("#page-0")!;
+    const elementsFromPoint = Object.getOwnPropertyDescriptor(
+      document,
+      "elementsFromPoint",
+    );
+    Object.defineProperty(document, "elementsFromPoint", {
+      configurable: true,
+      value: () => [page],
+    });
+    try {
+      await act(async () => pointer(page, "pointerdown", 400, 400));
+      await act(async () =>
+        pointer(page, "pointermove", 400 + size, 400 + size),
+      );
+      await act(async () => pointer(page, "pointerup", 400 + size, 400 + size));
+      expect(store.getState().fields).toHaveLength(size < 1 ? 1 : 2);
+      if (size >= 1)
+        expect(store.getState().fields.at(-1)?.rect).toEqual({
+          x: 400,
+          y: 400,
+          width: size,
+          height: size,
+        });
+    } finally {
+      if (elementsFromPoint)
+        Object.defineProperty(document, "elementsFromPoint", elementsFromPoint);
+      else Reflect.deleteProperty(document, "elementsFromPoint");
+    }
+  },
+);
+
 it("flushes field resizing on pointercancel and allows undo/redo", async () => {
   store.setState({ mode: "form", selectedId: "field" });
   const { tick } = await setupDrag();

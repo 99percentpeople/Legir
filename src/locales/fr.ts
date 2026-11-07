@@ -148,6 +148,9 @@ const fr = {
     },
   },
   properties: {
+    multi_selected: "{count} objets sélectionnés",
+    multi_selection_hint:
+      "Faites glisser pour déplacer ensemble. Ctrl/Cmd+C copie la sélection, Suppr la supprime. Sélectionnez un seul objet pour modifier ses propriétés.",
     stroke_preview: "Aperçu du tracé",
     form_detection: {
       api_key_missing:
@@ -538,7 +541,9 @@ const fr = {
     desc: "Raccourcis essentiels pour une édition plus rapide.",
     ctrl_create: "Ctrl + Glisser (Créer)",
     continuous_mode: "Mode de création continue",
-    ctrl_drag: "Ctrl + Glisser (Sélectionner)",
+    duplicate_drag: "Ctrl/Cmd + Glisser (Sélectionner)",
+    multi_select_key: "Ctrl/Cmd + Clic",
+    multi_select: "Ajouter ou retirer de la sélection",
     duplicate: "Dupliquer le champ",
     shift_drag_create: "Maj + Glisser (Créer)",
     draw_square: "Dessiner un carré (Ratio 1:1)",

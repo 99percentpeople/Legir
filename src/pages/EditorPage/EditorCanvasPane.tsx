@@ -68,7 +68,15 @@ export const EditorCanvasPane: React.FC<{
         !state.fields.some((field) => field.id === id)
       )
         return;
-      state.selectControl(id);
+      state.selectControl(id, "preserve");
+      state.deleteSelection();
+    },
+    [view],
+  );
+  const deleteSelectedAnnotation = useCallback(
+    (id: string) => {
+      const state = view.getState();
+      state.selectControl(id, "preserve");
       state.deleteSelection();
     },
     [view],
@@ -100,7 +108,6 @@ export const EditorCanvasPane: React.FC<{
     updateField,
     resetFieldToDefault,
     updateAnnotation,
-    deleteAnnotation,
     reorderControlLayer,
     selectControl,
     saveCheckpoint,
@@ -140,6 +147,7 @@ export const EditorCanvasPane: React.FC<{
       scale: state.scale,
       viewRotation: state.viewRotation,
       selectedId: state.selectedId,
+      selectedControlIds: state.selectedControlIds,
       tool: state.tool,
     }),
     [
@@ -166,6 +174,7 @@ export const EditorCanvasPane: React.FC<{
       state.scale,
       state.viewRotation,
       state.selectedId,
+      state.selectedControlIds,
       state.tool,
     ],
   );
@@ -375,7 +384,7 @@ export const EditorCanvasPane: React.FC<{
             onCopyControl={clipboard.copyControl}
             onPasteControl={clipboard.pasteControl}
             onUpdateAnnotation={updateAnnotation}
-            onDeleteAnnotation={deleteAnnotation}
+            onDeleteAnnotation={deleteSelectedAnnotation}
             onReorderControlLayer={reorderControlLayer}
             onEditAnnotation={onEditAnnotation}
             onScaleChange={updateScale}

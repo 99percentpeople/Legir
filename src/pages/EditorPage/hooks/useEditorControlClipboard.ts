@@ -7,7 +7,7 @@ import { useEventListener } from "@/hooks/useEventListener";
 import { createClipboardData, ownsTextClipboard } from "@/lib/clipboard";
 import type { ControlPasteTarget } from "@/lib/controlClipboard/types";
 import {
-  copySelectedControl,
+  copySelectedControls,
   readControlClipboard,
   writeControlClipboard,
 } from "@/lib/controlClipboard";
@@ -36,7 +36,7 @@ export function useEditorControlClipboardActions() {
         const state = editor.getState();
         if (state.documentLoadState !== "ready" || (runtime && !runtime.active))
           return;
-        const control = copySelectedControl(state, id);
+        const control = copySelectedControls(state, id);
         if (!control) return;
         const data = createClipboardData();
         writeControlClipboard(data, control);
@@ -95,7 +95,7 @@ export function useEditorControlClipboard() {
     try {
       if (event.type === "copy") {
         if (window.getSelection()?.toString()) return;
-        const control = copySelectedControl(state);
+        const control = copySelectedControls(state);
         if (!control) return;
         writeControlClipboard(event.clipboardData, control);
         event.preventDefault();

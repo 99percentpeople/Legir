@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FieldType } from "@/types";
-import type { ControlClipboard } from "./types";
+import type { ControlClipboard, ControlClipboardPayload } from "./types";
 
 const number = z.number().finite();
 const point = z.object({ x: number, y: number });
@@ -222,4 +222,23 @@ export const controlClipboardSchema: z.ZodType<ControlClipboard> =
   z.discriminatedUnion("type", [
     z.object({ ...envelope, type: z.literal("field"), data: field }),
     z.object({ ...envelope, type: z.literal("annotation"), data: annotation }),
+  ]);
+
+export const controlClipboardPayloadSchema: z.ZodType<ControlClipboardPayload> =
+  z.union([
+    controlClipboardSchema,
+    z
+      .object({
+        version: z.literal(2),
+        type: z.literal("group"),
+        data: z.array(controlClipboardSchema).min(1).max(10000),
+      })
+      .refine((group) =>
+        group.data.every(
+          (control) =>
+            control.type === group.data[0].type &&
+            control.data.pageIndex === group.data[0].data.pageIndex &&
+            control.sourceDocumentId === group.data[0].sourceDocumentId,
+        ),
+      ),
   ]);
