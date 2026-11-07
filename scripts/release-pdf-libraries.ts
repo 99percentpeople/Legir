@@ -7,14 +7,22 @@ import path from "node:path";
 const names = ["pdfium", "pdf-model", "pdf-core", "pdf-renderer"];
 const repository = "https://github.com/99percentpeople/Legir";
 
+type PackageMetadata = Record<string, unknown> & {
+  name: string;
+  version: string;
+  dependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+};
+
 export function releaseVersion(tag: string) {
   const match = /^pdf-libs-v(\d+\.\d+\.\d+)$/.exec(tag);
   if (!match) throw new Error("Expected a pdf-libs-vX.Y.Z tag");
   return match[1];
 }
 
-export function releasePackageMetadata(
-  metadata: Record<string, any>,
+export function releasePackageMetadata<T extends PackageMetadata>(
+  metadata: T,
   tag: string,
   revision: string,
 ) {
@@ -29,22 +37,26 @@ export function releasePackageMetadata(
     "dependencies",
     "optionalDependencies",
     "peerDependencies",
-  ]) {
-    for (const [name, range] of Object.entries(result[kind] ?? {})) {
+  ] as const) {
+    const dependencies = result[kind];
+    if (!dependencies) continue;
+    for (const [name, range] of Object.entries(dependencies)) {
       if (names.some((item) => name === `@legir/${item}`))
-        result[kind][name] =
+        dependencies[name] =
           `${repository}/releases/download/${tag}/legir-${name.slice(7)}-${version}.tgz`;
       else if (typeof range === "string" && range.startsWith("workspace:"))
         throw new Error(`Unpublished workspace dependency: ${name}`);
     }
   }
-  result.repository = {
-    type: "git",
-    url: `${repository}.git`,
-    directory: `packages/${metadata.name.slice(7)}`,
+  return {
+    ...result,
+    repository: {
+      type: "git",
+      url: `${repository}.git`,
+      directory: `packages/${metadata.name.slice(7)}`,
+    },
+    legirRelease: { revision, tag },
   };
-  result.legirRelease = { revision, tag };
-  return result;
 }
 
 async function prepare(sourceArg: string, tag: string, outputArg: string) {
