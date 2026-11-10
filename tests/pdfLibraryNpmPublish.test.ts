@@ -22,75 +22,114 @@ const fixtureVersion = "1.2.3";
 const fixtureTag = `pdf-libs-v${fixtureVersion}`;
 
 describe("npm PDF library releases", () => {
-  it("packs a tagged source with verifiable tarball AND manifest checksums", async () => {
-    const temporary = mkdtempSync(path.join(os.tmpdir(), "legir-pack-test-"));
-    const source = path.join(temporary, "source");
-    const output = path.join(temporary, "output");
-    mkdirSync(source);
-    const git = (...args: string[]) =>
-      execFileSync("git", args, { cwd: source, stdio: "pipe" });
-    try {
-      for (const name of ["pdf-model", "pdfium", "pdf-core", "pdf-renderer"]) {
-        const directory = path.join(source, "packages", name);
-        mkdirSync(path.join(directory, "dist"), { recursive: true });
-        writeFileSync(path.join(directory, "dist/index.js"), "export {};\n");
-        writeFileSync(
-          path.join(directory, "package.json"),
-          JSON.stringify({
-            name: `@legir/${name}`,
-            version: fixtureVersion,
-            files: ["dist"],
-            scripts: { prepack: "exit 1" },
-            dependencies:
-              name === "pdf-core" ? { "@legir/pdf-model": "workspace:*" } : {},
-          }),
+  it.each([true, false])(
+    "packs clean source with verifiable checksums (tagged=%s)",
+    async (tagged) => {
+      const temporary = mkdtempSync(path.join(os.tmpdir(), "legir-pack-test-"));
+      const source = path.join(temporary, "source");
+      const output = path.join(temporary, "output");
+      mkdirSync(source);
+      const git = (...args: string[]) =>
+        execFileSync("git", args, { cwd: source, stdio: "pipe" });
+      try {
+        for (const name of [
+          "pdf-model",
+          "pdfium",
+          "pdf-core",
+          "pdf-renderer",
+        ]) {
+          const directory = path.join(source, "packages", name);
+          mkdirSync(path.join(directory, "dist"), { recursive: true });
+          writeFileSync(path.join(directory, "dist/index.js"), "export {};\n");
+          writeFileSync(
+            path.join(directory, "package.json"),
+            JSON.stringify({
+              name: `@legir/${name}`,
+              version: fixtureVersion,
+              files: ["dist"],
+              scripts: { prepack: "exit 1" },
+              dependencies:
+                name === "pdf-core"
+                  ? { "@legir/pdf-model": "workspace:*" }
+                  : {},
+            }),
+          );
+        }
+        git("init", "-q");
+        git("add", ".");
+        git(
+          "-c",
+          "user.name=Test",
+          "-c",
+          "user.email=test@example.invalid",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-qm",
+          "fixture",
         );
+        git("tag", fixtureTag);
+        if (!tagged) {
+          // Historical tags must not have to be moved for a manual npm release.
+          git(
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "manual source",
+          );
+          expect(git("rev-parse", fixtureTag).toString()).not.toBe(
+            git("rev-parse", "HEAD").toString(),
+          );
+        }
+        await packNpmLibraries(source, tagged ? fixtureTag : null, output);
+        expect(
+          execFileSync("sha256sum", ["-c", "SHA256SUMS.txt"], {
+            cwd: output,
+            encoding: "utf8",
+            env: { ...process.env, LC_ALL: "C" },
+          }),
+        ).toContain("legir-libraries.json: OK");
+        const metadata = JSON.parse(
+          execFileSync(
+            "tar",
+            [
+              "-xzOf",
+              path.join(output, `legir-pdf-core-${fixtureVersion}.tgz`),
+              "package/package.json",
+            ],
+            { encoding: "utf8" },
+          ),
+        );
+        expect(metadata.dependencies["@legir/pdf-model"]).toBe(fixtureVersion);
+        const manifest = JSON.parse(
+          readFileSync(path.join(output, "legir-libraries.json"), "utf8"),
+        );
+        expect(manifest.packages).toHaveLength(4);
+        expect(manifest.version).toBe(fixtureVersion);
+        expect(manifest.tag).toBe(tagged ? fixtureTag : null);
+        expect(metadata.legirRelease).toEqual({
+          revision: manifest.revision,
+          tag: manifest.tag,
+        });
+        expect(manifest.revision).toBe(
+          git("rev-parse", "HEAD").toString().trim(),
+        );
+        writeFileSync(path.join(source, "uncommitted.txt"), "dirty source");
+        await expect(
+          packNpmLibraries(source, tagged ? fixtureTag : null, output),
+        ).rejects.toThrow("clean");
+      } finally {
+        rmSync(temporary, { recursive: true, force: true });
       }
-      git("init", "-q");
-      git("add", ".");
-      git(
-        "-c",
-        "user.name=Test",
-        "-c",
-        "user.email=test@example.invalid",
-        "-c",
-        "commit.gpgsign=false",
-        "commit",
-        "-qm",
-        "fixture",
-      );
-      git("tag", fixtureTag);
-      await packNpmLibraries(source, fixtureTag, output);
-      expect(
-        execFileSync("sha256sum", ["-c", "SHA256SUMS.txt"], {
-          cwd: output,
-          encoding: "utf8",
-          env: { ...process.env, LC_ALL: "C" },
-        }),
-      ).toContain("legir-libraries.json: OK");
-      const metadata = JSON.parse(
-        execFileSync(
-          "tar",
-          [
-            "-xzOf",
-            path.join(output, `legir-pdf-core-${fixtureVersion}.tgz`),
-            "package/package.json",
-          ],
-          { encoding: "utf8" },
-        ),
-      );
-      expect(metadata.dependencies["@legir/pdf-model"]).toBe(fixtureVersion);
-      const manifest = JSON.parse(
-        readFileSync(path.join(output, "legir-libraries.json"), "utf8"),
-      );
-      expect(manifest.packages).toHaveLength(4);
-      expect(manifest.revision).toBe(
-        git("rev-parse", "HEAD").toString().trim(),
-      );
-    } finally {
-      rmSync(temporary, { recursive: true, force: true });
-    }
-  }, 30_000);
+    },
+    30_000,
+  );
 
   it("rewrites internal workspace dependencies to the release version", () => {
     const source = {

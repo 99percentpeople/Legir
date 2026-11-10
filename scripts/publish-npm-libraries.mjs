@@ -29,10 +29,16 @@ export async function publishNpmLibraries(
   const manifest = JSON.parse(
     fs.readFileSync(path.join(directory, "legir-libraries.json"), "utf8"),
   );
-  const version = /^pdf-libs-v(\d+\.\d+\.\d+)$/.exec(manifest.tag)?.[1];
-  if (manifest.format !== 2 || !version)
+  const taggedVersion = /^pdf-libs-v(\d+\.\d+\.\d+)$/.exec(manifest.tag)?.[1];
+  const version = manifest.version ?? taggedVersion;
+  if (
+    manifest.format !== 2 ||
+    typeof version !== "string" ||
+    !/^\d+\.\d+\.\d+$/.test(version) ||
+    (manifest.tag !== null && taggedVersion !== version)
+  )
     throw new Error(
-      "Expected an npm library manifest with a stable release tag",
+      "Expected an npm library manifest with a stable release version",
     );
 
   const pending = [];

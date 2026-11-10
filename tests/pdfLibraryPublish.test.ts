@@ -22,7 +22,7 @@ const names = ["pdf-model", "pdfium", "pdf-core", "pdf-renderer"];
 let directory: string;
 const fetchMock = vi.fn<typeof fetch>();
 
-function release(version = fixtureVersion) {
+function release(version = fixtureVersion, tagged = true) {
   const packages = names.map((name) => {
     const file = `legir-${name}-${version}.tgz`;
     const bytes = Buffer.from(`${name}@${version}`);
@@ -38,7 +38,8 @@ function release(version = fixtureVersion) {
     path.join(directory, "legir-libraries.json"),
     JSON.stringify({
       format: 2,
-      tag: `pdf-libs-v${version}`,
+      tag: tagged ? `pdf-libs-v${version}` : null,
+      version,
       packages,
     }),
   );
@@ -87,6 +88,40 @@ describe("npm publish preflight", () => {
       ]);
     }
   });
+
+  it("publishes a manually packed release without a Git tag", async () => {
+    release(fixtureVersion, false);
+    await publishNpmLibraries(directory);
+    expect(execFileSync).toHaveBeenCalledTimes(4);
+  });
+
+  it("supports existing tagged manifests without an explicit version field", async () => {
+    const file = path.join(directory, "legir-libraries.json");
+    const manifest = JSON.parse(readFileSync(file, "utf8"));
+    delete manifest.version;
+    writeFileSync(file, JSON.stringify(manifest));
+    await publishNpmLibraries(directory);
+    expect(execFileSync).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    { tag: null, version: "1.2.3-beta.1" },
+    { tag: `pdf-libs-v${fixtureVersion}`, version: "9.9.9" },
+    { tag: "v1.2.3", version: fixtureVersion },
+    { tag: null, version: undefined },
+  ])(
+    "rejects inconsistent or non-stable release identity: %j",
+    async (identity) => {
+      const file = path.join(directory, "legir-libraries.json");
+      const manifest = JSON.parse(readFileSync(file, "utf8"));
+      writeFileSync(file, JSON.stringify({ ...manifest, ...identity }));
+      await expect(publishNpmLibraries(directory)).rejects.toThrow(
+        "stable release version",
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(execFileSync).not.toHaveBeenCalled();
+    },
+  );
 
   it("does not publish in check-only mode", async () => {
     await publishNpmLibraries(directory, { checkOnly: true });

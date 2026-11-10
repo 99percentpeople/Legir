@@ -27,10 +27,10 @@ export function releaseVersion(tag: string) {
 
 export function npmPackageMetadata<T extends PackageMetadata>(
   metadata: T,
-  tag: string,
+  tag: string | null,
   revision: string,
 ) {
-  const version = releaseVersion(tag);
+  const version = releaseVersion(tag ?? `pdf-libs-v${metadata.version}`);
   if (metadata.version !== version)
     throw new Error("All four package versions must match the library tag");
   if (metadata.private) throw new Error("Cannot publish a private package");
@@ -67,18 +67,27 @@ export function npmPackageMetadata<T extends PackageMetadata>(
 
 export async function packNpmLibraries(
   sourceArg: string,
-  tag: string,
+  tag: string | null,
   outputArg: string,
 ) {
-  const version = releaseVersion(tag);
   const source = path.resolve(sourceArg);
+  const firstMetadata = JSON.parse(
+    await readFile(
+      path.join(source, "packages", names[0], "package.json"),
+      "utf8",
+    ),
+  );
+  const version = releaseVersion(tag ?? `pdf-libs-v${firstMetadata.version}`);
   const output = path.resolve(outputArg);
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: source, encoding: "utf8" }).trim();
   if (git("status", "--porcelain"))
     throw new Error("Release source must be clean");
   const revision = git("rev-parse", "HEAD");
-  if (revision !== git("rev-parse", `refs/tags/${tag}^{commit}`))
+  if (
+    tag !== null &&
+    revision !== git("rev-parse", `refs/tags/${tag}^{commit}`)
+  )
     throw new Error("The checked out source must match the release tag");
   await mkdir(output, { recursive: true });
   const stage = await mkdtemp(path.join(os.tmpdir(), "legir-npm-"));
@@ -91,11 +100,14 @@ export async function packNpmLibraries(
   try {
     for (const name of names) {
       const folder = path.join(source, "packages", name);
-      const metadata = npmPackageMetadata(
-        JSON.parse(await readFile(path.join(folder, "package.json"), "utf8")),
-        tag,
-        revision,
+      const original = JSON.parse(
+        await readFile(path.join(folder, "package.json"), "utf8"),
       );
+      if (original.version !== version)
+        throw new Error(
+          "All four package versions must match the release version",
+        );
+      const metadata = npmPackageMetadata(original, tag, revision);
       const target = path.join(stage, name);
       await cp(folder, target, {
         recursive: true,
@@ -138,6 +150,7 @@ export async function packNpmLibraries(
           repository,
           revision,
           tag,
+          version,
           packages,
         },
         null,
@@ -169,7 +182,7 @@ if (import.meta.main) {
   const [source, tag, output] = process.argv.slice(2);
   if (!source || !tag || !output)
     throw new Error(
-      "Usage: bun scripts/pack-npm-libraries.ts SOURCE TAG OUTPUT",
+      "Usage: bun scripts/pack-npm-libraries.ts SOURCE TAG|--current OUTPUT",
     );
-  await packNpmLibraries(source, tag, output);
+  await packNpmLibraries(source, tag === "--current" ? null : tag, output);
 }
