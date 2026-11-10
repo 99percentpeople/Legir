@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing library tag, e.g. pdf-libs-v0.3.0"
+        description: "Existing library tag (pdf-libs-vX.Y.Z)"
         required: true
         type: string
 
