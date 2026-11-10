@@ -11,11 +11,11 @@ import {
 } from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { FreeTextExporter } from "@legir/pdf-core/exporters/AnnotationExporters";
+import { FreeTextExporter } from "../../packages/pdf-core/dist/exporters/AnnotationExporters.js";
 import {
   getOrderedExportControlsByPage,
   reorderExportedPageAnnotations,
-} from "@legir/pdf-core/lib/annotation-layer-order";
+} from "../../packages/pdf-core/dist/lib/annotation-layer-order.js";
 import { getOrderedPageControls } from "@legir/pdf-model/controlLayerOrder";
 import { FieldType, type Annotation, type FormField } from "@/types";
 import { createTestEditorStore } from "../helpers/editorStore";

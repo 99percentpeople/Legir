@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StampImageLibrary } from "@/components/stamps/StampImageLibrary";
 import { ButtonProperties } from "@/components/workspace/controls/properties/ButtonProperties";
 import { FieldType, type FormField } from "@/types";
-import { STAMP_LIBRARY_DRAG_TYPE } from "@legir/pdf-model/stampImage";
+import { STAMP_LIBRARY_DRAG_TYPE } from "@/lib/stampImageBrowser";
 
 const mocks = vi.hoisted(() => ({
   entries: [] as { id: string; name: string; image: { dataUrl: string } }[],
@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/store/stampLibraryStore", () => ({
   useStampLibraryStore: () => mocks,
 }));
-vi.mock("@legir/pdf-model/stampImage", async (original) => ({
-  ...(await original<typeof import("@legir/pdf-model/stampImage")>()),
+vi.mock("@/lib/stampImageBrowser", async (original) => ({
+  ...(await original<typeof import("@/lib/stampImageBrowser")>()),
   loadStampImageFile: mocks.load,
 }));
 vi.mock("@/components/workspace/controls/form/buttonImageFile", () => ({

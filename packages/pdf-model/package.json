@@ -3,7 +3,15 @@
   "version": "0.3.0",
   "description": "Portable PDF document models, geometry and editing policies",
   "type": "module",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/99percentpeople/Legir.git",
+    "directory": "packages/pdf-model"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
     "README.md",
@@ -15,14 +23,87 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./*": {
-      "types": "./dist/*.d.ts",
-      "import": "./dist/*.js"
+    "./annotationReplies": {
+      "types": "./dist/annotationReplies.d.ts",
+      "import": "./dist/annotationReplies.js"
+    },
+    "./buttonImage": {
+      "types": "./dist/buttonImage.d.ts",
+      "import": "./dist/buttonImage.js"
+    },
+    "./choiceFields": {
+      "types": "./dist/choiceFields.d.ts",
+      "import": "./dist/choiceFields.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "import": "./dist/constants.js"
+    },
+    "./controlLayerOrder": {
+      "types": "./dist/controlLayerOrder.d.ts",
+      "import": "./dist/controlLayerOrder.js"
+    },
+    "./controlMovement": {
+      "types": "./dist/controlMovement.d.ts",
+      "import": "./dist/controlMovement.js"
+    },
+    "./controlRotation": {
+      "types": "./dist/controlRotation.d.ts",
+      "import": "./dist/controlRotation.js"
+    },
+    "./fonts": {
+      "types": "./dist/fonts.d.ts",
+      "import": "./dist/fonts.js"
+    },
+    "./formAppearance": {
+      "types": "./dist/formAppearance.d.ts",
+      "import": "./dist/formAppearance.js"
+    },
+    "./imageCompression": {
+      "types": "./dist/imageCompression.d.ts",
+      "import": "./dist/imageCompression.js"
+    },
+    "./inkGeometry": {
+      "types": "./dist/inkGeometry.d.ts",
+      "import": "./dist/inkGeometry.js"
+    },
+    "./pdfDate": {
+      "types": "./dist/pdfDate.d.ts",
+      "import": "./dist/pdfDate.js"
+    },
+    "./pdfPermissions": {
+      "types": "./dist/pdfPermissions.d.ts",
+      "import": "./dist/pdfPermissions.js"
+    },
+    "./pdfScale": {
+      "types": "./dist/pdfScale.d.ts",
+      "import": "./dist/pdfScale.js"
+    },
+    "./shapeGeometry": {
+      "types": "./dist/shapeGeometry.d.ts",
+      "import": "./dist/shapeGeometry.js"
+    },
+    "./stampImage": {
+      "types": "./dist/stampImage.d.ts",
+      "import": "./dist/stampImage.js"
+    },
+    "./stamps": {
+      "types": "./dist/stamps.d.ts",
+      "import": "./dist/stamps.js"
+    },
+    "./viewportMath": {
+      "types": "./dist/viewportMath.d.ts",
+      "import": "./dist/viewportMath.js"
+    },
+    "./visibleRange": {
+      "types": "./dist/visibleRange.d.ts",
+      "import": "./dist/visibleRange.js"
     }
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', {recursive:true, force:true})\" && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {},
   "devDependencies": {

@@ -7,17 +7,19 @@ import {
   type PDFFont,
 } from "@legir/pdfium/authoring";
 import fontkit from "pdf-fontkit";
-import { FieldType, type FormField, type Annotation } from "@/types";
+import { FieldType, type FormField, type Annotation } from "@legir/pdf-model";
 import {
   canFontEncodeText,
   pickControlValueFont,
-} from "@legir/pdf-core/lib/font-selection";
-import { prepareExportFonts } from "@legir/pdf-core/lib/export-fonts";
+} from "../dist/lib/font-selection.js";
+import { prepareExportFonts } from "../dist/lib/export-fonts.js";
 
 let fontBytes: Uint8Array;
 beforeAll(async () => {
   fontBytes = new Uint8Array(
-    await readFile("public/fonts/NotoSansSC-Regular.ttf"),
+    await readFile(
+      new URL("../../../public/fonts/NotoSansSC-Regular.ttf", import.meta.url),
+    ),
   );
 });
 afterEach(() => {
@@ -187,7 +189,7 @@ describe("load fonts only for actual appearances", () => {
   });
 
   it("does not resolve fonts from excluded pages or preserved source annotations", async () => {
-    const { exportPDF } = await import("@/services/pdfService");
+    const { exportPDF } = await import("@legir/pdf-core/pipeline");
     const source = await PDFDocument.create();
     source.addPage([300, 300]);
     source.addPage([300, 300]);

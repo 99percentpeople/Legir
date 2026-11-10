@@ -4,6 +4,8 @@ Portable data contracts and geometry/editing policies shared by Legir, the PDF
 core and future consumers. No runtime package dependencies, UI framework, AI
 configuration, desktop API or PDF engine.
 
+Install with `bun add @legir/pdf-model` or `npm install @legir/pdf-model`.
+
 ```ts
 import { FieldType, type FormField, type Annotation } from "@legir/pdf-model";
 import { normalizeRotationDeg } from "@legir/pdf-model/controlRotation";
@@ -33,4 +35,18 @@ re-export the portable PDF defaults from `@legir/pdf-model/constants`.
 The permission-policy provider is realm-scoped, as before. Configure it at host
 initialization; do not mutate it to switch concurrent users or server tenants.
 
-License: AGPL-3.0-or-later, retained from the extracted application code.
+This package is typechecked without DOM libraries. Stamp resource creation,
+data-URL decoding and geometry stay portable; browser `FileReader`/`Image`
+loading and drag/drop adapters are intentionally not exported. Only the helper
+subpaths explicitly listed in `package.json` are public.
+
+## Tests
+
+After `bun run build:packages` at the repository root, run
+`bun run --cwd packages/pdf-model test` (or `bun run test` inside this package).
+Functional tests live in `tests/` and run under Node without application aliases.
+The root `bun run test` also includes this Vitest project.
+
+License: [MIT](LICENSE). Closed-source commercial use is permitted, provided
+that the copyright and license notice are retained. The Legir application
+remains AGPL-3.0-or-later.

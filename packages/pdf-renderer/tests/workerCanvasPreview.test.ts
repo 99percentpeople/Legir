@@ -1,9 +1,12 @@
 // @vitest-environment node
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import type { WorkerRequest } from "@legir/pdf-core/workerProtocol";
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
+import type { WorkerRequest } from "@legir/pdf-renderer/protocol";
+import { getPDFium } from "@legir/pdf-core/runtime";
 
-vi.mock("@legir/pdf-core/engine/runtime", () => ({ getPDFium: vi.fn() }));
+vi.mock("@legir/pdf-core/runtime", async (original) => ({
+  ...(await original<typeof import("@legir/pdf-core/runtime")>()),
+  getPDFium: vi.fn(),
+}));
 const surfaces: FakeCanvas[] = [];
 const encode = vi.fn(async () => new Blob(["preview"], { type: "image/jpeg" }));
 class FakeCanvas {
@@ -48,7 +51,7 @@ beforeAll(async () => {
   );
   vi.stubGlobal("self", scope);
   vi.stubGlobal("OffscreenCanvas", FakeCanvas);
-  await import("@/workers/pdf-render.worker");
+  await import("@legir/pdf-renderer/worker");
 });
 afterAll(() => {
   for (const channel of channels) {

@@ -20,5 +20,12 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "tests/**/*", "vitest.config.ts"]
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "packages/pdf-model/tests/**/*.ts",
+    "packages/pdf-core/tests/**/*.ts",
+    "packages/pdf-renderer/tests/**/*.ts",
+    "vitest.config.ts"
+  ]
 }

@@ -1,6 +1,6 @@
 import "./assets";
 import { configurePdfHost } from "@legir/pdf-core/host";
-import { getPdfWorkerForBytes } from "@legir/pdf-renderer/documentOwners";
+import { getPdfWorkerForBytes } from "@legir/pdf-renderer";
 import { getPlatformSystemFontBytes } from "@/services/platform/fonts";
 import { isDesktopApp } from "@/services/platform/runtime";
 import { getSystemFontCatalog } from "@/lib/system-fonts";

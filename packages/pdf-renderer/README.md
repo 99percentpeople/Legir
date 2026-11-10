@@ -4,6 +4,8 @@ Reusable browser PDF worker transport and rendering runtime. The package has no
 React, Zustand, Tauri or Vite imports and creates no default client or worker on
 import. The host supplies the worker constructor and optional system-font reader.
 
+Install with `bun add @legir/pdf-renderer` or `npm install @legir/pdf-renderer`.
+
 ```ts
 import { PDFWorkerService } from "@legir/pdf-renderer";
 
@@ -56,8 +58,27 @@ Do not import either worker entry into a main thread or a Node server.
 `getPdfWorkerForBytes` exposes the WeakMap owner lookup. It does not retain a
 closed document; `destroy()` releases ownership and pending requests. The core
 receives lookup through `configurePdfHost`, not a reverse package dependency.
+The mutable owner map and thumbnail cache are private. `protocol` exposes the
+typed Worker message contract; it belongs here, not in `pdf-core`.
+
+See [the standalone Vite example](../../examples/pdf-browser/README.md) for a
+complete client, asset-copy step and worker entry. It is typechecked and built
+from installed tarballs by `bun run test:consumer`; set `LEGIR_BROWSER_BIN` to
+add the real headless Chromium Worker/WASM smoke test.
 
 This is a rendering/transport library, not a React viewer component. Viewport
 components, interaction controls and application stores remain in Legir.
 
-License: AGPL-3.0-or-later, retained from the extracted application code.
+## Tests
+
+After `bun run build:packages` at the repository root, run
+`bun run --cwd packages/pdf-renderer test` (or `bun run test` inside this package).
+`tests/` checks worker lifetime, canvas previews, thumbnail caching and entry-point
+side effects using injected worker/canvas doubles, without application aliases.
+The root `bun run test` also includes this Vitest project. These unit tests do
+not replace the real browser Worker/WASM consumer check above.
+
+License: [MIT](LICENSE). Closed-source commercial use is permitted, provided
+that the copyright and license notice are retained. Dependencies retain their
+own licenses, including the engine notices in `@legir/pdfium/wasm/licenses/`.
+The Legir application remains AGPL-3.0-or-later.

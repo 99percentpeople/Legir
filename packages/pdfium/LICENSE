@@ -1,4 +1,40 @@
-BSD 3-Clause License
+MIT License
+
+Copyright (c) 2026 Legir contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Scope and historical grants
+---------------------------
+
+The MIT license above covers the Legir-authored bindings, authoring layer and
+native extensions, including Legir-authored files retaining historical
+BSD-3-Clause headers. MIT is an additional license option for those files;
+their previous BSD-3-Clause grant is retained below. Native file headers are
+preserved to keep the pinned source and WASM provenance unchanged.
+
+This MIT grant does not relicense PDFium, Emscripten or their bundled
+third-party dependencies. Their original terms and notices remain in
+wasm/licenses/ and must accompany redistribution of the compiled engine.
+
+Historical BSD 3-Clause License for Legir-authored code
+----------------------------------------------------
 
 Copyright (c) 2026, Legir contributors
 All rights reserved.

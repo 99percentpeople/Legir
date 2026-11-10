@@ -1,6 +1,6 @@
 /** Native round-trip checks. The benchmark additionally uses Poppler and qpdf
  * as independent readers; this helper never creates a second app session. */
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
+import { getPDFium } from "@legir/pdf-core/runtime";
 import type { PDFPage } from "@legir/pdfium";
 
 async function withPage<T>(

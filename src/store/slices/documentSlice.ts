@@ -149,8 +149,7 @@ export const createDocumentSlice: EditorStoreSlice<
       };
     }
 
-    const { verifyPdfOwnerPassword } =
-      await import("@legir/pdf-core/lib/owner-password");
+    const { verifyPdfOwnerPassword } = await import("@legir/pdf-core/content");
     const result = await verifyPdfOwnerPassword(store.pdfBytes, password);
     if (!result.ok) {
       return {

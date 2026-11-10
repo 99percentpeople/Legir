@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { PDFDocument, PDFName, StandardFonts } from "@legir/pdfium/authoring";
-import type { ExportPdfRequest } from "@legir/pdf-core/engine/sessionTypes";
-import { DocumentSession } from "@legir/pdf-core/engine/documentSession";
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
-import { disposeNativePage } from "@legir/pdf-core/engine/raster";
-import { getNativePageViewport } from "@legir/pdf-core/engine/pageContent";
+import type { ExportPdfRequest } from "@legir/pdf-core";
+import { DocumentSession } from "@legir/pdf-core";
+import { getPDFium } from "@legir/pdf-core/runtime";
+import { disposeNativePage } from "@legir/pdf-core/runtime";
+import { getNativePageViewport } from "@legir/pdf-core/runtime";
 
 async function fixture(label: string) {
   const doc = await PDFDocument.create();

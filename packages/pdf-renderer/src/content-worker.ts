@@ -1,13 +1,10 @@
 /// <reference lib="webworker" />
-import {
-  executePdfEngineRequest,
-  loadPDFium,
-} from "@legir/pdf-core/engine/pdfium";
+import { executePdfEngineRequest, loadPDFium } from "@legir/pdf-core/runtime";
 import type {
   PdfEngineRequest,
   PdfEngineResponse,
   PdfObjectValue,
-} from "@legir/pdf-core/engine/types";
+} from "@legir/pdf-core/runtime";
 
 const graphStreamTransfers = (
   value: PdfObjectValue,

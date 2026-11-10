@@ -4,6 +4,8 @@ PDF import/export policies and transactional document sessions, extracted from
 Legir. Depends on `@legir/pdfium`, `@legir/pdf-model` and `pdf-fontkit`, not on
 React, Zustand, Tauri, the application event bus or Vite.
 
+Install with `bun add @legir/pdf-core` or `npm install @legir/pdf-core`.
+
 ## Headless Node example
 
 Build the workspace packages first. After installing these packages in another
@@ -20,7 +22,7 @@ const session = new DocumentSession(engine, bytes);
 try {
   const model = await session.parse({}, async () => undefined);
   const fields = model.fields.map((field) =>
-    field.name === "project_name" ? { ...field, value: "Project 833" } : field,
+    field.name === "project_name" ? { ...field, value: "Example" } : field,
   );
   const result = await session.export({
     fields,
@@ -152,10 +154,34 @@ core does not depend on `PDFWorkerService` or any particular transport.
 - `engine/`: native document sessions, editing views and content operations.
 - `parsers/`, `exporters/`, `lib/`: field/annotation implementations and PDF helpers.
 
-The root exports `DocumentSession`, host contracts and pipeline entry points.
-`loadPDFInternal` is the lower-level hydration entry; normal headless callers
-should use a session to avoid constructing transport-shaped adapters themselves.
+The root exports `DocumentSession`, host contracts, export API and data contracts.
+For ordinary headless callers, use a session as shown above. Advanced hosts can
+use `loadPdf` from `@legir/pdf-core/pipeline` with injected hydration capabilities;
+the internal `loadPDFInternal` name is not exported from the package root.
+
+Other explicit integration entries are `host`, `content`, `runtime`, `text`,
+`search`, `previews`, `types`, and the supported `lib/coords`, `lib/freeTextLayout`,
+`lib/pageStructure` helpers. `runtime` is the advanced worker-adapter contract;
+`engine/*`, `parsers/*`, `exporters/*` and arbitrary `lib/*` files are private.
+See the [package guide](../README.md#api-and-scope) for the complete boundaries.
+
+Host configuration and permission policy are shared per JS realm. Do not change
+them per request in a multi-tenant server. Serialize jobs on each session and use
+`dispose()` in `finally`, including cancellation/error paths.
 The browser image/canvas-dependent helpers remain optional capabilities, not a
 promise that every image-transform path runs in Node without an adapter.
 
-License: AGPL-3.0-or-later, retained from the extracted application code.
+## Tests
+
+After `bun run build:packages` at the repository root, run
+`bun run --cwd packages/pdf-core test` (or `bun run test` inside this package).
+Functional tests in `tests/` cover document sessions, forms, native editing,
+streams, raster surfaces and font/export layout without application aliases.
+They run under Node, except browser font hydration tests explicitly using jsdom.
+CJK tests share the repository's `public/fonts` fixture through a file URL,
+not the current working directory. The root suite also includes this project.
+
+License: [MIT](LICENSE). Closed-source commercial use is permitted, provided
+that the copyright and license notice are retained. Dependencies retain their
+own licenses, including the engine notices in `@legir/pdfium/wasm/licenses/`.
+The Legir application remains AGPL-3.0-or-later.

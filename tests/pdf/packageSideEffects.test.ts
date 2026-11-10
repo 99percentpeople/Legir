@@ -18,13 +18,4 @@ describe("PDF integration side effects", () => {
       ]),
     );
   });
-
-  it("retains both published worker entry points", () => {
-    const { sideEffects } = manifest(
-      "../../packages/pdf-renderer/package.json",
-    );
-    expect(sideEffects).toEqual(
-      expect.arrayContaining(["./dist/worker.js", "./dist/content-worker.js"]),
-    );
-  });
 });

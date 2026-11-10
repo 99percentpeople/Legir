@@ -72,7 +72,11 @@ module boundaries and standalone Node/browser examples.
 Run `bun run build:packages` to build all libraries, `bun run check:boundaries`
 to enforce their dependency direction, and `bun run test:consumer` to verify
 packed artifacts from a plain Node project outside this repository. The latter
-packs locally; it does not publish to a registry.
+packs locally for verification; tagged builds publish the same tarballs to npm.
+The [standalone browser example](examples/pdf-browser/README.md) is also
+typechecked and built against those installed tarballs. Set
+`LEGIR_BROWSER_BIN=chromium` when running `test:consumer` to additionally verify
+real Worker/WASM rendering in headless Chromium.
 
 ## Deployment
 
@@ -100,5 +104,11 @@ For the internal architecture and module layout, see:
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 or later.
-See [LICENSE](LICENSE).
+The Legir application is licensed under the GNU Affero General Public License
+v3.0 or later. See [LICENSE](LICENSE).
+
+The four reusable libraries in [`packages/`](packages/README.md#license-boundary)
+offer their Legir-authored code under MIT, allowing closed-source commercial use
+with the copyright and license notice retained. Third-party dependencies,
+including the bundled PDFium engine, retain their own licenses and notices.
+See each package's `LICENSE` and `packages/pdfium/wasm/licenses/`.

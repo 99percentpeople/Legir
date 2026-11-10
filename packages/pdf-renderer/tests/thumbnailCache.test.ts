@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { ThumbnailRasterCache } from "@legir/pdf-core/engine/thumbnailCache";
+import { ThumbnailRasterCache } from "../dist/thumbnailCache.js";
 
 function surface(width = 100, height = 100) {
   const bitmap = { width, height, close: vi.fn() };

@@ -9,6 +9,8 @@ Native source revisions and the Emscripten toolchain are pinned in
 and reversible transactions so editing and rendering can share a document.
 These extensions use internal PDFium APIs and must be checked when upgrading.
 
+Install with `bun add @legir/pdfium` or `npm install @legir/pdfium`.
+
 ## Use from a worker or Node
 
 ```ts
@@ -403,5 +405,15 @@ and measures browser PSS separately; the combined retained cap is 512 MiB.
 `clear` closes owned bitmaps and invalidates late asynchronous results. The host
 must ignore memory notifications from an owner that has been replaced.
 
-The package is BSD-3-Clause; the surrounding Legir application keeps its own
-license. See `LICENSE` and `wasm/licenses/`.
+## License
+
+The Legir-authored bindings, authoring layer and native extensions are available
+under [MIT](LICENSE), permitting closed-source commercial use with the copyright
+and license notice retained. Native files keep their historical BSD-3-Clause
+headers to preserve the pinned build provenance; those Legir-authored files are
+also covered by the MIT grant, and the earlier BSD terms remain in `LICENSE`.
+
+PDFium, Emscripten and bundled third-party dependencies retain their original
+licenses. Distribute the notices in `wasm/licenses/` with the compiled engine;
+this MIT grant does not replace them. The surrounding Legir application remains
+AGPL-3.0-or-later.

@@ -3,27 +3,30 @@
 Run these from the repository root:
 
 ```sh
-bun run test         # Application integration, state, UI and platform tests
+bun run test         # Application + all four library Vitest projects
+bun run --cwd packages/pdf-core test # One library after build:packages
 bun run test:pdfium  # Standalone SDK tests under packages/pdfium/tests
 bun run lint
 ```
 
 The application command verifies the pinned WASM artifacts and builds the SDK
-before Vitest starts. CI runs both suites; changes under `packages/pdfium/**`
-trigger the same validation as application changes. The SDK uses Node while
-the application defaults to jsdom, with per-file environment overrides.
+before Vitest starts. Each library has its own Vitest config and `test` command;
+root `test` aggregates all of them with the application project. Libraries default
+to Node, the application defaults to jsdom, and browser-specific cases use
+explicit per-file environment overrides.
 
-| Area                                               | Responsibility                                                                                                                                                                        |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/pdf/`                                       | App import/export policies, forms, annotation replies, page assembly, owner routing, cancellation, incremental/full saves and cache invalidation.                                     |
-| `packages/pdfium/tests/`                           | Native resource lifetime, journal/graft/save semantics, rendering and the independent authoring API. Similar operations at these two layers protect different contracts.              |
-| `tests/workspace/`, `tests/editor*`, `tests/page*` | View state, interactions, page identity, undo/redo and UI rendering requests.                                                                                                         |
-| `tests/platform/`, `tests/desktop*`                | Persistence, file handling and desktop packaging rules.                                                                                                                               |
-| `tests/ai/`, `tests/www/`                          | AI service behavior and the separate marketing/demo surface.                                                                                                                          |
-| `scripts/pdf-benchmark/`                           | Manual production-browser timing, cancellation/ownership probes, canvas quality and independent qpdf/Poppler export validation. See its [README](../scripts/pdf-benchmark/README.md). |
+| Area                                                                                    | Responsibility                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/pdf/`                                                                            | App import/export policies, forms, annotation replies, page assembly, owner routing, cancellation, incremental/full saves and cache invalidation.                                     |
+| `packages/pdf-model/tests/`, `packages/pdf-core/tests/`, `packages/pdf-renderer/tests/` | Portable model geometry, core document/form/font/stream/raster behavior, and renderer worker/cache behavior. No application source imports or aliases.                                |
+| `packages/pdfium/tests/`                                                                | Native resource lifetime, journal/graft/save semantics, rendering and the independent authoring API. Similar operations at these two layers protect different contracts.              |
+| `tests/workspace/`, `tests/editor*`, `tests/page*`                                      | View state, interactions, page identity, undo/redo and UI rendering requests.                                                                                                         |
+| `tests/platform/`, `tests/desktop*`                                                     | Persistence, file handling and desktop packaging rules.                                                                                                                               |
+| `tests/ai/`, `tests/www/`                                                               | AI service behavior and the separate marketing/demo surface.                                                                                                                          |
+| `scripts/pdf-benchmark/`                                                                | Manual production-browser timing, cancellation/ownership probes, canvas quality and independent qpdf/Poppler export validation. See its [README](../scripts/pdf-benchmark/README.md). |
 
-`pdf/authoringLifecycle.ts` releases standalone native documents created by test
-fixtures after each application test. It does not own app sessions. App owners,
+`packages/pdfium/tests/helpers/authoringLifecycle.ts` releases standalone native
+documents created by fixtures after application/core tests. It does not own app sessions. App owners,
 pages, pixmaps and tasks still need explicit cleanup in their own tests.
 `pdf/nativeVerification.ts` provides native reopen/render checks; those checks
 share the engine under test and do not replace the independent corpus validator.
@@ -45,10 +48,27 @@ Retired duplicate/experimental tools are listed in the [benchmark archive](../sc
 ## Package boundaries and external consumers
 
 `bun run test` builds all workspace libraries and checks dependency boundaries
-before running the application regressions. `bun run test:consumer` separately
+before running all library and application regressions. `bun run test:consumer` separately
 packs all four libraries, installs their tarballs outside this repository and
 runs `scripts/pdf-consumer-smoke.mjs` under plain Node. It covers AcroForm import,
 fill, save, flatten, raster parity, transactional rollback and explicit native
 cleanup without Vite aliases, application source, React or Tauri. These checks
 also run in the CI validation job. They do not replace browser or native desktop
 validation when those paths change.
+
+`pdfLibraryNpmPublish.test.ts` packs a temporary tagged repository and verifies
+all tarball and manifest checksums with `sha256sum -c`. `pdfLibraryPublish.test.ts`
+mocks npm and registry requests to cover preflight failures, dependency order,
+`latest` downgrade protection, dry runs and partial-release retries. These tests
+never publish real packages. Their synthetic fixture versions are independent of
+the actual package manifests; do not update them when releasing.
+`pdfLibraryLicense.test.ts` checks the actual
+four package tarballs for MIT metadata and license text, preserved engine notices,
+and the unchanged AGPL application boundary.
+
+`pdfLibraryApi.test.ts` checks explicit export maps, development alias parity,
+private-path rejection and DOM-free model imports. Tests of private algorithms
+reference repository-local `packages/*/dist` files deliberately; those are not
+published import paths. The external consumer also typechecks/builds
+`examples/pdf-browser` without Legir aliases. Set `LEGIR_BROWSER_BIN=chromium`
+to additionally run its actual Worker/WASM path in a headless browser.

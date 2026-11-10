@@ -15,4 +15,4 @@ export class PDFWorkerService extends PdfWorkerClient {
 }
 export const createPdfWorkerService = () => new PDFWorkerService();
 export const pdfWorkerService = new PDFWorkerService({ lazy: true });
-export { getPdfWorkerForBytes } from "@legir/pdf-renderer/documentOwners";
+export { getPdfWorkerForBytes } from "@legir/pdf-renderer";

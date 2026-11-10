@@ -1,6 +1,6 @@
 import { parsePageRange } from "@/utils/pageRange";
 export type { ParsePageRangeResult } from "@/utils/pageRange";
-import type { TextContent, TextStyle } from "@legir/pdf-core/engine/textTypes";
+import type { TextContent, TextStyle } from "@legir/pdf-core/text";
 import {
   pdfWorkerService,
   type PDFWorkerService,
@@ -16,7 +16,7 @@ import {
   normalizeRotationDeg,
   projectPointsInterval,
   transform,
-} from "@legir/pdf-core/lib/textGeometry";
+} from "@legir/pdf-core/text";
 import type {
   Annotation,
   PageData,

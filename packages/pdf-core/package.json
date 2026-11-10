@@ -3,7 +3,15 @@
   "version": "0.3.0",
   "description": "PDF import, export, forms and document sessions without the application shell",
   "type": "module",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/99percentpeople/Legir.git",
+    "directory": "packages/pdf-core"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
     "README.md",
@@ -15,14 +23,55 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./*": {
-      "types": "./dist/*.d.ts",
-      "import": "./dist/*.js"
+    "./host": {
+      "types": "./dist/host.d.ts",
+      "import": "./dist/host.js"
+    },
+    "./content": {
+      "types": "./dist/content.d.ts",
+      "import": "./dist/content.js"
+    },
+    "./pipeline": {
+      "types": "./dist/pipeline.d.ts",
+      "import": "./dist/pipeline.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./text": {
+      "types": "./dist/text.d.ts",
+      "import": "./dist/text.js"
+    },
+    "./previews": {
+      "types": "./dist/engine/exportPreviews.d.ts",
+      "import": "./dist/engine/exportPreviews.js"
+    },
+    "./search": {
+      "types": "./dist/search.d.ts",
+      "import": "./dist/search.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./lib/coords": {
+      "types": "./dist/lib/coords.d.ts",
+      "import": "./dist/lib/coords.js"
+    },
+    "./lib/freeTextLayout": {
+      "types": "./dist/lib/freeTextLayout.d.ts",
+      "import": "./dist/lib/freeTextLayout.js"
+    },
+    "./lib/pageStructure": {
+      "types": "./dist/lib/pageStructure.d.ts",
+      "import": "./dist/lib/pageStructure.js"
     }
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', {recursive:true, force:true})\" && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@legir/pdf-model": "workspace:*",

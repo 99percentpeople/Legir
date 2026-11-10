@@ -1,18 +1,17 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-const hooks = vi.hoisted(() => ({ started: vi.fn(), terminated: vi.fn() }));
-vi.mock("@/workers/pdf-render.worker?worker", () => ({
-  default: class {
-    constructor() {
-      hooks.started();
-    }
-    postMessage() {}
-    terminate() {
-      hooks.terminated();
-    }
-  },
-}));
-import { createPdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { PDFWorkerService } from "@legir/pdf-renderer";
+
+const hooks = { started: vi.fn(), terminated: vi.fn() };
+class FakeWorker {
+  constructor() {
+    hooks.started();
+  }
+  postMessage() {}
+  terminate() {
+    hooks.terminated();
+  }
+}
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -20,7 +19,9 @@ it("does not resurrect a closed document worker when delayed cleanup or commands
   vi.stubGlobal("Worker", class {});
   hooks.started.mockClear();
   hooks.terminated.mockClear();
-  const worker = createPdfWorkerService();
+  const worker = new PDFWorkerService({
+    createWorker: () => new FakeWorker() as unknown as Worker,
+  });
   expect(hooks.started).toHaveBeenCalledOnce();
   const pendingRelease = worker.releaseCanvas({ canvasIds: ["in-flight"] });
   worker.destroy();

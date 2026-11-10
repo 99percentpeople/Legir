@@ -2,6 +2,8 @@ import type { PDFDocumentPermissions, PDFOutlineItem } from "@legir/pdf-model";
 import type { FontRequest } from "./engine/fontHost.js";
 import { hasWorkerFontProvider, requestHostFont } from "./engine/fontHost.js";
 import type { DocumentCommands } from "./engine/sessionTypes.js";
+export { hasWorkerFontProvider, requestHostFont } from "./engine/fontHost.js";
+export type { FontRequest } from "./engine/fontHost.js";
 
 export type PdfFontCatalog = {
   families: string[];

@@ -1,4 +1,4 @@
-import type { TextContent } from "@legir/pdf-core/engine/textTypes";
+import type { TextContent } from "@legir/pdf-core/text";
 import type { PageData, PDFSearchResult } from "@/types";
 import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 import {

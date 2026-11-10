@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { deflateSync } from "node:zlib";
 import {
@@ -11,9 +12,9 @@ import {
   createPdfStreamTextReader,
   decodePdfStreamBytes,
   decodePdfStreamToText,
-} from "@legir/pdf-core/lib/pdf-import-utils";
-import * as streamUtils from "@legir/pdf-core/lib/pdf-import-utils";
-import { ensurePdfEmbeddedFontLoaded } from "@legir/pdf-core/lib/embedded-fonts";
+} from "../dist/lib/pdf-import-utils.js";
+import * as streamUtils from "../dist/lib/pdf-import-utils.js";
+import { ensurePdfEmbeddedFontLoaded } from "../dist/lib/embedded-fonts.js";
 
 const fontSetDescriptor = Object.getOwnPropertyDescriptor(document, "fonts");
 afterEach(() => {

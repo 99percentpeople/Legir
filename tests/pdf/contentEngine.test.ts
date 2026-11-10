@@ -17,11 +17,11 @@ import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createEditorView } from "@/store/editorView";
 import { getPageId } from "@legir/pdf-core/lib/pageStructure";
-import { pdfContentEngine } from "@legir/pdf-core/engine/index";
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
+import { pdfContentEngine } from "../../packages/pdf-core/dist/engine/index.js";
+import { getPDFium } from "@legir/pdf-core/runtime";
 import { PDFPage as NativePage } from "@legir/pdfium";
-import type { PdfQuad } from "@legir/pdf-core/engine/types";
-import { applyTextRedactionsUnderFlattenedFreetext } from "@legir/pdf-core/lib/textRedaction";
+import type { PdfQuad } from "../../packages/pdf-core/dist/engine/types.js";
+import { applyTextRedactionsUnderFlattenedFreetext } from "../../packages/pdf-core/dist/lib/textRedaction.js";
 import { createPdfLibViewport } from "@legir/pdf-core/lib/coords";
 
 afterEach(() => vi.restoreAllMocks());

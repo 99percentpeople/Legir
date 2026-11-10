@@ -9,19 +9,16 @@ import type {
   ReadablePdfDocument,
   LoadPDFInternalOptions as CoreLoadOptions,
 } from "./documentPipeline";
-import type {
-  ExportPdfOptions,
-  ExportPdfRequest,
-} from "@legir/pdf-core/engine/sessionTypes";
+import type { ExportPdfOptions, ExportPdfRequest } from "@legir/pdf-core";
 import type { FormField, Annotation, PDFMetadata } from "@/types";
 import { getPdfPermissionPolicy } from "@legir/pdf-model/pdfPermissions";
 import {
   createPdfLoadSession,
   getPdfPasswordReason,
-} from "@legir/pdf-core/pipeline/loadSession";
+} from "@legir/pdf-core/pipeline";
 import { getSystemFontCatalog } from "@/lib/system-fonts";
-import { exportPreviews } from "@legir/pdf-core/engine/exportPreviews";
-import { yieldPdfTask } from "@legir/pdf-core/engine/yieldTask";
+import { exportPreviews } from "@legir/pdf-core/previews";
+import { yieldPdfTask } from "@legir/pdf-core/pipeline";
 export type {
   LoadedPdfDocument,
   ReadablePdfDocument,

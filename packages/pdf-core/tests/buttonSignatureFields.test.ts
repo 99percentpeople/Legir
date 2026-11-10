@@ -12,7 +12,7 @@ import {
   op,
 } from "@legir/pdfium/authoring";
 import { DocumentSession } from "@legir/pdf-core";
-import { renderWidgetAppearance } from "@legir/pdf-core/engine/widgetAppearance";
+import { renderWidgetAppearance } from "../dist/engine/widgetAppearance.js";
 import { FieldType, type FormField } from "@legir/pdf-model";
 import {
   detachFormFieldSource,

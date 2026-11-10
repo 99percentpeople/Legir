@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { DocumentSession } from "@legir/pdf-core";
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
+import { getPDFium } from "@legir/pdf-core/runtime";
 import { FieldType, type FormField } from "@legir/pdf-model";
 import { PDFDocument, PDFName, PDFStream } from "@legir/pdfium/authoring";
 
@@ -181,7 +181,12 @@ describe("text field vertical alignment", () => {
     const bytes = await source.save();
     const session = new DocumentSession(await getPDFium(), bytes);
     const fontBytes = new Uint8Array(
-      await readFile("public/fonts/NotoSansSC-Regular.ttf"),
+      await readFile(
+        new URL(
+          "../../../public/fonts/NotoSansSC-Regular.ttf",
+          import.meta.url,
+        ),
+      ),
     );
     const positions: number[] = [];
     try {

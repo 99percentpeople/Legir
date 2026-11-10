@@ -1,10 +1,18 @@
-import { getThumbnailSourceAnnotations } from "@legir/pdf-core/lib/thumbnailSourceAnnotations";
+import { getThumbnailSourceAnnotations } from "@legir/pdf-core/runtime";
 import { expect, it } from "vitest";
 import { PDFDocument } from "@legir/pdfium/authoring";
-import { FieldType, type Annotation } from "@/types";
-import { drawThumbnailOverlay } from "@legir/pdf-core/lib/thumbnailOverlay";
+import { FieldType, type Annotation, type FormField } from "@legir/pdf-model";
+import { drawThumbnailOverlay } from "../dist/lib/thumbnailOverlay.js";
 import type { ThumbnailContent } from "@legir/pdf-core/types";
-import { field } from "../helpers/editorStore";
+
+const field = (id: string, patch: Partial<FormField> = {}): FormField => ({
+  id,
+  name: id,
+  type: FieldType.TEXT,
+  pageIndex: 0,
+  rect: { x: 10, y: 10, width: 100, height: 20 },
+  ...patch,
+});
 
 async function createThumbnailOverlay(content: ThumbnailContent) {
   const pdfDoc = await PDFDocument.create();

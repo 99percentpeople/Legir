@@ -11,6 +11,10 @@ const temporary = fs.mkdtempSync(
 const consumer = path.join(temporary, "consumer");
 fs.mkdirSync(consumer);
 const dependencies = {};
+const example = path.join(root, "examples/pdf-browser");
+const exampleMetadata = JSON.parse(
+  fs.readFileSync(path.join(example, "package.json"), "utf8"),
+);
 const unpacked = [];
 const releaseDirectory = process.argv[2]
   ? path.resolve(process.argv[2])
@@ -42,8 +46,8 @@ try {
         },
       );
     if (releaseDirectory) {
-      // Release URLs are intentionally unavailable until all checks pass. Test
-      // the unchanged package bytes now; public URL installation is checked after publishing.
+      // Internal npm versions may not exist yet. Test the unchanged tarball
+      // contents locally without resolving unpublished @legir dependencies.
       const destination = path.join(temporary, name);
       fs.mkdirSync(destination);
       execFileSync("tar", [
@@ -72,6 +76,7 @@ try {
         type: "module",
         dependencies,
         overrides: dependencies,
+        devDependencies: exampleMetadata.devDependencies,
       },
       null,
       2,
@@ -103,6 +108,42 @@ try {
   console.log(
     "Packed-package consumer passed (plain Node, outside the repository).",
   );
+  // The same standalone example ships in the repository and is built using
+  // ONLY the tarballs installed above, with no source aliases or workspace links.
+  fs.cpSync(example, consumer, {
+    recursive: true,
+    filter: (file) =>
+      !["node_modules", "dist", "public"].includes(path.basename(file)) &&
+      path.basename(file) !== "package.json",
+  });
+  execFileSync(process.execPath, ["prepare-assets.mjs"], {
+    cwd: consumer,
+    stdio: "inherit",
+  });
+  execFileSync(
+    process.execPath,
+    ["node_modules/typescript/bin/tsc", "--noEmit"],
+    { cwd: consumer, stdio: "inherit", timeout: 60_000 },
+  );
+  execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
+    cwd: consumer,
+    stdio: "inherit",
+    timeout: 120_000,
+  });
+  console.log(
+    "Packed-package browser example typecheck/build passed (no Legir aliases).",
+  );
+  if (process.env.LEGIR_BROWSER_BIN) {
+    execFileSync(
+      process.execPath,
+      [
+        path.join(root, "scripts/browser-consumer-smoke.mjs"),
+        path.join(consumer, "dist"),
+        path.join(root, "tests/fixtures/pdf/classic-form.pdf"),
+      ],
+      { stdio: "inherit", timeout: 120_000 },
+    );
+  }
   fs.rmSync(temporary, { recursive: true, force: true });
 } catch (error) {
   console.error(`Consumer failure retained at ${temporary}`);

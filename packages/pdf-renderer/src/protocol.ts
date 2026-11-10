@@ -1,7 +1,7 @@
-import type { TextContent } from "./engine/textTypes.js";
+import type { TextContent } from "@legir/pdf-core/text";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@legir/pdf-model";
-import type { ThumbnailContent, Tile } from "./types.js";
-import type { DocumentCommands } from "./engine/sessionTypes.js";
+import type { ThumbnailContent, Tile } from "@legir/pdf-core/types";
+import type { DocumentCommands } from "@legir/pdf-core/runtime";
 
 type CommandSpec<TRequest extends object, TResponse = never> =
   | TRequest

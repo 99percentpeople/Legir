@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Legir contributors. BSD-3-Clause.
+// Copyright (c) 2026 Legir contributors. MIT; see ../../LICENSE.
 import type { PDFDocument } from "./document.js";
 import {
   PDFArray,

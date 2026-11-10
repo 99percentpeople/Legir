@@ -10,6 +10,20 @@ import { PDFWorkerService } from "@legir/pdf-renderer";
 
 assert.equal(typeof globalThis.window, "undefined");
 assert.equal(typeof globalThis.Worker, "undefined");
+for (const specifier of [
+  "@legir/pdf-core/engine/documentSession",
+  "@legir/pdf-core/parsers/AnnotationParsers",
+  "@legir/pdf-core/workerProtocol",
+  "@legir/pdf-renderer/documentOwners",
+]) {
+  await assert.rejects(import(specifier), {
+    code: "ERR_PACKAGE_PATH_NOT_EXPORTED",
+  });
+}
+assert.equal("loadPDFInternal" in (await import("@legir/pdf-core")), false);
+const stamp = await import("@legir/pdf-model/stampImage");
+assert.equal("loadStampImageFile" in stamp, false);
+assert.equal("hasStampImageTransfer" in stamp, false);
 let workerCreations = 0;
 const client = new PDFWorkerService({
   lazy: true,

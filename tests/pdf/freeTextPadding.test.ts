@@ -8,7 +8,7 @@ import {
   degrees,
 } from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
+import { getPDFium } from "@legir/pdf-core/runtime";
 import {
   freeTextPaddingFromPdf,
   getFreeTextContentBox,

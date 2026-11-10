@@ -10,7 +10,7 @@ import {
   PDFTextField,
 } from "@legir/pdfium/authoring";
 import { exportPDF, exportPDFBlob } from "@/services/pdfService";
-import { finalizeFormAppearances } from "@legir/pdf-core/lib/form-appearances";
+import { finalizeFormAppearances } from "../../packages/pdf-core/dist/lib/form-appearances.js";
 import { FieldType } from "@/types";
 
 const key = PDFName.of;

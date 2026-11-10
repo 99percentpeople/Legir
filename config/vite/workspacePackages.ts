@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(
@@ -6,16 +7,28 @@ const root = path.resolve(
   "../..",
 );
 
-/** Development reads workspace sources for HMR. Production and tests consume
- * the built package entry points, just like a separate application does. */
+/** HMR follows the same explicit public export map as production. Aliases must
+ * not make unexported implementation paths available only in development. */
 export const workspacePackageAliases = [
   "pdf-model",
   "pdf-core",
   "pdf-renderer",
 ].flatMap((name) => {
-  const source = path.join(root, "packages", name, "src").replaceAll("\\", "/");
-  return [
-    { find: new RegExp(`^@legir/${name}/(.+)$`), replacement: `${source}/$1` },
-    { find: `@legir/${name}`, replacement: `${source}/index.ts` },
-  ];
+  const base = path.join(root, "packages", name);
+  const manifest = JSON.parse(
+    readFileSync(path.join(base, "package.json"), "utf8"),
+  ) as {
+    name: string;
+    exports: Record<string, { import: string }>;
+  };
+  return Object.entries(manifest.exports).map(([subpath, entry]) => {
+    const specifier = manifest.name + (subpath === "." ? "" : subpath.slice(1));
+    const source = entry.import
+      .replace(/^\.\/dist\//, "src/")
+      .replace(/\.js$/, ".ts");
+    return {
+      find: new RegExp(`^${specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+      replacement: path.join(base, source).replaceAll("\\", "/"),
+    };
+  });
 });

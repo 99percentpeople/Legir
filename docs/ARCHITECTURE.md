@@ -21,7 +21,15 @@ to the model and PDFium. The packages cannot import `src/`, React, Zustand or
 Tauri. `scripts/check-module-boundaries.mjs` enforces the allowed graph.
 `src/services/pdfService/host.ts` injects application events, system fonts, owner
 lookup and worker creation. `assets.ts` supplies build-specific asset URLs.
-The React workspace and application state remain in `src/`.
+The React workspace and application state remain in `src/`. Model helpers are
+compiled without DOM libraries; stamp file loading and drag/drop live in the
+application's `stampImageBrowser.ts` adapter. Worker message contracts and the
+browser thumbnail raster cache belong to `pdf-renderer`, not the core.
+
+Package export maps are explicit allowlists. Production and HMR use those same
+public paths; renderer integration goes through the core's `runtime` facade,
+not its `engine/*` implementation files. Private implementation tests reference
+local compiled files, while the isolated consumer checks actual package exports.
 
 The old `documentPipeline.ts` is now an application compatibility facade. The
 implementation is split into `packages/pdf-core/src/pipeline/{load,annotations,
@@ -527,8 +535,11 @@ The package's ESM loader, WASM binary, provenance and third-party notices are
 copied under `pdfium/<source-revision>-<binary-hash>/`. The PWA precaches the
 loader and binary so the first PDF can open offline after installation. Builds
 verify that native sources, patches, toolchain pins and compiled assets match.
-The wrapper is BSD-3-Clause; PDFium and linked libraries retain their bundled
-notices. Legir remains AGPL-3.0-or-later. Browser and Tauri web builds share these
+The four libraries' Legir-authored code is available under MIT, including the
+wrapper and native extensions. Native files retain historical BSD-3-Clause
+headers for build provenance; the package LICENSE offers MIT as an additional
+option for that code. PDFium and linked libraries retain their bundled notices.
+The Legir application remains AGPL-3.0-or-later. Browser and Tauri web builds share these
 assets; native WebView behavior requires separate platform validation. V8 PDF
 actions and XFA are disabled in this build.
 

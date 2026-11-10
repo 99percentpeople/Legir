@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Legir contributors. BSD-3-Clause.
+// Copyright (c) 2026 Legir contributors. MIT; see ../../LICENSE.
 // Small authoring values and live views; parsing and serialization belong to PDFium.
 const encoder = new TextEncoder();
 export const bytesToHex = (bytes: Uint8Array) =>

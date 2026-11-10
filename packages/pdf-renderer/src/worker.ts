@@ -9,30 +9,25 @@ import type {
   WorkerProgressResponse,
   WorkerRequest,
   WorkerSuccessResponse,
-} from "@legir/pdf-core/workerProtocol";
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
+} from "./protocol.js";
+import { DocumentSession } from "@legir/pdf-core";
 import {
+  getPDFium,
   getNativePageViewport,
   getNativeTextContent,
   resolveNativeDestination,
-} from "@legir/pdf-core/engine/pageContent";
-import {
   drawPageToCanvas,
   drawPageToCanvasCooperatively,
   disposeNativePage,
   yieldRenderTask,
-} from "@legir/pdf-core/engine/raster";
-import { getThumbnailSourceAnnotations } from "@legir/pdf-core/lib/thumbnailSourceAnnotations";
-import { THUMBNAIL_TARGET_WIDTH } from "@legir/pdf-model/constants";
-
-import { DocumentSession } from "@legir/pdf-core/engine/documentSession";
-import { NativePageCache } from "@legir/pdf-core/engine/pageCache";
-import { ThumbnailRasterCache } from "@legir/pdf-core/engine/thumbnailCache";
-import { getEditingView } from "@legir/pdf-core/engine/editingDocument";
-import {
+  getThumbnailSourceAnnotations,
+  NativePageCache,
+  getEditingView,
   setWorkerFontProvider,
   type FontHostResponse,
-} from "@legir/pdf-core/engine/fontHost";
+} from "@legir/pdf-core/runtime";
+import { THUMBNAIL_TARGET_WIDTH } from "@legir/pdf-model/constants";
+import { ThumbnailRasterCache } from "./thumbnailCache.js";
 
 let fontSequence = 0;
 const fontRequests = new Map<string, (bytes?: Uint8Array) => void>();
@@ -747,7 +742,7 @@ const renderToImage = async (
     }
     if (content) {
       const { drawThumbnailOverlay, hasThumbnailOverlay } =
-        await import("@legir/pdf-core/lib/thumbnailOverlay");
+        await import("@legir/pdf-core/runtime");
       if (hasThumbnailOverlay(content))
         await currentSession.transaction(
           currentSession.primaryId,

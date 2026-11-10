@@ -27,8 +27,16 @@ export default tseslint.config(
       "scripts/check-module-boundaries.mjs",
       "scripts/check-package-consumer.mjs",
       "scripts/pdf-consumer-smoke.mjs",
+      "scripts/publish-npm-libraries.mjs",
     ],
-    languageOptions: { globals: { console: "readonly", process: "readonly" } },
+    languageOptions: {
+      globals: {
+        AbortSignal: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        process: "readonly",
+      },
+    },
   },
   {
     // Ignores specific files

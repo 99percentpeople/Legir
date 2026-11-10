@@ -3,7 +3,15 @@
   "version": "0.3.0",
   "description": "Standalone PDFium WebAssembly engine and TypeScript bindings",
   "type": "module",
-  "license": "BSD-3-Clause",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/99percentpeople/Legir.git",
+    "directory": "packages/pdfium"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
     "wasm",

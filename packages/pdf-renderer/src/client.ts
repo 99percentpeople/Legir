@@ -1,12 +1,12 @@
+import type { ExportPdfRequest } from "@legir/pdf-core";
 import type {
   DocumentCommands,
-  ExportPdfRequest,
-} from "@legir/pdf-core/engine/sessionTypes";
-import type { FontHostRequest } from "@legir/pdf-core/engine/fontHost";
-import type { FontRequest } from "@legir/pdf-core/engine/fontHost";
+  FontHostRequest,
+  FontRequest,
+} from "@legir/pdf-core/runtime";
 import type { PageData, PageSource, HistorySnapshot } from "@legir/pdf-model";
 import type { ThumbnailContent, Tile } from "@legir/pdf-core/types";
-import type { TextContent } from "@legir/pdf-core/engine/textTypes";
+import type { TextContent } from "@legir/pdf-core/text";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@legir/pdf-model";
 import type {
   WorkerCommandType,
@@ -14,7 +14,7 @@ import type {
   WorkerMessage,
   WorkerRequest,
   WorkerSuccessResponse,
-} from "@legir/pdf-core/workerProtocol";
+} from "./protocol.js";
 
 type WorkerHost = {
   worker: Worker | null;

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Legir package consumer</title>
+  </head>
+  <body>
+    <h1>PDF worker example</h1>
+    <label
+      >Choose a PDF
+      <input id="file" type="file" accept="application/pdf" disabled
+    /></label>
+    <output id="status" data-state="idle"
+      >Select a PDF to render its first page.</output
+    >
+    <div><canvas id="page"></canvas></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

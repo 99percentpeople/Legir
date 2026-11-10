@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Legir contributors. BSD-3-Clause.
+// Copyright (c) 2026 Legir contributors. MIT; see ../../LICENSE.
 import { decode, convertIndexedToRgb } from "fast-png";
 import { PDFContext, PDFRef } from "./objects.js";
 export function decodeImageInput(

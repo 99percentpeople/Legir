@@ -23,3 +23,7 @@ Rule of thumb:
 - Workspace-only rendering/interaction helper: `src/components/workspace/lib`
 
 Portable PDF models, geometry, font naming, stamp helpers and permission policies now live in `@legir/pdf-model`. Import their package subpaths rather than reintroducing copies here.
+
+`stampImageBrowser.ts` owns browser file/image decoding and drag/drop integration
+shared by the application and the website's reused controls. It is deliberately
+outside the portable model and PDF engine/pipeline services.

@@ -9,8 +9,8 @@ import {
   normalizeRotationDeg,
   projectPointsInterval,
   transform,
-} from "@legir/pdf-core/lib/textGeometry";
-import type { TextContent } from "@legir/pdf-core/engine/textTypes";
+} from "@legir/pdf-core/text";
+import type { TextContent } from "@legir/pdf-core/text";
 import type { PageData } from "@/types";
 
 type SerializablePageInfo = Pick<PageData, "rotation" | "userUnit" | "viewBox">;

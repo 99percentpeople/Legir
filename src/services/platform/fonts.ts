@@ -1,10 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { isDesktopApp } from "./runtime";
-import {
-  hasWorkerFontProvider,
-  requestHostFont,
-} from "@legir/pdf-core/engine/fontHost";
+import { hasWorkerFontProvider, requestHostFont } from "@legir/pdf-core/host";
 
 const normalizeFontBytes = (value: Uint8Array | number[] | null) => {
   if (!value) return undefined;

@@ -1,4 +1,5 @@
-export { loadPDFInternal, exportPDF } from "./documentPipeline.js";
+// Stable, host-independent entry point. Advanced adapters have explicit subpaths.
+export { exportPDF } from "./documentPipeline.js";
 export type {
   LoadedPdfDocument,
   ReadablePdfDocument,

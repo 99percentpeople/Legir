@@ -1,4 +1,4 @@
-import { hasStampImageTransfer } from "@legir/pdf-model/stampImage";
+import { hasStampImageTransfer } from "@/lib/stampImageBrowser";
 import React, {
   useCallback,
   useEffect,

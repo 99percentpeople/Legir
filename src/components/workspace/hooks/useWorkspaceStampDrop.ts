@@ -10,13 +10,13 @@ import { useLanguage } from "@/components/language-provider";
 import { useEditorTabRuntime } from "@/app/editorTabs/runtimeContext";
 import { useEventListeners } from "@/hooks/useEventListener";
 import { canPerformPdfPermissionOperation } from "@legir/pdf-model/pdfPermissions";
+import { createStampImageResource } from "@legir/pdf-model/stampImage";
 import {
-  createStampImageResource,
   hasStampImageTransfer,
   isStampImageFile,
   loadStampImageFile,
   STAMP_LIBRARY_DRAG_TYPE,
-} from "@legir/pdf-model/stampImage";
+} from "@/lib/stampImageBrowser";
 import { getStampRectAtPoint } from "@legir/pdf-model/stamps";
 import { useStampLibraryStore } from "@/store/stampLibraryStore";
 import type {

@@ -8,13 +8,13 @@ import {
   type ImageUploadContext,
 } from "@/components/ui/image-upload-field";
 import { useStampLibraryStore } from "@/store/stampLibraryStore";
+import { createStampImageResource } from "@legir/pdf-model/stampImage";
 import {
-  createStampImageResource,
   isStampImageFile,
   loadStampImageFile,
   STAMP_IMAGE_ACCEPT,
   STAMP_LIBRARY_DRAG_TYPE,
-} from "@legir/pdf-model/stampImage";
+} from "@/lib/stampImageBrowser";
 import type { StampImageResource } from "@/types";
 import { cn } from "@/utils/cn";
 

@@ -2,14 +2,14 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { PDFDocument, degrees, rgb } from "@legir/pdfium/authoring";
 import { PDFPixmap } from "@legir/pdfium";
-import { getPDFium } from "@legir/pdf-core/engine/runtime";
-import { getNativePageViewport } from "@legir/pdf-core/engine/pageContent";
+import { getPDFium } from "@legir/pdf-core/runtime";
+import { getNativePageViewport } from "@legir/pdf-core/runtime";
 import {
   disposeNativePage,
   drawPageToCanvas,
   drawPageToCanvasCooperatively,
   rasterizePage,
-} from "@legir/pdf-core/engine/raster";
+} from "../dist/engine/raster.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
