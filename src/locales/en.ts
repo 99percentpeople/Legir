@@ -401,7 +401,13 @@ const en = {
     selected: "Selected",
     default_selected: "Selected by Default",
     max_length: "Max Length",
-    alignment: "Alignment",
+    alignment: "Horizontal alignment",
+    vertical_alignment: "Vertical alignment",
+    vertical_alignment_options: {
+      top: "Top",
+      middle: "Middle",
+      bottom: "Bottom",
+    },
     alignment_options: {
       left: "Left",
       center: "Center",

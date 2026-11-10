@@ -176,3 +176,35 @@ describe.each(cases)(
     );
   },
 );
+
+it("saves one undo checkpoint for vertical alignment and restores the legacy default", async () => {
+  const initial = field("text", { type: FieldType.TEXT });
+  const store = createTestEditorStore({
+    fields: [initial],
+    past: [],
+    future: [],
+  });
+  try {
+    await act(async () =>
+      root.render(
+        <TextProperties
+          data={initial}
+          onChange={(patch) => store.getState().updateField(initial.id, patch)}
+          onTriggerHistorySave={() => store.getState().saveCheckpoint()}
+        />,
+      ),
+    );
+    const button = host.querySelector<HTMLButtonElement>(
+      '[aria-label="properties.vertical_alignment_options.bottom"]',
+    )!;
+    await act(async () => button.click());
+    expect(store.getState().fields[0].verticalAlignment).toBe("bottom");
+    expect(store.getState().past).toHaveLength(1);
+    store.getState().undo();
+    expect(store.getState().fields[0].verticalAlignment).toBeUndefined();
+    store.getState().redo();
+    expect(store.getState().fields[0].verticalAlignment).toBe("bottom");
+  } finally {
+    store.dispose();
+  }
+});

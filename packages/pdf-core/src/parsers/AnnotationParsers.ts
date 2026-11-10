@@ -1811,6 +1811,7 @@ export class FreeTextParser implements IAnnotationParser {
           layerOrder: index,
           type: "freetext",
           rect: computeInnerUiRect(),
+          verticalAlignment: annotation.verticalAlignment,
           textPadding: freeTextPaddingFromPdf(
             annotation.rectDifferences,
             styleScale,

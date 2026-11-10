@@ -389,7 +389,13 @@ const zhTW = {
     selected: "已選擇",
     default_selected: "預設選擇",
     max_length: "最大長度",
-    alignment: "對齊",
+    alignment: "水平對齊",
+    vertical_alignment: "垂直對齊",
+    vertical_alignment_options: {
+      top: "頂端對齊",
+      middle: "垂直置中",
+      bottom: "底端對齊",
+    },
     alignment_options: {
       left: "靠左對齊",
       center: "置中",

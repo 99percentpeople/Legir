@@ -324,7 +324,13 @@ const de = {
     selected: "Ausgewählt",
     default_selected: "Standardmäßig ausgewählt",
     max_length: "Max. Länge",
-    alignment: "Ausrichtung",
+    alignment: "Horizontale Ausrichtung",
+    vertical_alignment: "Vertikale Ausrichtung",
+    vertical_alignment_options: {
+      top: "Oben",
+      middle: "Mittig",
+      bottom: "Unten",
+    },
     alignment_options: {
       left: "Links",
       center: "Zentriert",

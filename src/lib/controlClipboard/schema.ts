@@ -11,6 +11,7 @@ const rect = point.extend({
 const text = z.string().optional();
 const flag = z.boolean().optional();
 const numeric = number.optional();
+const verticalAlignment = z.enum(["top", "middle", "bottom"]).optional();
 const alignment = z.enum(["left", "center", "right"]).optional();
 const borderStyle = z.enum(["solid", "dashed", "underline"]).optional();
 const scaleMode = z.enum(["contain", "fill"]).optional();
@@ -95,6 +96,7 @@ const field = base
     multiline: flag,
     maxLength: numeric,
     alignment,
+    verticalAlignment,
   })
   .transform(({ signatureData, imageScaleMode, ...value }) =>
     signatureData && value.type === FieldType.SIGNATURE
@@ -153,6 +155,7 @@ const annotation = base.extend({
     .optional(),
   fontFamily: text,
   alignment,
+  verticalAlignment,
   subtype: text,
   intent: text,
   linkUrl: text,

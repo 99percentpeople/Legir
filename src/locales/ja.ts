@@ -319,7 +319,13 @@ const ja = {
     selected: "選択済み",
     default_selected: "初期状態で選択",
     max_length: "最大長",
-    alignment: "配置",
+    alignment: "水平方向の配置",
+    vertical_alignment: "垂直方向の配置",
+    vertical_alignment_options: {
+      top: "上揃え",
+      middle: "中央揃え",
+      bottom: "下揃え",
+    },
     alignment_options: {
       left: "左揃え",
       center: "中央揃え",

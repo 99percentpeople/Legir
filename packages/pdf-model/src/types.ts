@@ -172,6 +172,7 @@ export interface Annotation {
   fontFamily?: string; // For text
   rotationDeg?: number;
   alignment?: "left" | "center" | "right"; // For comment text alignment
+  verticalAlignment?: "top" | "middle" | "bottom"; // FreeText; omission means top
   subtype?: string; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
   updatedAt?: string; // ISO Date string for modification date

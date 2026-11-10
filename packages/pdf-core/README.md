@@ -71,6 +71,12 @@ const fields = model.fields.map((field) =>
 );
 ```
 
+FreeText annotations also accept `verticalAlignment` with the same three values.
+Omission preserves top alignment. Alignment uses the complete wrapped line block
+inside `textPadding`; overflowing blocks stay at the top so their start remains
+accessible. Editor display, editable annotation appearances and flattened output
+share this layout. FreeText also round-trips the optional `/LegirVAlign` extension.
+
 ## List boxes and dropdowns
 
 Choice controls share `FieldType.DROPDOWN`, but `isListBox` preserves the PDF

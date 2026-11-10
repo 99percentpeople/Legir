@@ -6,7 +6,7 @@ import {
   DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM,
   resolveFormControlFontFamilyCss,
 } from "@legir/pdf-model/fonts";
-import { measureCssTextVisualCenterAboveBaselineEm } from "../../lib/formTextMetrics";
+import { measureCssTextMetrics } from "../../lib/formTextMetrics";
 
 export const TextControl: React.FC<FormControlProps> = (props) => {
   const {
@@ -30,8 +30,56 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
     style.fontFamily,
     displayedValue,
   );
-  const [visualCenterAboveBaselineEm, setVisualCenterAboveBaselineEm] =
-    React.useState(DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM);
+  const [textMetrics, setTextMetrics] = React.useState({
+    ascent: DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM * 2,
+    descent: 0,
+  });
+  const verticalAlignment =
+    data.verticalAlignment ?? (data.multiline ? "top" : "middle");
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  React.useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || !data.verticalAlignment) return;
+    let cancelled = false;
+    const update = () => {
+      if (cancelled) return;
+      // Measure natural wrapped content without the full-height textarea masking it.
+      const previousScroll = textarea.scrollTop;
+      textarea.style.paddingTop = "calc(1px * var(--scale, 1))";
+      textarea.style.height = "0px";
+      const contentHeight = textarea.scrollHeight;
+      textarea.style.height = "100%";
+      const freeSpace = Math.max(0, textarea.clientHeight - contentHeight);
+      const offset =
+        verticalAlignment === "bottom"
+          ? freeSpace
+          : verticalAlignment === "middle"
+            ? freeSpace / 2
+            : 0;
+      textarea.style.paddingTop = `calc(1px * var(--scale, 1) + ${offset}px)`;
+      textarea.scrollTop = previousScroll;
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (textarea.parentElement) observer.observe(textarea.parentElement);
+    void document.fonts?.ready.then(update);
+    document.fonts?.addEventListener("loadingdone", update);
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+      document.fonts?.removeEventListener("loadingdone", update);
+      textarea.style.paddingTop = "calc(1px * var(--scale, 1))";
+    };
+  }, [
+    data.verticalAlignment,
+    verticalAlignment,
+    displayedValue,
+    data.placeholder,
+    data.multiline,
+    fontFamily,
+    style.fontSize,
+    style.borderWidth,
+  ]);
   const textAnchor =
     data.alignment === "center"
       ? "middle"
@@ -50,14 +98,9 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
 
     let cancelled = false;
     const updateMetrics = () => {
-      const measured = measureCssTextVisualCenterAboveBaselineEm(
-        displayedValue,
-        fontFamily,
-      );
+      const measured = measureCssTextMetrics(displayedValue, fontFamily);
       if (cancelled) return;
-      setVisualCenterAboveBaselineEm(
-        measured ?? DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM,
-      );
+      if (measured) setTextMetrics(measured);
     };
 
     updateMetrics();
@@ -102,7 +145,11 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
       <div
         className={cn(
           "relative flex h-full w-full transition-colors",
-          data.multiline ? "items-start" : "items-center",
+          verticalAlignment === "top"
+            ? "items-start"
+            : verticalAlignment === "bottom"
+              ? "items-end"
+              : "items-center",
           "overflow-hidden",
           showHelperBg && isFormMode && "bg-blue-500/10 dark:bg-blue-400/10",
           showHelperBg && isFormMode && !isSelectable && "hover:bg-blue-500/20",
@@ -138,7 +185,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             className="pointer-events-none h-full w-full overflow-hidden"
             style={{
               boxSizing: "border-box",
-              paddingInline: "calc(1px * var(--scale, 1))",
+              padding: "calc(1px * var(--scale, 1))",
             }}
           >
             <svg
@@ -152,8 +199,14 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             >
               <text
                 x={textX}
-                y="50%"
-                dy={`${visualCenterAboveBaselineEm}em`}
+                y={
+                  verticalAlignment === "top"
+                    ? "0%"
+                    : verticalAlignment === "bottom"
+                      ? "100%"
+                      : "50%"
+                }
+                dy={`${verticalAlignment === "top" ? textMetrics.ascent : verticalAlignment === "bottom" ? -textMetrics.descent : (textMetrics.ascent - textMetrics.descent) / 2}em`}
                 dominantBaseline="alphabetic"
                 textAnchor={textAnchor}
                 style={{
@@ -168,6 +221,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
           </div>
         ) : data.multiline ? (
           <textarea
+            ref={textareaRef}
             readOnly={!canFill}
             maxLength={maxLength}
             tabIndex={isFormMode ? -1 : undefined}
@@ -208,7 +262,9 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
               boxSizing: "border-box",
               height: "auto",
               lineHeight: 1,
-              paddingBlock: 0,
+              paddingBlock: data.verticalAlignment
+                ? "calc(1px * var(--scale, 1))"
+                : 0,
               textAlign: data.alignment,
               paddingInline: "calc(1px * var(--scale, 1))",
             }}

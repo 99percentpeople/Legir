@@ -1,6 +1,6 @@
 let measureCanvas: HTMLCanvasElement | undefined;
 
-export const measureCssTextVisualCenterAboveBaselineEm = (
+export const measureCssTextMetrics = (
   text: string | undefined,
   fontFamily: string,
 ) => {
@@ -20,5 +20,5 @@ export const measureCssTextVisualCenterAboveBaselineEm = (
   }
   if (ascent + descent <= 0) return undefined;
 
-  return (ascent - descent) / (2 * fontSize);
+  return { ascent: ascent / fontSize, descent: descent / fontSize };
 };

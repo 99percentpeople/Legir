@@ -95,3 +95,18 @@ export const wrapFreeText = (
   }
   return lines;
 };
+
+/** Align the complete line block; overflowing text stays reachable from the top. */
+export const getFreeTextVerticalOffset = (
+  alignment: Annotation["verticalAlignment"],
+  contentHeight: number,
+  lineCount: number,
+  lineHeight: number,
+) => {
+  const remaining = Math.max(0, contentHeight - lineCount * lineHeight);
+  return alignment === "bottom"
+    ? remaining
+    : alignment === "middle"
+      ? remaining / 2
+      : 0;
+};

@@ -15,7 +15,8 @@ import { getEffectivePdfPermissions } from "@legir/pdf-model/pdfPermissions";
 The root exports document, page, form, annotation, history and stamp types.
 Text `FormField`s expose optional `verticalAlignment` (`top`, `middle`, `bottom`)
 alongside horizontal `alignment`. Omission retains legacy layout; consumers
-must not rewrite existing records just to add a default.
+must not rewrite existing records just to add a default. FreeText `Annotation`s
+also expose `verticalAlignment`; omission preserves top alignment.
 Subpath exports contain rotation, shape/ink geometry, layer ordering, stamp
 layout, font naming and permission helpers. Existing coordinate conventions,
 field names and serialized values are preserved; this extraction is not a data

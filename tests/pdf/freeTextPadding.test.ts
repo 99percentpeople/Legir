@@ -12,6 +12,7 @@ import { getPDFium } from "@legir/pdf-core/runtime";
 import {
   freeTextPaddingFromPdf,
   getFreeTextContentBox,
+  getFreeTextVerticalOffset,
   wrapFreeText,
 } from "@legir/pdf-core/lib/freeTextLayout";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
@@ -98,6 +99,67 @@ const ink = async (bytes: Uint8Array) => {
 };
 
 describe("FreeText content layout", () => {
+  it("aligns the whole wrapped block and keeps overflow at the top", () => {
+    expect(getFreeTextVerticalOffset(undefined, 100, 2, 20)).toBe(0);
+    expect(getFreeTextVerticalOffset("middle", 100, 2, 20)).toBe(30);
+    expect(getFreeTextVerticalOffset("bottom", 100, 2, 20)).toBe(60);
+    expect(getFreeTextVerticalOffset("bottom", 30, 2, 20)).toBe(0);
+  });
+
+  it.each([0, 90, 180, 270])(
+    "round-trips vertical alignment and matches flattened placement at rotation %s",
+    async (rotationDeg) => {
+      const source = await fixture();
+      const bounds: Awaited<ReturnType<typeof ink>>[] = [];
+      for (const verticalAlignment of ["top", "middle", "bottom"] as const) {
+        const item = {
+          ...annotation,
+          size: 14,
+          rotationDeg,
+          verticalAlignment,
+          textPadding: { top: 12, bottom: 8, left: 10, right: 10 },
+        };
+        const editable = await exportPDF(source, [], undefined, [item]);
+        const loaded = await read(editable);
+        try {
+          expect(loaded.annotations[0].verticalAlignment).toBe(
+            verticalAlignment,
+          );
+          const saved = await exportPDF(editable, [], undefined, [
+            { ...loaded.annotations[0], text: "Changed", isEdited: true },
+          ]);
+          const reopened = await read(saved);
+          try {
+            expect(reopened.annotations[0].verticalAlignment).toBe(
+              verticalAlignment,
+            );
+          } finally {
+            reopened.dispose();
+          }
+        } finally {
+          loaded.dispose();
+        }
+        const flat = await exportPDF(source, [], undefined, [
+          { ...item, flatten: true },
+        ]);
+        const normalInk = await ink(editable);
+        const flatInk = await ink(flat);
+        for (const edge of ["top", "bottom", "left", "right"] as const) {
+          expect(Math.abs(normalInk[edge] - flatInk[edge])).toBeLessThanOrEqual(
+            1,
+          );
+        }
+        bounds.push(normalInk);
+      }
+      const axis = rotationDeg % 180 ? "left" : "top";
+      expect(new Set(bounds.map((b) => b[axis])).size).toBe(3);
+      expect(bounds[1][axis]).toBeCloseTo(
+        (bounds[0][axis] + bounds[2][axis]) / 2,
+        0,
+      );
+    },
+  );
+
   it("keeps legacy border insets, accepts zero and collapses over-padded content", () => {
     expect(getFreeTextContentBox({ borderWidth: 2 }, 100, 40)).toMatchObject({
       x: 2,

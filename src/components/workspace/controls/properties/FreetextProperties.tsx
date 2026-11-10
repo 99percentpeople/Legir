@@ -1,3 +1,4 @@
+import { VerticalAlignmentProperty } from "./VerticalAlignmentProperty";
 import React from "react";
 import { Annotation } from "@/types";
 import { PropertyPanelProps } from "./types";
@@ -262,41 +263,51 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label>{t("properties.alignment")}</Label>
-          <div
-            role="group"
-            aria-label={t("properties.alignment")}
-            className="bg-muted border-input flex rounded-md border p-1"
-          >
-            {(
-              [
-                ["left", AlignLeft],
-                ["center", AlignCenter],
-                ["right", AlignRight],
-              ] as const
-            ).map(([alignment, Icon]) => (
-              <button
-                key={alignment}
-                type="button"
-                onClick={() => {
-                  if ((data.alignment || "left") === alignment) return;
-                  onTriggerHistorySave();
-                  onChange({ alignment });
-                }}
-                className={cn(
-                  "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                  (data.alignment || "left") === alignment &&
-                    "bg-background text-foreground shadow-sm",
-                )}
-                title={t(`properties.alignment_options.${alignment}`)}
-                aria-label={t(`properties.alignment_options.${alignment}`)}
-                aria-pressed={(data.alignment || "left") === alignment}
-              >
-                <Icon size={16} />
-              </button>
-            ))}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>{t("properties.alignment")}</Label>
+            <div
+              role="group"
+              aria-label={t("properties.alignment")}
+              className="bg-muted border-input flex rounded-md border p-1"
+            >
+              {(
+                [
+                  ["left", AlignLeft],
+                  ["center", AlignCenter],
+                  ["right", AlignRight],
+                ] as const
+              ).map(([alignment, Icon]) => (
+                <button
+                  key={alignment}
+                  type="button"
+                  onClick={() => {
+                    if ((data.alignment || "left") === alignment) return;
+                    onTriggerHistorySave();
+                    onChange({ alignment });
+                  }}
+                  className={cn(
+                    "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
+                    (data.alignment || "left") === alignment &&
+                      "bg-background text-foreground shadow-sm",
+                  )}
+                  title={t(`properties.alignment_options.${alignment}`)}
+                  aria-label={t(`properties.alignment_options.${alignment}`)}
+                  aria-pressed={(data.alignment || "left") === alignment}
+                >
+                  <Icon size={16} />
+                </button>
+              ))}
+            </div>
           </div>
+
+          <VerticalAlignmentProperty
+            value={data.verticalAlignment ?? "top"}
+            onChange={(verticalAlignment) => {
+              onTriggerHistorySave();
+              onChange({ verticalAlignment });
+            }}
+          />
         </div>
 
         {/* Font Size */}

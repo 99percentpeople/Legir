@@ -21,7 +21,10 @@ import {
   isKnownFontKey,
   splitTextRuns,
 } from "@legir/pdf-model/fonts";
-import { getFreeTextContentBox } from "@legir/pdf-core/lib/freeTextLayout";
+import {
+  getFreeTextContentBox,
+  getFreeTextVerticalOffset,
+} from "@legir/pdf-core/lib/freeTextLayout";
 import { useFreeTextLayout } from "../../lib/useFreeTextLayout";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 
@@ -125,6 +128,12 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
     resolvedFontFamily,
     nonAsciiFontFamily,
     editFontFamily,
+  );
+  const verticalOffset = getFreeTextVerticalOffset(
+    data.verticalAlignment,
+    content.height,
+    lines.length,
+    baseLineHeightPx,
   );
   const effectiveOpacity =
     baseOpacity * (!hasText && !hasBackgroundColor ? 0.1 : 1);
@@ -310,8 +319,11 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                   lineHeight: "inherit",
                   textAlign: data.alignment || "left",
                   scrollbarWidth: "none",
-                  transform: `translateY(${editingOffset}px)`,
-                  height: Math.max(0, content.height - editingOffset),
+                  transform: `translateY(${verticalOffset + editingOffset}px)`,
+                  height: Math.max(
+                    0,
+                    content.height - verticalOffset - editingOffset,
+                  ),
                 }}
               />
             ) : (
@@ -336,7 +348,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                           ? content.width / 2
                           : 0
                     }
-                    y={baseline + index * baseLineHeightPx}
+                    y={verticalOffset + baseline + index * baseLineHeightPx}
                     textAnchor={
                       data.alignment === "right"
                         ? "end"

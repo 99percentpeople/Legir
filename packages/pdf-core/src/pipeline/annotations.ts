@@ -829,6 +829,15 @@ export const buildPdfLibAnnotsByPageIndex = async (
         if (!style && typeof intensity !== "number") return undefined;
         return { style, intensity };
       })();
+      const rawVerticalAlignment = pdfObjToString(
+        annot.lookup(PDFName.of("LegirVAlign")),
+      );
+      const verticalAlignment =
+        rawVerticalAlignment === "top" ||
+        rawVerticalAlignment === "middle" ||
+        rawVerticalAlignment === "bottom"
+          ? rawVerticalAlignment
+          : undefined;
       const rectDifferences = pdfArrayToNumberList(
         annot.lookup(PDFName.of("RD")),
       );
@@ -1089,6 +1098,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
             : undefined,
         intent,
         rectDifferences,
+        verticalAlignment,
         cloudSpacing,
         shapeFillOpacity,
         arrowSize,

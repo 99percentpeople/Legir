@@ -322,7 +322,13 @@ const es = {
     selected: "Seleccionado",
     default_selected: "Seleccionado por defecto",
     max_length: "Longitud máxima",
-    alignment: "Alineación",
+    alignment: "Alineación horizontal",
+    vertical_alignment: "Alineación vertical",
+    vertical_alignment_options: {
+      top: "Arriba",
+      middle: "Centro",
+      bottom: "Abajo",
+    },
     alignment_options: {
       left: "Izquierda",
       center: "Centro",

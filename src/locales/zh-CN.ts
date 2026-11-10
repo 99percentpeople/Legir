@@ -390,7 +390,13 @@ const zhCN = {
     selected: "已选择",
     default_selected: "默认选择",
     max_length: "最大长度",
-    alignment: "对齐",
+    alignment: "水平对齐",
+    vertical_alignment: "垂直对齐",
+    vertical_alignment_options: {
+      top: "顶端对齐",
+      middle: "垂直居中",
+      bottom: "底端对齐",
+    },
     alignment_options: {
       left: "左对齐",
       center: "居中",

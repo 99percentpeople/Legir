@@ -39,6 +39,7 @@ import { generateInkAppearanceOps } from "../lib/ink.js";
 import { containsNonAscii, isSerifFamily } from "../lib/text.js";
 import {
   getFreeTextBaseline,
+  getFreeTextVerticalOffset,
   getFreeTextContentBox,
   getFreeTextPadding,
   wrapFreeText,
@@ -550,6 +551,12 @@ export class FreeTextExporter implements IAnnotationExporter {
         ? annotation.lineHeight
         : 1;
     const lineHeight = fontSize * lineHeightMultiplier;
+    const verticalOffset = getFreeTextVerticalOffset(
+      annotation.verticalAlignment,
+      contentH,
+      lines.length,
+      lineHeight,
+    );
     const baseline = getFreeTextBaseline(
       fontSize,
       lineHeight,
@@ -632,7 +639,8 @@ export class FreeTextExporter implements IAnnotationExporter {
 
       for (let li = 0; li < lines.length; li++) {
         const lineText = lines[li]!;
-        const drawY = y + h - padding.top - baseline - li * lineHeight;
+        const drawY =
+          y + h - padding.top - verticalOffset - baseline - li * lineHeight;
 
         if (!useMixedFonts || !cjkFont || !cjkResourceName) {
           const runFont =
@@ -725,7 +733,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       });
     }
 
-    const startY = h - padding.top - baseline;
+    const startY = h - padding.top - verticalOffset - baseline;
 
     const pdfNum = (n: number) => {
       if (!Number.isFinite(n)) return "0";
@@ -887,6 +895,9 @@ export class FreeTextExporter implements IAnnotationExporter {
       DA: PDFString.of(da),
       AP: { N: appearanceRef },
       Q: q,
+      LegirVAlign: annotation.verticalAlignment
+        ? PDFName.of(annotation.verticalAlignment)
+        : undefined,
       BS: { W: hasBorder ? borderWidth : 0 },
       C:
         hasBorder &&

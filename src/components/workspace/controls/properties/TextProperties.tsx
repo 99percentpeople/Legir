@@ -1,3 +1,4 @@
+import { VerticalAlignmentProperty } from "./VerticalAlignmentProperty";
 import React from "react";
 import { FormField } from "@/types";
 import { PropertyPanelProps } from "./types";
@@ -148,19 +149,19 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
 
       {/* Specific Properties */}
       <div className="mt-3 space-y-3">
+        <div className="space-y-2">
+          <Label>{t("properties.max_length")}</Label>
+          <NumberInput
+            minValue={0}
+            formatOptions={{ maximumFractionDigits: 0 }}
+            value={data.maxLength || NaN}
+            onFocus={onTriggerHistorySave}
+            onChange={(val) =>
+              onChange({ maxLength: isNaN(val) ? undefined : val })
+            }
+          />
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>{t("properties.max_length")}</Label>
-            <NumberInput
-              minValue={0}
-              formatOptions={{ maximumFractionDigits: 0 }}
-              value={data.maxLength || NaN}
-              onFocus={onTriggerHistorySave}
-              onChange={(val) =>
-                onChange({ maxLength: isNaN(val) ? undefined : val })
-              }
-            />
-          </div>
           <div className="space-y-2">
             <Label>{t("properties.alignment")}</Label>
             <div className="bg-muted border-input flex rounded-md border p-1">
@@ -208,6 +209,15 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
               </button>
             </div>
           </div>
+          <VerticalAlignmentProperty
+            value={
+              data.verticalAlignment ?? (data.multiline ? "top" : "middle")
+            }
+            onChange={(verticalAlignment) => {
+              onTriggerHistorySave();
+              onChange({ verticalAlignment });
+            }}
+          />
         </div>
       </div>
     </>
