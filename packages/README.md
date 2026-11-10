@@ -21,10 +21,10 @@ To publish, first give all four packages the same version and commit the change,
 then push a matching `pdf-libs-vX.Y.Z` tag. The `publish-pdf-libraries` workflow
 builds the exact tagged source, checks package boundaries and an isolated consumer,
 packs the four tarballs, and publishes them to npm in dependency order. Publishing
-requires the `legir` npm organization (or user) to own the scope, plus an
-`NPM_TOKEN` repository secret: an npm granular access token that can read and write
-the `@legir` packages and bypass 2FA. For an existing tag, use manual dispatch with
-that tag. The single CI job builds, verifies checksums and tests the tarballs, then
+uses npm Trusted Publishing (OIDC), with each package trusting
+`99percentpeople/Legir` and workflow `pdf-libraries-release.yml`; no long-lived
+npm secret is stored in GitHub. For an existing tag, dispatch the workflow from
+that same tag so its OIDC provenance matches the release source. The single CI job builds, verifies checksums and tests the tarballs, then
 publishes those same files directly; artifacts are retained only for diagnosis.
 Before uploading any package, the script checks all four for checksum/version
 conflicts and refuses to publish a missing version older than npm's `latest`.

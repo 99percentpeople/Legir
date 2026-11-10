@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 # Different release versions must not race to update npm's latest tag.
 concurrency:
@@ -32,11 +33,18 @@ jobs:
           ref: ${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
           path: source
+      - name: Verify workflow and release source identity
+        run: |
+          if [ "$(git -C source rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+            echo "Run this workflow from the release tag so OIDC provenance matches its source." >&2
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
           scope: "@legir"
+      - run: npm --version
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.2"
@@ -61,12 +69,10 @@ jobs:
           name: pdf-libraries
           path: release-assets/
           if-no-files-found: error
-      - name: Preflight all versions and publish to npm in dependency order
+      - name: Publish to npm using trusted publishing (OIDC)
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "Missing NPM_TOKEN repository secret." >&2
-            exit 1
-          fi
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_URL"
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN"
           node tooling/scripts/publish-npm-libraries.mjs release-assets
