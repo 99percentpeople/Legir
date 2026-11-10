@@ -145,16 +145,26 @@ export const getStampSvgIntrinsicSize = (dataUrl: string) => {
     return undefined;
   }
 
-  const widthAttr = svgText.match(/\bwidth=["']([^"']+)["']/i)?.[1];
-  const heightAttr = svgText.match(/\bheight=["']([^"']+)["']/i)?.[1];
-  const width = parseSvgLength(widthAttr);
-  const height = parseSvgLength(heightAttr);
+  // Only the outer SVG defines the image size; descendants can have unrelated
+  // dimensions. Keep quoted values intact, including embedded '>' characters.
+  const root = svgText.match(
+    /<(?:[\w.-]+:)?svg(?=[\s/>])((?:"[^"]*"|'[^']*'|[^"'<>])*)>/i,
+  );
+  if (!root) return undefined;
+  const attributes = new Map<string, string>();
+  for (const match of root[1].matchAll(
+    /(?:^|\s)([^\s=/'"<>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g,
+  )) {
+    attributes.set(match[1].toLowerCase(), match[2] ?? match[3]);
+  }
+  const width = parseSvgLength(attributes.get("width"));
+  const height = parseSvgLength(attributes.get("height"));
 
   if (width && height) {
     return { width, height };
   }
 
-  const viewBoxAttr = svgText.match(/\bviewBox=["']([^"']+)["']/i)?.[1];
+  const viewBoxAttr = attributes.get("viewbox");
   if (!viewBoxAttr) return undefined;
 
   const values = viewBoxAttr

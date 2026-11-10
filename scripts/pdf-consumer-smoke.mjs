@@ -24,6 +24,16 @@ assert.equal("loadPDFInternal" in (await import("@legir/pdf-core")), false);
 const stamp = await import("@legir/pdf-model/stampImage");
 assert.equal("loadStampImageFile" in stamp, false);
 assert.equal("hasStampImageTransfer" in stamp, false);
+assert.deepEqual(
+  stamp.getStampSvgIntrinsicSize(
+    "data:image/svg+xml," +
+      encodeURIComponent(
+        '<svg viewBox="0 0 200 100"><rect width="10" height="20"/></svg>',
+      ),
+  ),
+  { width: 200, height: 100 },
+  "SVG stamp sizing must use the root, not child element dimensions",
+);
 let workerCreations = 0;
 const client = new PDFWorkerService({
   lazy: true,
