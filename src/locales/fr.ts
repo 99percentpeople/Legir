@@ -219,7 +219,7 @@ const fr = {
         author: "Saisir le nom de l’auteur",
         subject: "Décrire brièvement le contenu du document",
         keywords: "Saisir un mot-clé, puis appuyer sur Entrée",
-        creator: "Ex. : Microsoft Word",
+        creator: "Saisir le créateur",
         producer: "Ex. : Legir",
         producer_auto: "Défini sur Legir à l’exportation",
       },

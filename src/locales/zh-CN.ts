@@ -288,7 +288,7 @@ const zhCN = {
         author: "输入作者姓名",
         subject: "简要描述文档内容",
         keywords: "输入关键词，按回车添加",
-        creator: "例如：Microsoft Word",
+        creator: "输入创建者",
         producer: "例如：Legir",
         producer_auto: "导出时自动设为 Legir",
       },

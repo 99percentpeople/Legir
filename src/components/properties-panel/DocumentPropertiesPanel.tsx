@@ -620,7 +620,9 @@ function KeywordsInput({
   return (
     <TagInput
       id={id}
-      placeholder={t("properties.document.placeholders.keywords")}
+      placeholder={
+        tags.length === 0 ? t("properties.document.placeholders.keywords") : ""
+      }
       tags={tags}
       setTags={handleSetTags}
       activeTagIndex={activeTagIndex}

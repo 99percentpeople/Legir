@@ -214,7 +214,7 @@ const ja = {
         author: "作成者名を入力",
         subject: "文書の内容を簡潔に説明",
         keywords: "キーワードを入力し、Enter キーで追加",
-        creator: "例：Microsoft Word",
+        creator: "作成者を入力",
         producer: "例：Legir",
         producer_auto: "エクスポート時に Legir を設定",
       },

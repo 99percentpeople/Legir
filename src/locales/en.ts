@@ -297,7 +297,7 @@ const en = {
         author: "Enter author name",
         subject: "Briefly describe the document",
         keywords: "Type a keyword and press Enter",
-        creator: "e.g. Microsoft Word",
+        creator: "Enter creator",
         producer: "e.g. Legir",
         producer_auto: "Set to Legir on export",
       },

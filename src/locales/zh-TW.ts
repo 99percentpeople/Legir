@@ -288,7 +288,7 @@ const zhTW = {
         author: "輸入作者姓名",
         subject: "簡要描述文件內容",
         keywords: "輸入關鍵字，按 Enter 新增",
-        creator: "例如：Microsoft Word",
+        creator: "輸入建立者",
         producer: "例如：Legir",
         producer_auto: "匯出時自動設為 Legir",
       },

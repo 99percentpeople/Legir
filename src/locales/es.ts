@@ -217,7 +217,7 @@ const es = {
         author: "Introduce el nombre del autor",
         subject: "Describe brevemente el contenido del documento",
         keywords: "Escribe una palabra clave y pulsa Intro",
-        creator: "Ej.: Microsoft Word",
+        creator: "Introduce el creador",
         producer: "Ej.: Legir",
         producer_auto: "Se establece en Legir al exportar",
       },

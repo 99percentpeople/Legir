@@ -218,7 +218,7 @@ const de = {
         author: "Name des Autors eingeben",
         subject: "Den Dokumentinhalt kurz beschreiben",
         keywords: "Stichwort eingeben, mit Enter hinzufügen",
-        creator: "z. B. Microsoft Word",
+        creator: "Ersteller eingeben",
         producer: "z. B. Legir",
         producer_auto: "Beim Export auf Legir gesetzt",
       },

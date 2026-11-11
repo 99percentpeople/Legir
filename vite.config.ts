@@ -96,6 +96,9 @@ export default defineConfig(({ mode, command }) => {
       // Tauri uses Chromium on Windows and WebKit on macOS and Linux
       target:
         process.env.TAURI_ENV_PLATFORM == "windows" ? "chrome105" : "safari13",
+      // Tailwind v4's CSS baseline. Targeting Safari 13 rewrites logical insets
+      // into :lang() lists that Chromium rejects, breaking positioned controls.
+      cssTarget: ["chrome111", "safari16.4", "firefox128"],
       // don't minify for debug builds
       minify: !process.env.TAURI_ENV_DEBUG ? "oxc" : false,
       // produce sourcemaps for debug builds
