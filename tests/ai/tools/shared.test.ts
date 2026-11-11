@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 import type { AiToolContext } from "@/services/ai/chat/aiToolContext";
 import type { AiToolHandler } from "@/services/ai/chat/tools/shared";
@@ -93,10 +92,11 @@ describe("AI chat tool shared helpers", () => {
   });
 
   test("exports page number ranges without tuple-style items schema", () => {
-    const schema = zodToJsonSchema(
+    const schema = z.toJSONSchema(
       z.object({
         page_numbers: requiredPageNumbersSchema,
       }),
+      { io: "input", target: "draft-07" },
     ) as {
       properties?: {
         page_numbers?: {

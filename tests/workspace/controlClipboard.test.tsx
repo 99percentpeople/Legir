@@ -177,6 +177,7 @@ describe("control clipboard event ownership", () => {
     }
     const range = document.createRange();
     range.selectNodeContents(host.querySelector("[data-canvas]")!);
+    window.getSelection()!.removeAllRanges();
     window.getSelection()!.addRange(range);
     expect((await dispatch("copy", data)).defaultPrevented).toBe(false);
     expect(view.getState().fields).toHaveLength(1);

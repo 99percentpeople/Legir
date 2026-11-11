@@ -1,5 +1,6 @@
+import { GithubIcon } from "./GithubIcon";
 import { useRef, useState } from "react";
-import { Github, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageDropdownToggle } from "@/components/LanguageToggle";
 import { ThemeDropdownToggle } from "@/components/ThemeToggle";
@@ -61,7 +62,7 @@ export function SiteHeader({
               aria-label={copy.hero.source}
               title={copy.hero.source}
             >
-              <Github className="size-[1.2rem]" aria-hidden="true" />
+              <GithubIcon className="size-[1.2rem]" aria-hidden="true" />
             </a>
           </Button>
           <button

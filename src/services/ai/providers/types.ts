@@ -5,7 +5,11 @@
  * here. Higher-level chat/task payloads should stay in their own feature
  * folders.
  */
-import type { SharedV3ProviderOptions } from "@ai-sdk/provider";
+import type {
+  ProviderV3,
+  ProviderV4,
+  SharedV4ProviderOptions,
+} from "@ai-sdk/provider";
 import type { FetchFunction } from "@ai-sdk/provider-utils";
 import type { LanguageModel } from "ai";
 
@@ -20,6 +24,9 @@ import type {
   AiRuntimeRequest,
 } from "@/services/ai/providers/runtimeAdapters/types";
 import type { AppOptions, EditorState, LLMModelCapabilities } from "@/types";
+
+// The Zhipu adapter still implements v3; AI SDK 7 accepts both protocols.
+export type AiSdkProvider = ProviderV4 | ProviderV3;
 
 export type AiSdkProviderId = AiProviderId;
 
@@ -43,13 +50,10 @@ export interface AiSdkModelSpecifier {
   modelId: string;
 }
 
-export interface AiSdkResolvedLanguageModel {
+export interface AiSdkResolvedRuntime {
   specifier: AiSdkModelSpecifier;
   model: LanguageModel;
   callOptions?: AiSdkModelCallOptions;
-}
-
-export interface AiSdkResolvedRuntime extends AiSdkResolvedLanguageModel {
   adapter: AiRuntimeAdapter;
   reasoning: AiReasoningResolution;
   request: AiRuntimeRequest;
@@ -58,7 +62,7 @@ export interface AiSdkResolvedRuntime extends AiSdkResolvedLanguageModel {
 export type AiSdkTaskModelKind = "translate" | "vision" | "chat" | "summarize";
 
 export interface AiSdkModelCallOptions {
-  providerOptions?: SharedV3ProviderOptions;
+  providerOptions?: SharedV4ProviderOptions;
 }
 
 export interface AiSdkDiscoveredModel {
@@ -83,11 +87,6 @@ export interface AiSdkModelCatalogProviderTaskRequest {
   kind: AiSdkTaskModelKind;
 }
 
-export interface AiSdkModelCatalogProviderCallOptionsRequest {
-  modelId: string;
-  kind: AiSdkTaskModelKind;
-}
-
 export interface AiSdkModelCatalogProvider {
   readonly providerId: AiSdkProviderId;
   fetchModels: (
@@ -96,9 +95,6 @@ export interface AiSdkModelCatalogProvider {
   getModelsForTask: (
     options: AiSdkModelCatalogProviderTaskRequest,
   ) => LLMModelOption[];
-  resolveCallOptions?: (
-    options: AiSdkModelCatalogProviderCallOptionsRequest,
-  ) => AiSdkModelCallOptions | undefined;
   checkConfig: (
     options: AiSdkModelCatalogProviderRequest,
   ) => Promise<void> | void;

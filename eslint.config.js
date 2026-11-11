@@ -5,6 +5,13 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Surface new ESLint 10 diagnostics without changing the existing lint gate.
+    rules: {
+      "no-useless-assignment": "warn",
+      "preserve-caught-error": "warn",
+    },
+  },
+  {
     files: [
       "src/**/*.{js,jsx,ts,tsx}",
       "www/**/*.{js,jsx,ts,tsx}",

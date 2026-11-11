@@ -3,7 +3,6 @@ import { initializeModelsDev } from "./modelsDev";
 
 import { isAiProviderId } from "@/services/ai/providers/catalog";
 import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
-import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";
 import { getAiSdkProviderModelOptions } from "@/services/ai/providers/modelSelection";
 import { preferencesStore } from "@/store/preferencesStore";
 import type { AppOptions, EditorState } from "@/types";
@@ -14,13 +13,11 @@ import {
 } from "@/services/ai/providers/settings";
 import {
   getAiChatReasoningPreference,
-  mergeAiSdkModelCallOptions,
   normalizeReasoningPreference,
 } from "@/services/ai/providers/runtimeAdapters";
 import type {
   AiSdkModelSpecifier,
   AiSdkResolvedRuntime,
-  AiSdkResolvedLanguageModel,
   AiSdkTaskModelKind,
 } from "@/services/ai/providers/types";
 
@@ -97,22 +94,6 @@ export const resolveAiSdkLanguageModel = async (
   });
 };
 
-export const resolveAiSdkLanguageModelDetailed = async (
-  options: AppOptions,
-  specifier: AiSdkModelSpecifier,
-  kind: AiSdkTaskModelKind,
-): Promise<AiSdkResolvedLanguageModel> => {
-  const provider = getAiSdkModelCatalogProvider(specifier.providerId);
-  return {
-    specifier,
-    model: await resolveAiSdkLanguageModel(options, specifier),
-    callOptions: provider.resolveCallOptions?.({
-      modelId: specifier.modelId,
-      kind,
-    }),
-  };
-};
-
 export const resolveAiSdkRuntime = async (options: {
   appOptions: AppOptions;
   specifier: AiSdkModelSpecifier;
@@ -130,9 +111,6 @@ export const resolveAiSdkRuntime = async (options: {
     );
   }
 
-  const catalogProvider = getAiSdkModelCatalogProvider(
-    options.specifier.providerId,
-  );
   const adapter = getAiRuntimeAdapter(config);
   const runtimeRequest = {
     providerId: config.providerId,
@@ -165,13 +143,7 @@ export const resolveAiSdkRuntime = async (options: {
     adapter,
     reasoning,
     request: runtimeRequest,
-    callOptions: mergeAiSdkModelCallOptions(
-      catalogProvider.resolveCallOptions?.({
-        modelId: options.specifier.modelId,
-        kind: options.kind,
-      }),
-      reasoning.callOptions,
-    ),
+    callOptions: reasoning.callOptions,
   };
 };
 

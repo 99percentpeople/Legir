@@ -254,7 +254,8 @@ provider registry and never use connection IDs as provider identities.
   catalog refresh does not require rebuilding the application. The source catalog's
   MIT license is retained in `public/models-dev.LICENSE.txt`.
 - `settings.ts` resolves a saved connection; `registry.ts` selects its protocol
-  adapter. Connection IDs and provider/SDK option namespaces are separate, so
+  adapter using the shared `catalog.ts` protocol resolver. Connection IDs and
+  provider/SDK option namespaces are separate, so
   multiple connections retain the correct reasoning parameters.
 
 ### Model discovery and capabilities
@@ -292,7 +293,10 @@ requests targeting a removed connection fail instead of using another account.
 
 The AI SDK remains responsible for generation, streaming and tool execution.
 `runtimeAdapters/` contains protocol-specific thinking settings and message replay
-requirements. The shared proxy is injected as `fetch` for both discovery and model
+requirements. `runtimeAdapters/protocols.ts` is the single SDK factory table;
+SDKs load lazily when used. Compatible providers share protocol implementations,
+with DeepSeek/MiMo retaining their chat transport and reasoning replay checks.
+The shared proxy is injected as `fetch` for both discovery and model
 calls. Authentication can be disabled for local compatible endpoints.
 
 `metadata.ts` and `reasoning.ts` read model facts and thinking controls from
@@ -333,7 +337,7 @@ reading UI state.
 - `tasks/index.ts` exports task implementations.
 
 Task implementations may use `resolveAiSdkRuntime` or
-`resolveAiSdkLanguageModelDetailed`, but provider-specific request behavior
+`resolveAiSdkLanguageModel`, but provider-specific request behavior
 should stay in `providers/runtimeAdapters/`.
 
 ## Shared Entry Points and Helpers
@@ -379,7 +383,7 @@ Shared app constants, including the default model context window, live in
 
 - Providers using supported protocols enter through models.dev or a custom
   connection; do not add provider allowlists or duplicate model facts locally.
-- Add new protocol/SDK support in `catalog.ts` and `registry.ts` with transport
+- Add new protocol/SDK support in `catalog.ts` and `runtimeAdapters/protocols.ts` with transport
   tests. Remote npm package names are data, not executable import instructions.
 - Add provider request-shape behavior in `providers/runtimeAdapters/`.
 - Add chat tools in `chat/tools/` and register them through

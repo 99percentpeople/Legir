@@ -1,13 +1,20 @@
 import { describe, expect, test } from "vitest";
 
 import { sanitizeAiChatMessagesForReasoningReplay } from "@/services/ai/chat/runtime/reasoningReplay";
-import { deepseekAdapter } from "@/services/ai/providers/runtimeAdapters/deepseek";
+import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
 import type { AiChatMessageRecord } from "@/services/ai/chat/types";
 
 const validateDeepSeekReplay = (messages: AiChatMessageRecord[]) =>
   deepseekAdapter.validateMessages?.(messages, {
     reasoning: { replayPolicy: "tool-calls" },
   } as Parameters<NonNullable<typeof deepseekAdapter.validateMessages>>[1]);
+
+const deepseekAdapter = getAiRuntimeAdapter({
+  providerId: "deepseek",
+  backendKind: "openai-compatible",
+  label: "DeepSeek",
+  apiKey: "test-key",
+});
 
 describe("AI chat reasoning replay sanitization", () => {
   test("materializes assistant tool calls without reasoning as resumable context", () => {

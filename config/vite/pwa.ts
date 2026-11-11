@@ -78,9 +78,8 @@ export const createPwaPlugin = (displayName: string) =>
     injectManifest: {
       globIgnores: [
         "fonts/*.ttf",
-        // Only provider chunks are optional offline. The AI runtime chunk also
-        // contains shared dependencies pulled in by manualChunks, so the app
-        // shell and PDF editor need it in the precache even without AI use.
+        // Only provider chunks are optional offline. Keep the AI runtime and
+        // shared chunks cached so startup imports also work without a network.
         "assets/ai-provider-*.js",
       ],
       // PDFium is needed even for the first PDF opened after going offline.

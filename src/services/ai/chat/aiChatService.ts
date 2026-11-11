@@ -37,7 +37,7 @@ import type {
 
 type AiChatStreamFinishEvent = Pick<
   OnFinishEvent<ToolSet>,
-  "finishReason" | "steps" | "totalUsage" | "response"
+  "finishReason" | "steps" | "totalUsage" | "responseMessages"
 >;
 type AiChatStreamFinishResolver = (result: AiChatStreamFinishEvent) => void;
 type AiChatUsageLike = LanguageModelUsage | null | undefined;
@@ -67,12 +67,10 @@ const getUsageTotalTokens = (usage: AiChatUsageLike) => {
 };
 
 const getUsageReasoningTokens = (usage: AiChatUsageLike) =>
-  readUsageInt(usage?.outputTokenDetails?.reasoningTokens) ??
-  readUsageInt(usage?.reasoningTokens);
+  readUsageInt(usage?.outputTokenDetails?.reasoningTokens);
 
 const getUsageCachedInputTokens = (usage: AiChatUsageLike) =>
-  readUsageInt(usage?.inputTokenDetails?.cacheReadTokens) ??
-  readUsageInt(usage?.cachedInputTokens);
+  readUsageInt(usage?.inputTokenDetails?.cacheReadTokens);
 
 const normalizeAiChatStreamError = (
   error: unknown,
@@ -179,15 +177,10 @@ export const aiChatService = {
         supportsImageToolResults:
           runtime.adapter.supportsImageToolResults === true,
       });
-      const providerMessages =
-        runtime.adapter.prepareMessages?.(imageMessages, {
-          ...runtime.request,
-          reasoning: runtime.reasoning,
-        }) ?? imageMessages;
       // New tool steps can also omit reasoning. Recover their completed tool
       // context before validation, just as we do for restored conversations.
       const preparedMessages = sanitizeAiChatMessagesForReasoningReplay({
-        messages: providerMessages,
+        messages: imageMessages,
         replayPolicy: runtime.reasoning.replayPolicy,
       });
       runtime.adapter.validateMessages?.(preparedMessages, {
@@ -228,33 +221,38 @@ export const aiChatService = {
       onToolUpdate,
       getCurrentBatchId: () => currentBatchId,
     });
-    let latestResponseMessages: AiChatMessageRecord[] = [];
+    const latestResponseMessages: AiChatMessageRecord[] = [];
 
     try {
       const result = streamText({
         model: runtime.model,
         ...(runtime.callOptions ?? null),
-        system: getAiChatSystemInstruction({
+        instructions: getAiChatSystemInstruction({
           toolDefinitions,
         }),
+        // Internal memory and reasoning recovery use trusted system messages.
+        allowSystemInMessages: true,
         // prepareStep projects each request without persisting transport-only
         // image messages or bypassing visual-history compression on later steps.
         messages: requestBaseConversation,
-        prepareStep: async ({ messages }) => {
-          const preparedMessages = await buildStepMessages(messages);
+        prepareStep: async ({ initialMessages, responseMessages }) => {
+          const preparedMessages = await buildStepMessages([
+            ...initialMessages,
+            ...responseMessages,
+          ]);
           latestPreparedMessageTokenEstimate =
             estimateAiChatMessageTokens(preparedMessages);
           return {
             messages: preparedMessages,
           };
         },
-        experimental_include: {
+        include: {
           requestBody: false,
         },
         tools: toolRuntime.tools,
         stopWhen: stepCountIs(maxToolSteps),
         onStepFinish: (step) => {
-          latestResponseMessages = step.response.messages;
+          latestResponseMessages.push(...step.response.messages);
           const actualContextTokens = getAiChatContextTokens(step.usage);
           onUsageUpdate?.({
             tokenUsage: toAiChatTokenUsageSummary(step.usage),
@@ -266,12 +264,12 @@ export const aiChatService = {
             stepNumber: step.stepNumber,
           });
         },
-        onFinish: ({ finishReason, steps, totalUsage, response }) => {
+        onFinish: ({ finishReason, steps, totalUsage, responseMessages }) => {
           resolveFinishEvent?.({
             finishReason,
             steps,
             totalUsage,
-            response,
+            responseMessages,
           });
           resolveFinishEvent = null;
         },
@@ -360,7 +358,7 @@ export const aiChatService = {
       const conversation = sanitizeAiChatMessagesForReasoningReplay({
         messages: [
           ...persistedBaseConversation,
-          ...finishEvent.response.messages,
+          ...finishEvent.responseMessages,
         ],
         replayPolicy: runtime.reasoning.replayPolicy,
       });

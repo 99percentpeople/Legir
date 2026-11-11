@@ -6,7 +6,7 @@
  * related records. Runtime context composition and execution wiring should live
  * alongside the runtime implementation instead of here.
  */
-import type { ZodTypeAny } from "zod";
+import type { ZodType } from "zod";
 import type { ModelMessage, ToolSet } from "ai";
 import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import type { AiDocumentLinkTarget } from "@/services/ai/utils/documentLinks";
@@ -53,7 +53,7 @@ export interface AiChatToolDefinition {
   name: string;
   description: string;
   accessType: "read" | "write";
-  inputSchema: ZodTypeAny;
+  inputSchema: ZodType;
   promptInstructions?: string[];
   requiredInputModalities?: LLMModelModality[];
   requiredModelCapabilities?: AiChatToolRequiredModelCapability[];
@@ -282,13 +282,7 @@ export interface AiSearchResultSummary {
 }
 
 export type AiAnnotationKind =
-  | "comment"
-  | "highlight"
-  | "ink"
-  | "freetext"
-  | "stamp"
-  | "shape"
-  | "link";
+  "comment" | "highlight" | "ink" | "freetext" | "stamp" | "shape" | "link";
 
 export type AiShapeAnnotationSubType =
   | "square"
@@ -481,12 +475,7 @@ export interface AiAnnotationUpdateResult {
 }
 
 export type AiFormFieldKind =
-  | "text"
-  | "checkbox"
-  | "radio"
-  | "dropdown"
-  | "button"
-  | "signature";
+  "text" | "checkbox" | "radio" | "dropdown" | "button" | "signature";
 
 export type AiFormFieldValue = string | string[] | boolean | null;
 
@@ -676,8 +665,7 @@ export interface AiChatAnnotationAttachment {
 }
 
 export type AiChatMessageAttachment =
-  | AiChatSelectionAttachment
-  | AiChatAnnotationAttachment;
+  AiChatSelectionAttachment | AiChatAnnotationAttachment;
 
 export type AiChatUserMessageInput =
   | string

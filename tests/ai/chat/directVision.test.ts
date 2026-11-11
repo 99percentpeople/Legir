@@ -1,4 +1,12 @@
-import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  vi,
+} from "vitest";
 import { DEFAULT_EDITOR_UI_STATE } from "@/constants";
 import { aiChatService } from "@/services/ai/chat/aiChatService";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
@@ -13,6 +21,14 @@ import { initializeModelsDev } from "@/services/ai/providers/modelsDev";
 import type { AiProviderBackendKind } from "@/services/ai/providers/catalog";
 
 beforeAll(() => initializeModelsDev());
+beforeEach(() => {
+  // jsdom does not decode images; this fixture is a real 1x1 PNG.
+  vi.stubGlobal("createImageBitmap", async () => ({
+    width: 1,
+    height: 1,
+    close: vi.fn(),
+  }));
+});
 afterEach(() => vi.unstubAllGlobals());
 
 const imageData =
@@ -137,30 +153,59 @@ const createRegistry = (direct: boolean) => {
 const nativeReply = (backend: AiProviderBackendKind) => {
   const text = "I read the image directly.";
   const events =
-    backend === "openai"
+    backend === "openai" || backend === "xai"
       ? [
           {
             type: "response.created",
-            response: { id: "reply", created_at: 1, model: "vision-test" },
+            response: {
+              id: "reply",
+              object: "response",
+              created_at: 1,
+              model: "vision-test",
+              output: [],
+              status: "in_progress",
+            },
           },
           {
             type: "response.output_item.added",
             output_index: 0,
-            item: { type: "message", id: "text-1" },
+            item: {
+              type: "message",
+              id: "text-1",
+              role: "assistant",
+              content: [],
+              status: "completed",
+            },
           },
           {
             type: "response.output_text.delta",
             item_id: "text-1",
+            output_index: 0,
+            content_index: 0,
             delta: text,
           },
           {
             type: "response.output_item.done",
             output_index: 0,
-            item: { type: "message", id: "text-1" },
+            item: {
+              type: "message",
+              id: "text-1",
+              role: "assistant",
+              content: [],
+              status: "completed",
+            },
           },
           {
             type: "response.completed",
-            response: { usage: { input_tokens: 10, output_tokens: 5 } },
+            response: {
+              id: "reply",
+              object: "response",
+              created_at: 1,
+              model: "vision-test",
+              output: [],
+              status: "completed",
+              usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+            },
           },
         ]
       : backend === "google"
@@ -218,6 +263,7 @@ const nativeReply = (backend: AiProviderBackendKind) => {
 describe("direct image inspection through the installed SDK", () => {
   test.each<AiProviderBackendKind>([
     "openai",
+    "xai",
     "anthropic",
     "anthropic-compatible",
     "google",
@@ -278,7 +324,7 @@ describe("direct image inspection through the installed SDK", () => {
       const requestJson = JSON.stringify(requests[0]);
       expect(requestJson.split(imageData)).toHaveLength(2);
       expect(requestJson).toContain(
-        backend === "openai"
+        backend === "openai" || backend === "xai"
           ? '"type":"input_image"'
           : backend === "google"
             ? '"inlineData"'
@@ -288,12 +334,7 @@ describe("direct image inspection through the installed SDK", () => {
     },
   );
 
-  test.each<AiProviderBackendKind>([
-    "openai-compatible",
-    "groq",
-    "xai",
-    "openrouter",
-  ])(
+  test.each<AiProviderBackendKind>(["openai-compatible", "groq", "openrouter"])(
     "%s sends image_url parts to the same model, without a visual intermediary or duplicated history",
     async (backend) => {
       const requests: {

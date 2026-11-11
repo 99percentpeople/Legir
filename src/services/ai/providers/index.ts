@@ -7,4 +7,3 @@ export * from "./metadata";
 export * from "./models";
 export * from "./modelResolver";
 export * from "./settings";
-export { createAiSdkProviderRegistry, createAiSdkProviders } from "./config";

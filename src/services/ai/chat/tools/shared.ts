@@ -1,4 +1,4 @@
-import { z, type ZodTypeAny } from "zod";
+import { z, type ZodType } from "zod";
 
 import type {
   AiAnnotationKind,
@@ -60,10 +60,7 @@ export const createToolHandlerMap = (
   return handlers;
 };
 
-type AiToolBuilderState<
-  TName extends AiToolName,
-  TSchema extends ZodTypeAny,
-> = {
+type AiToolBuilderState<TName extends AiToolName, TSchema extends ZodType> = {
   name: TName;
   enabled: boolean;
   accessType?: AiChatToolDefinition["accessType"];
@@ -79,7 +76,7 @@ type AiToolBuilderState<
   toModelOutput?: AiChatToolDefinition["toModelOutput"];
 };
 
-type AiToolBuilderExecuteOptions<TSchema extends ZodTypeAny> = {
+type AiToolBuilderExecuteOptions<TSchema extends ZodType> = {
   args: z.output<TSchema>;
   rawArgs: unknown;
   ctx: AiToolContext;
@@ -176,19 +173,21 @@ const parseArgsObject = (value: unknown) => {
   throw new Error("Tool arguments must be a JSON object.");
 };
 
-const formatIssuePath = (path: Array<string | number>) =>
+const formatIssuePath = (path: PropertyKey[]) =>
   path
-    .map((segment) => (typeof segment === "number" ? `[${segment}]` : segment))
+    .map((segment) =>
+      typeof segment === "number" ? `[${segment}]` : String(segment),
+    )
     .join(".");
 
 const formatZodIssue = (
   issue: z.ZodIssue,
-  basePath: Array<string | number> = [],
+  basePath: PropertyKey[] = [],
 ): string => {
   const path = [...basePath, ...issue.path];
   if (issue.code === "invalid_union") {
-    const nestedMessages = issue.unionErrors.flatMap((unionError) =>
-      unionError.issues.map((nestedIssue) => formatZodIssue(nestedIssue, path)),
+    const nestedMessages = issue.errors.flatMap((issues) =>
+      issues.map((nestedIssue) => formatZodIssue(nestedIssue, path)),
     );
     if (nestedMessages.length > 0) {
       return nestedMessages.join("; ");
@@ -207,7 +206,7 @@ const formatToolArgsError = (error: unknown) => {
   return error instanceof Error ? error.message : "Invalid tool arguments.";
 };
 
-export const parseToolArgs = <T extends ZodTypeAny>(
+export const parseToolArgs = <T extends ZodType>(
   schema: T,
   value: unknown,
 ): { success: true; data: z.output<T> } | { success: false; error: string } => {
@@ -365,7 +364,7 @@ export const emptyObjectSchema = z.object({}).strict();
 
 const createConfiguredToolBuilder = <
   TName extends AiToolName,
-  TSchema extends ZodTypeAny,
+  TSchema extends ZodType,
 >(
   state: AiToolBuilderState<TName, TSchema>,
 ) => ({
@@ -419,7 +418,7 @@ const createConfiguredToolBuilder = <
       ...state,
       toModelOutput,
     }),
-  inputSchema: <TNextSchema extends ZodTypeAny>(inputSchema: TNextSchema) =>
+  inputSchema: <TNextSchema extends ZodType>(inputSchema: TNextSchema) =>
     createConfiguredToolBuilder<TName, TNextSchema>({
       ...state,
       inputSchema,

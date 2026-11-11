@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { materializeIncompleteTimelineTail } from "@/services/ai/chat/runtime/requestRecovery";
-import { deepseekAdapter } from "@/services/ai/providers/runtimeAdapters/deepseek";
+import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
 import type {
   AiChatMessageRecord,
   AiChatTimelineItem,
@@ -11,6 +11,13 @@ const validateDeepSeekReplay = (messages: AiChatMessageRecord[]) =>
   deepseekAdapter.validateMessages?.(messages, {
     reasoning: { replayPolicy: "tool-calls" },
   } as Parameters<NonNullable<typeof deepseekAdapter.validateMessages>>[1]);
+
+const deepseekAdapter = getAiRuntimeAdapter({
+  providerId: "deepseek",
+  backendKind: "openai-compatible",
+  label: "DeepSeek",
+  apiKey: "test-key",
+});
 
 describe("AI chat request recovery", () => {
   test("materializes incomplete timeline tools without requiring tool output", () => {

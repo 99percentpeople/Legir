@@ -1,7 +1,7 @@
 import type {
-  EmbeddingModelV3,
-  ImageModelV3,
-  LanguageModelV3,
+  EmbeddingModelV4,
+  ImageModelV4,
+  LanguageModelV4,
 } from "@ai-sdk/provider";
 import type { ModelMessage } from "ai";
 
@@ -38,7 +38,7 @@ export const createOpenAiCompatibleChatOnlyProvider = async (
   const getHeaders = () =>
     withUserAgentSuffix(headers, options.userAgentSuffix);
 
-  const createChatModel = (modelId: string): LanguageModelV3 =>
+  const createChatModel = (modelId: string): LanguageModelV4 =>
     new OpenAICompatibleChatLanguageModel(modelId, {
       provider: options.providerName,
       url: ({ path }) => `${baseURL}${path}`,
@@ -50,16 +50,16 @@ export const createOpenAiCompatibleChatOnlyProvider = async (
         : {}),
     });
 
-  const createEmbeddingModel = (modelId: string): EmbeddingModelV3 => {
+  const createEmbeddingModel = (modelId: string): EmbeddingModelV4 => {
     throw new NoSuchModelError({ modelId, modelType: "embeddingModel" });
   };
 
-  const createImageModel = (modelId: string): ImageModelV3 => {
+  const createImageModel = (modelId: string): ImageModelV4 => {
     throw new NoSuchModelError({ modelId, modelType: "imageModel" });
   };
 
   return Object.assign((modelId: string) => createChatModel(modelId), {
-    specificationVersion: "v3" as const,
+    specificationVersion: "v4" as const,
     languageModel: createChatModel,
     chatModel: createChatModel,
     chat: createChatModel,

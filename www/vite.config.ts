@@ -3,15 +3,15 @@ import { readFileSync } from "fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { workspacePackageAliases } from "../config/vite/workspacePackages";
+import { workspacePackageAliases } from "../config/vite/workspacePackages.ts";
 
-const workspaceRoot = path.resolve(__dirname, "..");
+const workspaceRoot = path.resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(
   readFileSync(path.resolve(workspaceRoot, "package.json"), "utf-8"),
 );
 
 export default defineConfig(({ command }) => ({
-  root: __dirname,
+  root: import.meta.dirname,
   envDir: workspaceRoot,
   publicDir: path.resolve(workspaceRoot, "public"),
   server: {

@@ -4,10 +4,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-import { viteDevApiProxyPlugin } from "./config/vite/devApiProxy";
-import { createPwaPlugin } from "./config/vite/pwa";
-import { createStaticCopyPlugin } from "./config/vite/staticCopy";
-import { workspacePackageAliases } from "./config/vite/workspacePackages";
+import { viteDevApiProxyPlugin } from "./config/vite/devApiProxy.ts";
+import { createPwaPlugin } from "./config/vite/pwa.ts";
+import { createStaticCopyPlugin } from "./config/vite/staticCopy.ts";
+import { workspacePackageAliases } from "./config/vite/workspacePackages.ts";
 
 const pdfiumBuild = JSON.parse(
   readFileSync("./packages/pdfium/wasm/provenance.json", "utf-8"),
@@ -82,7 +82,7 @@ export default defineConfig(({ mode, command }) => {
     resolve: {
       alias: [
         ...(command === "serve" ? workspacePackageAliases : []),
-        { find: "@", replacement: path.resolve(__dirname, "./src") },
+        { find: "@", replacement: path.resolve(import.meta.dirname, "./src") },
       ],
     },
     // Env variables starting with the item of `envPrefix` will be exposed in tauri's source code through `import.meta.env`.
@@ -90,19 +90,23 @@ export default defineConfig(({ mode, command }) => {
     // Thumbnail appearances reuse the export/font pipeline inside the classic
     // render worker. Keep its lazy imports in one file for WebView compatibility.
     worker: {
-      rollupOptions: { output: { inlineDynamicImports: true } },
+      rolldownOptions: { output: { codeSplitting: false } },
     },
     build: {
       // Tauri uses Chromium on Windows and WebKit on macOS and Linux
       target:
         process.env.TAURI_ENV_PLATFORM == "windows" ? "chrome105" : "safari13",
       // don't minify for debug builds
-      minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
+      minify: !process.env.TAURI_ENV_DEBUG ? "oxc" : false,
       // produce sourcemaps for debug builds
       sourcemap: !!process.env.TAURI_ENV_DEBUG,
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks: getManualChunk,
+          codeSplitting: {
+            // Shared startup dependencies must stay out of optional provider chunks.
+            includeDependenciesRecursively: false,
+            groups: [{ name: getManualChunk, debugName: "named-vendors" }],
+          },
         },
       },
     },

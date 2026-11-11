@@ -267,7 +267,7 @@ describe("SDK reasoning request serialization", () => {
       "none",
       { reasoning_effort: "none", reasoning_format: "hidden" },
     ],
-    ["xai", "grok-4.7", "xhigh", { reasoning_effort: "xhigh" }],
+    ["xai", "grok-4.7", "xhigh", { reasoning: { effort: "xhigh" } }],
     [
       "openrouter",
       "openai/gpt-5.5",

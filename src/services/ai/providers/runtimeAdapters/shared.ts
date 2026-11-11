@@ -1,4 +1,3 @@
-import type { AiSdkModelCallOptions } from "@/services/ai/providers/types";
 import type {
   AiReasoningResolution,
   AiRuntimeRequest,
@@ -175,32 +174,3 @@ export const canPreviewCollapsedReasoningText = (
 ) =>
   canDisplayReasoningText(resolution) &&
   resolution.capability.textExposure === "raw";
-
-export const mergeAiSdkModelCallOptions = (
-  ...items: Array<AiSdkModelCallOptions | undefined>
-): AiSdkModelCallOptions | undefined => {
-  const providerOptions: NonNullable<AiSdkModelCallOptions["providerOptions"]> =
-    {};
-
-  for (const item of items) {
-    if (!item?.providerOptions) continue;
-    for (const [provider, value] of Object.entries(item.providerOptions)) {
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        providerOptions[provider] = value;
-        continue;
-      }
-      const previous = providerOptions[provider];
-      providerOptions[provider] =
-        previous && typeof previous === "object" && !Array.isArray(previous)
-          ? {
-              ...previous,
-              ...value,
-            }
-          : value;
-    }
-  }
-
-  return Object.keys(providerOptions).length > 0
-    ? { providerOptions }
-    : undefined;
-};

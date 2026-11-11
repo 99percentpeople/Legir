@@ -11,7 +11,7 @@ import {
   buildAiChatContextMemoryMessage,
   getAiChatConversationMemoryCoveredMessageCount,
 } from "@/services/ai/chat/runtime/memory/serialization";
-import { deepseekAdapter } from "@/services/ai/providers/runtimeAdapters/deepseek";
+import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
 import type {
   AiChatContextMemory,
   AiChatMessageRecord,
@@ -71,6 +71,13 @@ const hasAssistantToolCallWithoutReasoning = (message: AiChatMessageRecord) => {
   );
   return hasToolCall && !hasReasoning;
 };
+
+const deepseekAdapter = getAiRuntimeAdapter({
+  providerId: "deepseek",
+  backendKind: "openai-compatible",
+  label: "DeepSeek",
+  apiKey: "test-key",
+});
 
 describe("AI chat compression segments", () => {
   test("groups memory and complete turns with traits", () => {

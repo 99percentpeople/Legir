@@ -10,17 +10,11 @@ import {
   resolveAiProviderModelMetadata,
 } from "@/services/ai/providers/metadata";
 import { createOpenAiLikeModelCapabilities } from "@/services/ai/providers/capabilities";
-import { anthropicAdapter } from "@/services/ai/providers/runtimeAdapters/anthropic";
-import { createAnthropicCompatibleAdapter } from "@/services/ai/providers/runtimeAdapters/anthropicCompatible";
-import { deepseekAdapter } from "@/services/ai/providers/runtimeAdapters/deepseek";
-import { geminiAdapter } from "@/services/ai/providers/runtimeAdapters/gemini";
-import { mimoAdapter } from "@/services/ai/providers/runtimeAdapters/mimo";
-import { openAiAdapter } from "@/services/ai/providers/runtimeAdapters/openai";
-import { zhipuAdapter } from "@/services/ai/providers/runtimeAdapters/zhipu";
+import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
+import { catalogProviderId } from "@/services/ai/providers/catalog";
 import {
   canDisplayReasoningText,
   canPreviewCollapsedReasoningText,
-  mergeAiSdkModelCallOptions,
   normalizeReasoningPreference,
 } from "@/services/ai/providers/runtimeAdapters/shared";
 import type {
@@ -30,7 +24,22 @@ import type {
 } from "@/services/ai/providers/runtimeAdapters/types";
 import type { AiSdkBackendKind } from "@/services/ai/providers/types";
 
-const minimaxAdapter = createAnthropicCompatibleAdapter("minimax");
+const adapterFor = (providerId: string, backendKind: AiSdkBackendKind) =>
+  getAiRuntimeAdapter({
+    providerId,
+    catalogId: catalogProviderId(providerId),
+    backendKind,
+    label: providerId,
+    apiKey: "test-key",
+  });
+
+const openAiAdapter = adapterFor("openai", "openai");
+const anthropicAdapter = adapterFor("anthropic", "anthropic");
+const minimaxAdapter = adapterFor("minimax", "anthropic-compatible");
+const deepseekAdapter = adapterFor("deepseek", "openai-compatible");
+const mimoAdapter = adapterFor("xiaomi-mimo", "openai-compatible");
+const geminiAdapter = adapterFor("gemini", "google");
+const zhipuAdapter = adapterFor("zhipu", "openai-compatible");
 
 const getBackendKindForAdapter = (
   adapter: AiRuntimeAdapter,
@@ -456,33 +465,5 @@ describe("AI provider runtime adapters", () => {
       },
     });
     expect(canPreviewCollapsedReasoningText(resolution)).toBe(true);
-  });
-
-  test("merges provider call options without dropping sibling provider settings", () => {
-    expect(
-      mergeAiSdkModelCallOptions(
-        {
-          providerOptions: {
-            openai: { reasoningEffort: "low" },
-            google: { safetySettings: "strict" },
-          },
-        },
-        {
-          providerOptions: {
-            openai: { parallelToolCalls: false },
-            anthropic: { thinking: { type: "enabled" } },
-          },
-        },
-      ),
-    ).toEqual({
-      providerOptions: {
-        openai: {
-          reasoningEffort: "low",
-          parallelToolCalls: false,
-        },
-        google: { safetySettings: "strict" },
-        anthropic: { thinking: { type: "enabled" } },
-      },
-    });
   });
 });

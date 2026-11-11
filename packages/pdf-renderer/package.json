@@ -50,7 +50,7 @@
     "@legir/pdfium": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "~5.9.3",
-    "@types/node": "^24.12.4"
+    "typescript": "~6.0.3",
+    "@types/node": "^26.6.6"
   }
 }

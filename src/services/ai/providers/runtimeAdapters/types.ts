@@ -1,9 +1,9 @@
 import type { ModelMessage } from "ai";
-import type { ProviderV3 } from "@ai-sdk/provider";
 
 import type { AppOptions } from "@/types";
 import type {
   AiSdkBackendKind,
+  AiSdkProvider,
   AiSdkModelCallOptions,
   AiSdkProviderConfig,
   AiSdkProviderId,
@@ -11,20 +11,11 @@ import type {
 } from "@/services/ai/providers/types";
 
 export type AiReasoningLevel =
-  | "none"
-  | "auto"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
+  "none" | "auto" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 export type AiReasoningActiveLevel = Exclude<AiReasoningLevel, "none" | "auto">;
 export type AiReasoningReplayPolicy = "none" | "tool-calls" | "all";
 export type AiReasoningDisplayPolicy =
-  | "hidden"
-  | "summary"
-  | "full-if-provider-exposes";
+  "hidden" | "summary" | "full-if-provider-exposes";
 export type AiReasoningTextExposure = "none" | "summary" | "raw";
 export type AiReasoningBudgetByLevel = Partial<
   Record<AiReasoningLevel, number>
@@ -80,7 +71,7 @@ export interface AiRuntimeAdapter {
   /** Build the AI SDK provider, including provider-specific SDK wrappers. */
   createSdkProvider: (
     config: AiSdkProviderConfig,
-  ) => ProviderV3 | Promise<ProviderV3>;
+  ) => AiSdkProvider | Promise<AiSdkProvider>;
 
   getReasoningCapability: (request: AiRuntimeRequest) => AiReasoningCapability;
 
@@ -89,13 +80,6 @@ export interface AiRuntimeAdapter {
       preference: AiReasoningPreference;
     },
   ) => AiReasoningResolution;
-
-  prepareMessages?: (
-    messages: ModelMessage[],
-    request: AiRuntimeRequest & {
-      reasoning: AiReasoningResolution;
-    },
-  ) => ModelMessage[];
 
   validateMessages?: (
     messages: ModelMessage[],

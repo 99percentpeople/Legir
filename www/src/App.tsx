@@ -1,3 +1,4 @@
+import { GithubIcon } from "./components/GithubIcon";
 import { useEffect } from "react";
 import {
   ArrowRight,
@@ -6,7 +7,6 @@ import {
   ChevronDown,
   Download,
   FileText,
-  Github,
   LockKeyhole,
   ShieldCheck,
 } from "lucide-react";
@@ -190,7 +190,7 @@ export default function App() {
         <div className="footer-meta">
           <a href="#downloads">{downloadCopy.nav}</a>
           <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
-            <Github size={15} aria-hidden="true" />
+            <GithubIcon size={15} aria-hidden="true" />
             GitHub
             <ArrowUpRight size={13} aria-hidden="true" />
           </a>

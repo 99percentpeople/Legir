@@ -46,6 +46,22 @@ export const runtimeProviderId = (id: string): string =>
       string
     >
   )[id] || id;
+
+export type AiRuntimeProtocol =
+  Exclude<AiProviderBackendKind, "anthropic-compatible"> | "mimo";
+
+/** Compatible providers share transport code but can require distinct wire options. */
+export const getRuntimeProtocol = (
+  backend: AiProviderBackendKind,
+  providerId: string,
+): AiRuntimeProtocol => {
+  if (backend === "anthropic-compatible") return "anthropic";
+  if (backend !== "openai-compatible") return backend;
+  const source = runtimeProviderId(providerId);
+  if (source === "deepseek" || source === "zhipu") return source;
+  if (source === "xiaomi-mimo") return "mimo";
+  return "openai-compatible";
+};
 const SDK_PROTOCOLS: Record<
   string,
   { kind: AiProviderBackendKind; id?: string; url?: string }

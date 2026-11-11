@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     projects: [
       {
-        resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+        resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
         test: {
           name: "app",
           server: { deps: { external: [/\/packages\/pdfium\/dist\//] } },

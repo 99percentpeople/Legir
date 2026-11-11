@@ -1,4 +1,9 @@
-import { getCatalogProviderSpec, runtimeProviderId } from "./catalog";
+import {
+  getCatalogProviderSpec,
+  getRuntimeProtocol,
+  runtimeProviderId,
+  type AiRuntimeProtocol,
+} from "./catalog";
 import { getModelsDevModel, getModelsDevProvider } from "./modelsDev";
 import {
   AI_REASONING_LEVELS,
@@ -9,35 +14,17 @@ import type {
   AiReasoningLevel,
 } from "./runtimeAdapters/types";
 
-export type AiReasoningProtocol =
-  | "openai"
-  | "openai-compatible"
-  | "anthropic"
-  | "google"
-  | "openrouter"
-  | "groq"
-  | "xai"
-  | "deepseek"
-  | "mimo"
-  | "zhipu";
-
 export type AiModelReasoningMetadata = AiReasoningCapability;
 
-const getCatalogProtocol = (providerId: string): AiReasoningProtocol => {
+const getCatalogProtocol = (providerId: string): AiRuntimeProtocol => {
   const provider = getModelsDevProvider(providerId);
   const backend = provider && getCatalogProviderSpec(provider)?.backendKind;
-  if (!backend || backend === "openai-compatible") {
-    const runtime = runtimeProviderId(providerId);
-    if (runtime === "deepseek" || runtime === "zhipu") return runtime;
-    if (runtime === "xiaomi-mimo") return "mimo";
-    return "openai-compatible";
-  }
-  return backend === "anthropic-compatible" ? "anthropic" : backend;
+  return getRuntimeProtocol(backend ?? "openai-compatible", providerId);
 };
 
 // These are SDK wire constraints, not model capabilities. Model choices come only
 // from reasoning_options; a new model never requires a name or family rule here.
-const acceptsEffort = (protocol: AiReasoningProtocol, value: string) => {
+const acceptsEffort = (protocol: AiRuntimeProtocol, value: string) => {
   if (protocol === "google")
     return ["minimal", "low", "medium", "high"].includes(value);
   if (protocol === "anthropic")

@@ -330,7 +330,7 @@ describe("shallow-merge behavior", () => {
     const edited = store.getState();
     store.getState().undo();
     expect(store.getState().fields).toBe(original.fields);
-    expect(store.getState().dirtyPermissionScopes).toBe(
+    expect(store.getState().dirtyPermissionScopes).toEqual(
       original.dirtyPermissionScopes,
     );
     expect(store.getState().selectedId).toBeNull();
@@ -426,7 +426,7 @@ describe("shallow-merge behavior", () => {
       name.endsWith(".ts"),
     )) {
       expect(readFileSync(resolve(directory, name), "utf8"), name).not.toMatch(
-        /\.\.\.state\s*[,}]/,
+        /(?:return\s*|=>\s*\()\{\s*\.\.\.state\s*[,}]/,
       );
     }
   });

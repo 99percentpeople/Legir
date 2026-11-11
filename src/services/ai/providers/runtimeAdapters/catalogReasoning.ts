@@ -1,7 +1,5 @@
-import {
-  getCatalogReasoningMetadata,
-  type AiReasoningProtocol,
-} from "../reasoning";
+import { getCatalogReasoningMetadata } from "../reasoning";
+import type { AiRuntimeProtocol } from "../catalog";
 import {
   createNoReasoningResolution,
   getReasoningBudgetTokensForLevel,
@@ -12,7 +10,7 @@ import type { AiSdkModelCallOptions } from "../types";
 
 /** Wire formats are code; all model support, effort values and limits are catalog data. */
 export const createCatalogReasoningAdapter = (
-  protocol: AiReasoningProtocol,
+  protocol: AiRuntimeProtocol,
 ): Pick<AiRuntimeAdapter, "getReasoningCapability" | "resolveReasoning"> => {
   const getReasoningCapability = (request: AiRuntimeRequest) =>
     getCatalogReasoningMetadata(
