@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { DragDropProvider } from "@dnd-kit/react";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { DragDropProvider, useDragDropManager } from "@dnd-kit/react";
 import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import {
   KeyboardSensor,
   PointerSensor,
   PointerActivationConstraints,
+  Scroller,
 } from "@dnd-kit/dom";
 import { RestrictToElement } from "@dnd-kit/dom/modifiers";
 import { ArrowLeft, ExternalLink, Home, LoaderCircle, X } from "lucide-react";
@@ -143,6 +144,7 @@ export function EditorTabStrip({
         });
       }}
     >
+      <TabScrollBoundary scrollerRef={scrollerRef} />
       <div
         className="editor-tab-strip flex h-10 shrink-0 items-end pt-1.5 sm:px-1"
         data-app-keyboard-dragging={dragging ? "true" : undefined}
@@ -179,6 +181,29 @@ export function EditorTabStrip({
       </div>
     </DragDropProvider>
   );
+}
+
+function TabScrollBoundary({
+  scrollerRef,
+}: {
+  scrollerRef: RefObject<HTMLDivElement | null>;
+}) {
+  const manager = useDragDropManager();
+  useEffect(() => {
+    const scroller = manager?.registry.plugins.get(Scroller);
+    if (!scroller) return;
+
+    // The default follows the pointer into any scrollable element, including
+    // the PDF viewport. Tab drags may only scroll their own strip, for pointer
+    // auto-scrolling and keyboard movement alike.
+    const getScrollableElements = scroller.getScrollableElements;
+    scroller.getScrollableElements = () =>
+      scrollerRef.current ? new Set([scrollerRef.current]) : null;
+    return () => {
+      scroller.getScrollableElements = getScrollableElements;
+    };
+  }, [manager, scrollerRef]);
+  return null;
 }
 
 function SortableEditorTab({
