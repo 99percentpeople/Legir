@@ -64,7 +64,7 @@ export const renderMarkdownToHtml = (source: string) => {
 
   try {
     return decorateRenderedHtml(
-      micromark(source, {
+      micromark(source, "utf8", {
         allowDangerousHtml: true,
         extensions: [gfm()],
         htmlExtensions: [gfmHtml()],

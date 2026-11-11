@@ -29,6 +29,9 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bun run check:desktop
+      # Build www before lint builds all packages; generated app libraries must
+      # not hide dependencies that are missing in a fresh Vercel checkout.
+      - run: bun run build:www
       - run: bun run lint
       - run: bun run test
       - run: bun run test:pdfium
