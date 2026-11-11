@@ -59,7 +59,9 @@ offline, reloads Home and opens `/editor` in a new tab before opening its first 
 This verifies that the app starts from Cache Storage without already-loaded
 modules hiding missing precache dependencies. It edits a text field and saves it
 twice. PDFium must retain the exact original prefix without growing a
-revision chain. It then inserts a blank page, undoes/redoes it, imports the
+revision chain. It opens the lazy AI Assistant panel while offline, checking SDK
+schema initialization and React error-boundary failures without API credentials
+or generation requests. It then inserts a blank page, undoes/redoes it, imports the
 four-page donor and saves again.
 It reopens the download with the native SDK (eight pages, three fields), checks for
 visible broken images and, for PDFium, verifies one live worker followed by zero

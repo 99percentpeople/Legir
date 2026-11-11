@@ -102,6 +102,9 @@ export default defineConfig(({ mode, command }) => {
       sourcemap: !!process.env.TAURI_ENV_DEBUG,
       rolldownOptions: {
         output: {
+          // Explicit chunks can import shared dependencies back from a consumer.
+          // Initialize those modules before AI SDK schemas call Zod constructors.
+          strictExecutionOrder: true,
           codeSplitting: {
             // Shared startup dependencies must stay out of optional provider chunks.
             includeDependenciesRecursively: false,

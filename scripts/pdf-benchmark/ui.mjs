@@ -55,7 +55,12 @@ try {
     }),
   );
   page.on("console", (m) => {
-    if (m.type() === "error") console.log("console", m.text());
+    if (m.type() === "error") {
+      console.log("console", m.text());
+      // React error boundaries can catch lazy-import failures without pageerror.
+      if (m.text().startsWith("Application render error"))
+        errors.push(m.text());
+    }
   });
   await page.addInitScript(() => {
     delete window.showSaveFilePicker;
@@ -163,6 +168,17 @@ try {
     throw new Error(
       "Repeated UI save accumulated a revision instead of reusing the original base",
     );
+  // Loading the editor alone does not evaluate the AI SDK's schema modules.
+  // Open the lazy panel offline to exercise their production initialization order.
+  await page.getByRole("button", { name: "AI Assistant", exact: true }).click();
+  await page
+    .getByPlaceholder(
+      "Ask the AI to read, search, jump, or highlight PDF content...",
+    )
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Document Info", exact: true })
+    .click();
   await page.getByRole("button", { name: "Select Mode", exact: true }).click();
   await page
     .getByRole("menuitemradio", { name: "Page mode", exact: true })
