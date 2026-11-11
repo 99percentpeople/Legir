@@ -3,6 +3,7 @@ import { PDFButton, PDFSignature } from "@legir/pdfium/authoring";
 import {
   updateButtonWidget,
   applyFieldMetadata,
+  applyFieldFlags,
   applyFieldWidgetStyle,
 } from "./button-field.js";
 import {
@@ -525,6 +526,35 @@ export const updateExistingSourceField = async (
     );
   };
   const existingTypeName = existingField.constructor.name;
+  applyFieldFlags(existingField, field);
+  if (field.style) {
+    const source =
+      field.sourcePdfRef &&
+      form.doc.context.lookup(
+        PDFRef.of(
+          field.sourcePdfRef.objectNumber,
+          field.sourcePdfRef.generationNumber,
+        ),
+      );
+    const widgets =
+      source instanceof PDFDict &&
+      pdfObjToString(source.lookup(PDFName.of("Subtype"))) === "Widget"
+        ? [PDFWidgetAnnotation.fromDict(source)]
+        : existingField.acroField.getWidgets();
+    const font =
+      field.type === FieldType.TEXT || field.type === FieldType.DROPDOWN
+        ? (pickControlValueFont(field, form, fontMap) ?? form.getDefaultFont())
+        : undefined;
+    for (const widget of widgets) {
+      applyFieldWidgetStyle(
+        widget,
+        field,
+        existingField,
+        options?.viewport,
+        font,
+      );
+    }
+  }
 
   try {
     if (field.type === FieldType.TEXT) {

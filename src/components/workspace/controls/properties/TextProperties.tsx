@@ -1,3 +1,4 @@
+import { HorizontalAlignmentProperty } from "./HorizontalAlignmentProperty";
 import { VerticalAlignmentProperty } from "./VerticalAlignmentProperty";
 import React from "react";
 import { FormField } from "@/types";
@@ -8,15 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { NumberInput } from "@/components/ui/number-input";
 import { Separator } from "@/components/ui/separator";
-import {
-  Database,
-  MousePointer2,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-} from "lucide-react";
+import { Database, MousePointer2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { cn } from "@/utils/cn";
 
 export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,
@@ -162,53 +156,13 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>{t("properties.alignment")}</Label>
-            <div className="bg-muted border-input flex rounded-md border p-1">
-              <button
-                onClick={() => {
-                  onTriggerHistorySave();
-                  onChange({ horizontalAlignment: "left" });
-                }}
-                className={cn(
-                  "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                  (data.horizontalAlignment || "left") === "left" &&
-                    "bg-background text-foreground shadow-sm",
-                )}
-                title={t("properties.alignment_options.left")}
-              >
-                <AlignLeft size={16} />
-              </button>
-              <button
-                onClick={() => {
-                  onTriggerHistorySave();
-                  onChange({ horizontalAlignment: "center" });
-                }}
-                className={cn(
-                  "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                  data.horizontalAlignment === "center" &&
-                    "bg-background text-foreground shadow-sm",
-                )}
-                title={t("properties.alignment_options.center")}
-              >
-                <AlignCenter size={16} />
-              </button>
-              <button
-                onClick={() => {
-                  onTriggerHistorySave();
-                  onChange({ horizontalAlignment: "right" });
-                }}
-                className={cn(
-                  "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                  data.horizontalAlignment === "right" &&
-                    "bg-background text-foreground shadow-sm",
-                )}
-                title={t("properties.alignment_options.right")}
-              >
-                <AlignRight size={16} />
-              </button>
-            </div>
-          </div>
+          <HorizontalAlignmentProperty
+            value={data.horizontalAlignment ?? "left"}
+            onChange={(horizontalAlignment) => {
+              onTriggerHistorySave();
+              onChange({ horizontalAlignment });
+            }}
+          />
           <VerticalAlignmentProperty
             value={
               data.verticalAlignment ?? (data.multiline ? "top" : "middle")

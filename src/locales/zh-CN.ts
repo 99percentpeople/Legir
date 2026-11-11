@@ -197,6 +197,9 @@ const zhCN = {
     },
   },
   properties: {
+    text_style: "文字样式",
+    mixed_values: "混合",
+    batch_edit_hint: "修改将应用于所有选中对象。“混合”表示当前属性值不同。",
     multi_selected: "已选择 {count} 个对象",
     multi_selection_hint:
       "拖动可整体移动，Ctrl/Cmd+C 复制选区，Delete 删除选区。选择单个对象可编辑其属性。",
@@ -279,6 +282,16 @@ const zhCN = {
         "已开启段落模式，请先点击“预览段落”提取候选。",
     },
     document: {
+      placeholders: {
+        filename: "文档.pdf",
+        title: "输入文档标题",
+        author: "输入作者姓名",
+        subject: "简要描述文档内容",
+        keywords: "输入关键词，按回车添加",
+        creator: "例如：Microsoft Word",
+        producer: "例如：Legir",
+        producer_auto: "导出时自动设为 Legir",
+      },
       title: "文档信息",
       hint: "编辑全局 PDF 信息。在画布上选择一个字段以编辑其属性。",
     },

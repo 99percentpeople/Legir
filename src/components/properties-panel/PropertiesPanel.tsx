@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/components/language-provider";
 import { FormField, Annotation, PDFMetadata } from "@/types";
 import { DocumentPropertiesPanel } from "./DocumentPropertiesPanel";
+import { BatchControlProperties } from "./BatchControlProperties";
 import { ControlPropertiesPanel } from "./ControlPropertiesPanel";
 import { useEditorView } from "@/store/useEditorView";
 import { useShallow } from "zustand/react/shallow";
@@ -107,9 +108,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
             </Button>
           }
         >
-          <p className="text-muted-foreground p-4 text-sm">
-            {t("properties.multi_selection_hint")}
-          </p>
+          <BatchControlProperties />
         </PanelLayout>
       );
     }

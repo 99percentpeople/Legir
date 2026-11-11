@@ -1,3 +1,4 @@
+import { applyFieldFlags } from "../lib/button-field.js";
 import { isListBoxField } from "@legir/pdf-model/choiceFields";
 import {
   PDFForm,
@@ -46,6 +47,8 @@ export class TextControlExporter implements IControlExporter {
       () => form.createTextField(field.name),
       options?.context,
     );
+
+    applyFieldFlags(tf, field);
 
     tf.addToPage(page, { ...commonOpts, font: fieldFont });
     applyWidgetExportRotation(
@@ -124,6 +127,8 @@ export class CheckboxControlExporter implements IControlExporter {
       options?.context,
     );
 
+    applyFieldFlags(cb, field);
+
     cb.addToPage(page, commonOpts);
     applyWidgetExportRotation(
       cb.acroField.getWidgets().at(-1),
@@ -177,6 +182,8 @@ export class DropdownControlExporter implements IControlExporter {
         options?.context,
       );
 
+      applyFieldFlags(ol, field);
+
       ol.addToPage(page, { ...commonOpts, font: fieldFont });
       applyWidgetExportRotation(
         ol.acroField.getWidgets().at(-1),
@@ -224,6 +231,8 @@ export class DropdownControlExporter implements IControlExporter {
         () => form.createDropdown(field.name),
         options?.context,
       );
+
+      applyFieldFlags(dd, field);
 
       dd.addToPage(page, { ...commonOpts, font: fieldFont });
       applyWidgetExportRotation(
@@ -284,6 +293,7 @@ export class RadioControlExporter implements IControlExporter {
       () => form.getRadioGroup(field.name),
       () => {
         const group = form.createRadioGroup(field.name);
+
         if (field.toolTip) {
           group.acroField.dict.set(
             PDFName.of("TU"),
@@ -295,6 +305,7 @@ export class RadioControlExporter implements IControlExporter {
       options?.context,
     );
 
+    applyFieldFlags(rg, field);
     const val = field.radioValue || field.exportValue || `Choice_${field.id}`;
     rg.addOptionToPage(val, page, commonOpts);
     applyWidgetExportRotation(

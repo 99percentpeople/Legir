@@ -6,7 +6,9 @@ import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
 import type { ColorPaletteType } from "@/lib/colorPalette";
 
 interface ColorPropertyInputProps {
+  id?: string;
   color: string;
+  mixedLabel?: string;
   opacity?: number;
   title: string;
   paletteType?: ColorPaletteType;
@@ -18,7 +20,9 @@ interface ColorPropertyInputProps {
 }
 
 export const ColorPropertyInput: React.FC<ColorPropertyInputProps> = ({
+  id,
   color,
+  mixedLabel,
   opacity,
   title,
   paletteType = "foreground",
@@ -48,6 +52,8 @@ export const ColorPropertyInput: React.FC<ColorPropertyInputProps> = ({
       title={title}
     >
       <Button
+        id={id}
+        aria-label={title}
         type="button"
         variant="outline"
         className="w-full justify-between px-3"
@@ -56,9 +62,11 @@ export const ColorPropertyInput: React.FC<ColorPropertyInputProps> = ({
         <span className="flex min-w-0 items-center gap-2">
           <span
             className="h-4 w-4 rounded-full border border-black/10 shadow-sm"
-            style={{ backgroundColor: color }}
+            style={{ backgroundColor: mixedLabel ? undefined : color }}
           />
-          <span className="truncate font-mono text-xs uppercase">{color}</span>
+          <span className="truncate font-mono text-xs uppercase">
+            {mixedLabel ?? color}
+          </span>
         </span>
         {shouldShowOpacity ? (
           <span className="text-muted-foreground text-xs">

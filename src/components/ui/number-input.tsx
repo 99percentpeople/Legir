@@ -13,12 +13,14 @@ import { cn } from "../../utils/cn";
 export interface NumberInputProps extends Omit<NumberFieldProps, "onChange"> {
   className?: string;
   label?: string;
+  placeholder?: string;
   onChange?: (value: number) => void;
 }
 
 export function NumberInput({
   className,
   label,
+  placeholder,
   onChange,
   ...props
 }: NumberInputProps) {
@@ -35,7 +37,10 @@ export function NumberInput({
         </Label>
       )}
       <Group className="border-input data-focus-within:border-ring data-focus-within:ring-ring/50 data-focus-within:has-aria-invalid:border-destructive data-focus-within:has-aria-invalid:ring-destructive/20 dark:data-focus-within:has-aria-invalid:ring-destructive/40 bg-background relative inline-flex h-9 w-full items-center overflow-hidden rounded-md border text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none data-disabled:opacity-50 data-focus-within:ring-[3px]">
-        <Input className="text-foreground min-w-0 flex-1 bg-transparent px-3 py-2 tabular-nums outline-none" />
+        <Input
+          placeholder={placeholder}
+          className="text-foreground min-w-0 flex-1 bg-transparent px-3 py-2 tabular-nums outline-none"
+        />
         <div className="border-input flex h-full w-6 shrink-0 flex-col border-l">
           <Button
             slot="increment"

@@ -146,6 +146,10 @@ const ja = {
     },
   },
   properties: {
+    text_style: "文字スタイル",
+    mixed_values: "混在",
+    batch_edit_hint:
+      "変更は選択したすべてのオブジェクトに適用されます。「混在」は現在の値が異なることを示します。",
     multi_selected: "{count} 個のオブジェクトを選択",
     multi_selection_hint:
       "ドラッグでまとめて移動、Ctrl/Cmd+C でコピー、Delete で削除できます。プロパティを編集するには、1 つのオブジェクトを選択してください。",
@@ -204,6 +208,16 @@ const ja = {
         "段落モードが有効です。候補を抽出するには「段落をプレビュー」をクリックしてください。",
     },
     document: {
+      placeholders: {
+        filename: "文書.pdf",
+        title: "文書のタイトルを入力",
+        author: "作成者名を入力",
+        subject: "文書の内容を簡潔に説明",
+        keywords: "キーワードを入力し、Enter キーで追加",
+        creator: "例：Microsoft Word",
+        producer: "例：Legir",
+        producer_auto: "エクスポート時に Legir を設定",
+      },
       title: "ドキュメント情報",
       hint: "PDF 全体の情報を編集します。キャンバス上のフィールドを選択して設定を変更します。",
     },

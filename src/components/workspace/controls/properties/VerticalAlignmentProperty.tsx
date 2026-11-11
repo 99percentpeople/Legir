@@ -12,13 +12,18 @@ export function VerticalAlignmentProperty({
   value,
   onChange,
 }: {
-  value: VerticalAlignment;
+  value: VerticalAlignment | undefined;
   onChange: (value: VerticalAlignment) => void;
 }) {
   const { t } = useLanguage();
   return (
     <div className="space-y-2">
       <Label>{t("properties.vertical_alignment")}</Label>
+      {value === undefined && (
+        <span className="text-muted-foreground block text-xs">
+          {t("properties.mixed_values")}
+        </span>
+      )}
       <div
         role="group"
         aria-label={t("properties.vertical_alignment")}

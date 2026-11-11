@@ -1,3 +1,10 @@
+import { getFieldUpdate, getAnnotationUpdate } from "../controlUpdates";
+import {
+  CONTROL_PROPERTIES,
+  getControlPropertyPatch,
+  isFormControl,
+  isValidControlPropertyValue,
+} from "@/lib/controlProperties";
 import {
   duplicateFieldForDrag,
   duplicateAnnotationForDrag,
@@ -52,6 +59,7 @@ export const createControlSlice: EditorStoreSlice<
     | "addAnnotation"
     | "addAnnotations"
     | "updateField"
+    | "updateSelectedControlProperty"
     | "resetFieldToDefault"
     | "updateAnnotation"
     | "addAnnotationReply"
@@ -358,78 +366,77 @@ export const createControlSlice: EditorStoreSlice<
       throwFormFieldPermissionDenied(updates);
     }
 
-    set((state) => {
-      let nextFields = state.fields;
-      const targetField = state.fields.find((field) => field.id === id);
+    set((state) => getFieldUpdate(state, id, updates));
+  },
 
-      if (!targetField) return state;
-
-      if (updates.isChecked === true && targetField.type === FieldType.RADIO) {
-        nextFields = nextFields.map((field) =>
-          field.name === targetField.name &&
-          field.id !== id &&
-          field.type === FieldType.RADIO
-            ? { ...field, isChecked: false }
-            : field,
-        );
-      }
-
-      const propsToSync = [
-        "value",
-        "defaultValue",
-        "placeholder",
-        "options",
-        "required",
-        "readOnly",
-        "toolTip",
-        "multiline",
-        "maxLength",
-        "horizontalAlignment",
-        "verticalAlignment",
-      ];
-
-      if (targetField.type !== FieldType.RADIO) {
-        propsToSync.push("isChecked");
-        propsToSync.push("isDefaultChecked");
-      }
-
-      const syncUpdates: Partial<FormField> = {};
-      propsToSync.forEach((key) => {
-        const typedKey = key as keyof FormField;
-        if (
-          updates[typedKey] !== undefined ||
-          ((typedKey === "horizontalAlignment" ||
-            typedKey === "verticalAlignment") &&
-            Object.prototype.hasOwnProperty.call(updates, typedKey))
-        ) {
-          // @ts-expect-error index signature mismatch for dynamic keyof assignment
-          syncUpdates[typedKey] = updates[typedKey];
-        }
-      });
-
-      if (Object.keys(syncUpdates).length > 0) {
-        nextFields = nextFields.map((field) =>
-          field.name === targetField.name &&
-          field.id !== id &&
-          field.type === targetField.type
-            ? { ...field, ...syncUpdates }
-            : field,
-        );
-      }
-
-      nextFields = nextFields.map((field) =>
-        field.id === id ? { ...field, ...updates } : field,
+  updateSelectedControlProperty: (key, value, checkpoint = true) => {
+    const state = get();
+    if (state.documentLoadState !== "ready") return false;
+    const ids = new Set(state.selectedControlIds);
+    const controls = [...state.fields, ...state.annotations].filter((c) =>
+      ids.has(c.id),
+    );
+    const property = CONTROL_PROPERTIES.find((p) => p.key === key);
+    if (
+      !controls.length ||
+      !property ||
+      !controls.every(property.supports) ||
+      !isValidControlPropertyValue(property, value)
+    )
+      return false;
+    if (
+      controls.some(
+        (c) =>
+          isFormControl(c) &&
+          c.type === FieldType.SIGNATURE &&
+          c.signature?.present,
+      )
+    )
+      return false;
+    for (const control of controls) {
+      assertPdfPermissionOperation(
+        isFormControl(control) ? "edit_form_structure" : "edit_annotation",
+        state.documentPermissions,
       );
-
-      return {
-        fields: nextFields,
-        isDirty: true,
-        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-          state.dirtyPermissionScopes,
-          getFormFieldUpdateDirtyScopes(state.documentPermissions, updates),
-        ),
+    }
+    // Build the complete result before publishing, using the same field-linking,
+    // imported-font and annotation-appearance rules as single-control editing.
+    let next = state;
+    for (const selected of controls) {
+      const control = isFormControl(selected)
+        ? next.fields.find((c) => c.id === selected.id)!
+        : next.annotations.find((c) => c.id === selected.id)!;
+      if (
+        Object.is(property.read(control), value) &&
+        !(
+          key === "backgroundColor" &&
+          (isFormControl(control)
+            ? control.style?.isTransparent
+            : !control.backgroundColor)
+        )
+      )
+        continue;
+      const patch = getControlPropertyPatch(control, key, value);
+      next = {
+        ...next,
+        ...(isFormControl(control)
+          ? getFieldUpdate(next, control.id, patch as Partial<FormField>)
+          : getAnnotationUpdate(
+              next,
+              control.id,
+              patch as Partial<Annotation>,
+            )),
       };
+    }
+    if (next === state) return false;
+    if (checkpoint) state.saveCheckpoint();
+    set({
+      fields: next.fields,
+      annotations: next.annotations,
+      isDirty: true,
+      dirtyPermissionScopes: next.dirtyPermissionScopes,
     });
+    return true;
   },
 
   resetFieldToDefault: (id) => {
@@ -566,57 +573,7 @@ export const createControlSlice: EditorStoreSlice<
 
   updateAnnotation: (id, updates) => {
     assertPdfPermissionOperation("edit_annotation", get().documentPermissions);
-    set((state) => {
-      const current = state.annotations.find(
-        (annotation) => annotation.id === id,
-      );
-      const nextAuthor = updates.author ?? state.options.userName;
-
-      const shouldMarkEdited =
-        !!current?.sourcePdfRef && current.isEdited !== true;
-      const shouldResetFontOnFirstEdit =
-        shouldMarkEdited &&
-        !!current?.sourcePdfFontMissing &&
-        updates.fontFamily === undefined;
-
-      const updatesWithTime = {
-        ...updates,
-        author: nextAuthor,
-        updatedAt: new Date().toISOString(),
-        ...(shouldMarkEdited ? { isEdited: true } : null),
-        ...(shouldResetFontOnFirstEdit ? { fontFamily: "Helvetica" } : null),
-      };
-      const shouldRecomputeInkRect =
-        current?.type === "ink" &&
-        (updates.thickness !== undefined ||
-          updates.strokes !== undefined ||
-          updates.points !== undefined ||
-          current.rect === undefined);
-      const shouldRecomputeInkPath =
-        current?.type === "ink" &&
-        (updates.strokes !== undefined ||
-          updates.points !== undefined ||
-          !current.svgPath);
-
-      return {
-        annotations: state.annotations.map((annotation) =>
-          annotation.id === id
-            ? prepareInkAnnotationForStore(
-                { ...annotation, ...updatesWithTime },
-                {
-                  recomputeRect: shouldRecomputeInkRect,
-                  recomputeSvgPath: shouldRecomputeInkPath,
-                },
-              )
-            : annotation,
-        ),
-        isDirty: true,
-        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-          state.dirtyPermissionScopes,
-          { modifyAnnotations: true },
-        ),
-      };
-    });
+    set((state) => getAnnotationUpdate(state, id, updates));
   },
 
   addAnnotationReply: (annotationId, reply) => {

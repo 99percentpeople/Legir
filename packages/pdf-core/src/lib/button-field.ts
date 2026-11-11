@@ -46,6 +46,10 @@ export function applyFieldMetadata(native: PDFField, field: FormField) {
       PDFHexString.fromText(field.toolTip),
     );
   else native.acroField.dict.delete(PDFName.of("TU"));
+  applyFieldFlags(native, field);
+}
+
+export function applyFieldFlags(native: PDFField, field: FormField) {
   if (field.readOnly) native.enableReadOnly();
   else native.disableReadOnly();
   if (field.required) native.enableRequired();
@@ -56,6 +60,7 @@ export function applyFieldWidgetStyle(
   field: FormField,
   native: PDFField,
   viewport?: ViewportLike,
+  font?: PDFFont,
 ) {
   const page = native.doc.getPage(field.pageIndex);
   const opts = getCommonControlExportOpts(field, page, viewport);
@@ -83,7 +88,11 @@ export function applyFieldWidgetStyle(
           : "S",
     ),
   );
-  if (opts.textColor)
+  if (font) {
+    const appearance = `/${font.name} ${field.style?.fontSize || 12} Tf ${opts.textColor ? setFillingColor(opts.textColor) : "0 g"}`;
+    native.acroField.setDefaultAppearance(appearance);
+    widget.setDefaultAppearance(appearance);
+  } else if (opts.textColor)
     widget.setDefaultAppearance(setFillingColor(opts.textColor).toString());
 }
 export async function updateButtonWidget(

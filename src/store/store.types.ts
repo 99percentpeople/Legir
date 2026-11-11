@@ -1,3 +1,7 @@
+import type {
+  ControlPropertyKey,
+  ControlPropertyValue,
+} from "@/lib/controlProperties/types";
 import type { StateCreator } from "zustand";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type {
@@ -152,6 +156,11 @@ export interface EditorActions {
     options?: { preserveOwnerRestrictionsOnSave?: boolean },
   ) => Promise<PdfOwnerUnlockResult>;
   addField: (field: FormField) => void;
+  updateSelectedControlProperty: (
+    key: ControlPropertyKey,
+    value: ControlPropertyValue,
+    checkpoint?: boolean,
+  ) => boolean;
   updateField: (id: string, updates: Partial<FormField>) => void;
   resetFieldToDefault: (id: string) => void;
   moveSelectedControl: (

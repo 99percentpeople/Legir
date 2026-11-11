@@ -197,6 +197,9 @@ const zhTW = {
     },
   },
   properties: {
+    text_style: "文字樣式",
+    mixed_values: "混合",
+    batch_edit_hint: "修改將套用至所有選取物件。「混合」表示目前屬性值不同。",
     multi_selected: "已選取 {count} 個物件",
     multi_selection_hint:
       "拖動可整體移動，Ctrl/Cmd+C 複製選取項目，Delete 刪除選取項目。選取單一物件可編輯其屬性。",
@@ -279,6 +282,16 @@ const zhTW = {
         "已開啟段落模式，請先點擊「預覽段落」以擷取候選。",
     },
     document: {
+      placeholders: {
+        filename: "文件.pdf",
+        title: "輸入文件標題",
+        author: "輸入作者姓名",
+        subject: "簡要描述文件內容",
+        keywords: "輸入關鍵字，按 Enter 新增",
+        creator: "例如：Microsoft Word",
+        producer: "例如：Legir",
+        producer_auto: "匯出時自動設為 Legir",
+      },
       title: "文件資訊",
       hint: "編輯全域 PDF 資訊。在畫布上選擇一個欄位以編輯其屬性。",
     },

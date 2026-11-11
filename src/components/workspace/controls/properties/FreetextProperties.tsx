@@ -1,9 +1,10 @@
+import { HorizontalAlignmentProperty } from "./HorizontalAlignmentProperty";
 import { VerticalAlignmentProperty } from "./VerticalAlignmentProperty";
 import React from "react";
 import { Annotation } from "@/types";
 import { PropertyPanelProps } from "./types";
 import { Label } from "@/components/ui/label";
-import { AlignCenter, AlignLeft, AlignRight, Palette } from "lucide-react";
+import { Palette } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -20,7 +21,6 @@ import { getSystemFontFamilies } from "@/lib/system-fonts";
 import { resolveFontStackForDisplay } from "@legir/pdf-model/fonts";
 import { ColorPropertyInput } from "./ColorPropertyInput";
 import { getFreeTextPadding } from "@legir/pdf-core/lib/freeTextLayout";
-import { cn } from "@/utils/cn";
 
 export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   data,
@@ -264,46 +264,13 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>{t("properties.alignment")}</Label>
-            <div
-              role="group"
-              aria-label={t("properties.alignment")}
-              className="bg-muted border-input flex rounded-md border p-1"
-            >
-              {(
-                [
-                  ["left", AlignLeft],
-                  ["center", AlignCenter],
-                  ["right", AlignRight],
-                ] as const
-              ).map(([alignment, Icon]) => (
-                <button
-                  key={alignment}
-                  type="button"
-                  onClick={() => {
-                    if ((data.horizontalAlignment || "left") === alignment)
-                      return;
-                    onTriggerHistorySave();
-                    onChange({ horizontalAlignment: alignment });
-                  }}
-                  className={cn(
-                    "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                    (data.horizontalAlignment || "left") === alignment &&
-                      "bg-background text-foreground shadow-sm",
-                  )}
-                  title={t(`properties.alignment_options.${alignment}`)}
-                  aria-label={t(`properties.alignment_options.${alignment}`)}
-                  aria-pressed={
-                    (data.horizontalAlignment || "left") === alignment
-                  }
-                >
-                  <Icon size={16} />
-                </button>
-              ))}
-            </div>
-          </div>
-
+          <HorizontalAlignmentProperty
+            value={data.horizontalAlignment ?? "left"}
+            onChange={(horizontalAlignment) => {
+              onTriggerHistorySave();
+              onChange({ horizontalAlignment });
+            }}
+          />
           <VerticalAlignmentProperty
             value={data.verticalAlignment ?? "top"}
             onChange={(verticalAlignment) => {

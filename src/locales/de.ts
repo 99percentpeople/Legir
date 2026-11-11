@@ -148,6 +148,10 @@ const de = {
     },
   },
   properties: {
+    text_style: "Textstil",
+    mixed_values: "Gemischt",
+    batch_edit_hint:
+      "Änderungen gelten für alle ausgewählten Objekte. „Gemischt“ bedeutet, dass die aktuellen Werte unterschiedlich sind.",
     multi_selected: "{count} Objekte ausgewählt",
     multi_selection_hint:
       "Zum gemeinsamen Verschieben ziehen. Strg/Cmd+C kopiert die Auswahl, Entf löscht sie. Ein einzelnes Objekt auswählen, um seine Eigenschaften zu bearbeiten.",
@@ -208,6 +212,16 @@ const de = {
         "Absatzmodus ist aktiviert. Klicke auf „Absätze vorschauen“, um Kandidaten zu extrahieren.",
     },
     document: {
+      placeholders: {
+        filename: "Dokument.pdf",
+        title: "Dokumenttitel eingeben",
+        author: "Name des Autors eingeben",
+        subject: "Den Dokumentinhalt kurz beschreiben",
+        keywords: "Stichwort eingeben, mit Enter hinzufügen",
+        creator: "z. B. Microsoft Word",
+        producer: "z. B. Legir",
+        producer_auto: "Beim Export auf Legir gesetzt",
+      },
       title: "Dokumentinfos",
       hint: "Bearbeite globale PDF-Informationen. Wähle ein Feld auf der Leinwand aus, um dessen Eigenschaften zu bearbeiten.",
     },

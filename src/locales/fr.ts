@@ -148,6 +148,10 @@ const fr = {
     },
   },
   properties: {
+    text_style: "Style du texte",
+    mixed_values: "Mixte",
+    batch_edit_hint:
+      "Les modifications s’appliquent à tous les objets sélectionnés. « Mixte » indique des valeurs différentes.",
     multi_selected: "{count} objets sélectionnés",
     multi_selection_hint:
       "Faites glisser pour déplacer ensemble. Ctrl/Cmd+C copie la sélection, Suppr la supprime. Sélectionnez un seul objet pour modifier ses propriétés.",
@@ -209,6 +213,16 @@ const fr = {
         "Le mode paragraphes est activé. Cliquez sur « Prévisualiser les paragraphes » pour extraire des candidats.",
     },
     document: {
+      placeholders: {
+        filename: "document.pdf",
+        title: "Saisir le titre du document",
+        author: "Saisir le nom de l’auteur",
+        subject: "Décrire brièvement le contenu du document",
+        keywords: "Saisir un mot-clé, puis appuyer sur Entrée",
+        creator: "Ex. : Microsoft Word",
+        producer: "Ex. : Legir",
+        producer_auto: "Défini sur Legir à l’exportation",
+      },
       title: "Infos du document",
       hint: "Modifiez les informations globales du PDF. Sélectionnez un champ sur le canevas pour modifier ses propriétés.",
     },

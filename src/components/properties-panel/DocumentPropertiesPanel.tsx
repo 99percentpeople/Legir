@@ -123,7 +123,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onFilenameChange(e.target.value)}
-              placeholder="document.pdf"
+              placeholder={t("properties.document.placeholders.filename")}
             />
             <p className="text-muted-foreground text-xs">
               {t("properties.filename.desc")}
@@ -224,7 +224,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ title: e.target.value })}
-              placeholder="Untitled Document"
+              placeholder={t("properties.document.placeholders.title")}
             />
           </div>
 
@@ -233,6 +233,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Input
               type="text"
               value={metadata.author || ""}
+              placeholder={t("properties.document.placeholders.author")}
               disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ author: e.target.value })}
@@ -244,6 +245,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Textarea
               rows={2}
               value={metadata.subject || ""}
+              placeholder={t("properties.document.placeholders.subject")}
               disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ subject: e.target.value })}
@@ -266,6 +268,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Input
               type="text"
               value={metadata.creator || ""}
+              placeholder={t("properties.document.placeholders.creator")}
               disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ creator: e.target.value })}
@@ -294,6 +297,11 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               <Input
                 type="text"
                 value={metadata.producer || ""}
+                placeholder={t(
+                  metadata.isProducerManual
+                    ? "properties.document.placeholders.producer"
+                    : "properties.document.placeholders.producer_auto",
+                )}
                 disabled={!canModifyContents || !metadata.isProducerManual}
                 onFocus={onTriggerHistorySave}
                 onChange={(e) => onMetadataChange({ producer: e.target.value })}
@@ -578,6 +586,7 @@ function KeywordsInput({
   onTriggerHistorySave,
   disabled = false,
 }: KeywordsInputProps) {
+  const { t } = useLanguage();
   const id = React.useId();
   const [activeTagIndex, setActiveTagIndex] = useState<number | null>(null);
 
@@ -611,7 +620,7 @@ function KeywordsInput({
   return (
     <TagInput
       id={id}
-      placeholder="(e.g. invoice)"
+      placeholder={t("properties.document.placeholders.keywords")}
       tags={tags}
       setTags={handleSetTags}
       activeTagIndex={activeTagIndex}

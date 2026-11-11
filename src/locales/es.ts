@@ -148,6 +148,10 @@ const es = {
     },
   },
   properties: {
+    text_style: "Estilo de texto",
+    mixed_values: "Mixto",
+    batch_edit_hint:
+      "Los cambios se aplican a todos los objetos seleccionados. «Mixto» indica valores diferentes.",
     multi_selected: "{count} objetos seleccionados",
     multi_selection_hint:
       "Arrastra para moverlos juntos. Ctrl/Cmd+C copia la selección y Supr la elimina. Selecciona un solo objeto para editar sus propiedades.",
@@ -207,6 +211,16 @@ const es = {
         "El modo de párrafos está habilitado. Haz clic en “Previsualizar párrafos” para extraer candidatos.",
     },
     document: {
+      placeholders: {
+        filename: "documento.pdf",
+        title: "Introduce el título del documento",
+        author: "Introduce el nombre del autor",
+        subject: "Describe brevemente el contenido del documento",
+        keywords: "Escribe una palabra clave y pulsa Intro",
+        creator: "Ej.: Microsoft Word",
+        producer: "Ej.: Legir",
+        producer_auto: "Se establece en Legir al exportar",
+      },
       title: "Información del documento",
       hint: "Editar información global del PDF. Seleccione un campo en el lienzo para editar sus propiedades.",
     },

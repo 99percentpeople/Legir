@@ -201,6 +201,10 @@ const en = {
     },
   },
   properties: {
+    text_style: "Text style",
+    mixed_values: "Mixed",
+    batch_edit_hint:
+      "Changes apply to all selected objects. Mixed means the current values differ.",
     multi_selected: "{count} objects selected",
     multi_selection_hint:
       "Drag to move together. Use Ctrl/Cmd+C to copy, or Delete to remove the selection. Select one object to edit its properties.",
@@ -287,6 +291,16 @@ const en = {
         "Paragraph mode is enabled. Click “Preview paragraphs” to extract candidates.",
     },
     document: {
+      placeholders: {
+        filename: "document.pdf",
+        title: "Enter document title",
+        author: "Enter author name",
+        subject: "Briefly describe the document",
+        keywords: "Type a keyword and press Enter",
+        creator: "e.g. Microsoft Word",
+        producer: "e.g. Legir",
+        producer_auto: "Set to Legir on export",
+      },
       title: "Document Info",
       hint: "Edit global PDF information. Select a field on the canvas to edit its properties.",
     },
