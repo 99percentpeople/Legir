@@ -35,7 +35,12 @@ concurrency:
 
 jobs:
   build:
+    name: build (${{ matrix.dependencies }})
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: [clean, cached-isolated]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
@@ -44,7 +49,26 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.2"
-      # Shared src/ imports need hoisted resolution, but only www's dependency
-      # graph is installed. No app install or generated PDF engine is available.
-      - run: bun install --frozen-lockfile --filter '!./' --filter legir-www --linker hoisted --ignore-scripts
+      - name: Seed the previous isolated Markdown dependencies
+        if: matrix.dependencies == 'cached-isolated'
+        run: |
+          mkdir -p "$RUNNER_TEMP/www-old-deps"
+          cat > "$RUNNER_TEMP/www-old-deps/package.json" <<'JSON'
+          {
+            "private": true,
+            "dependencies": {
+              "micromark": "4.0.2",
+              "micromark-extension-gfm": "3.0.0"
+            },
+            "overrides": { "micromark-util-types": "2.0.2" }
+          }
+          JSON
+          bun install --cwd "$RUNNER_TEMP/www-old-deps" --linker isolated --ignore-scripts
+          mv "$RUNNER_TEMP/www-old-deps/node_modules" node_modules
+      # Exercise the exact Vercel install command, including repair of links
+      # restored from an older isolated node_modules cache.
+      - name: Install website dependencies
+        working-directory: www
+        run: |
+          node -e "require('node:child_process').execSync(require('./vercel.json').installCommand, { stdio: 'inherit' })"
       - run: bun run build:www
