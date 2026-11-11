@@ -91,7 +91,7 @@
     },
     "packages/pdf-core": {
       "name": "@legir/pdf-core",
-      "version": "0.2.1",
+      "version": "0.3.1",
       "dependencies": {
         "@legir/pdf-model": "workspace:*",
         "@legir/pdfium": "workspace:*",
@@ -104,7 +104,7 @@
     },
     "packages/pdf-model": {
       "name": "@legir/pdf-model",
-      "version": "0.2.1",
+      "version": "0.3.1",
       "devDependencies": {
         "@types/node": "^26.6.6",
         "typescript": "~6.0.3",
@@ -112,7 +112,7 @@
     },
     "packages/pdf-renderer": {
       "name": "@legir/pdf-renderer",
-      "version": "0.2.1",
+      "version": "0.3.1",
       "dependencies": {
         "@legir/pdf-core": "workspace:*",
         "@legir/pdf-model": "workspace:*",
@@ -125,7 +125,7 @@
     },
     "packages/pdfium": {
       "name": "@legir/pdfium",
-      "version": "0.2.1",
+      "version": "0.3.1",
       "dependencies": {
         "@xmldom/xmldom": "^0.9.12",
         "fast-png": "^8.0.0",

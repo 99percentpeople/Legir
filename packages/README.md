@@ -40,6 +40,24 @@ To check local tarballs against npm without publishing, run:
 node scripts/publish-npm-libraries.mjs /path/to/release-assets --check
 ```
 
+## Upgrading from 0.2.x to 0.3.1
+
+Upgrade all four libraries together. This release changes the public text
+alignment API:
+
+- Replace model `alignment` with `horizontalAlignment` (`left`, `center`, `right`).
+- Use `verticalAlignment` (`top`, `middle`, `bottom`) for text fields and FreeText
+  annotations. Vertical centering is `middle`; the older aliases are not accepted.
+- Replace numeric authoring `setAlignment` / `getAlignment` with string-based
+  `setHorizontalAlignment` / `getHorizontalAlignment`. Use `fromPdfTextAlignment`
+  and `toPdfTextAlignment` at boundaries that still require PDF numeric codes.
+- Choice fields expose `isListBox` independently of `isMultiSelect`, preserving
+  single-select list boxes during import and export.
+
+See each package's README for layout defaults and the `/LegirVAlign` extension.
+The native PDFium WASM revision is unchanged. Version `0.3.0` was already used by
+an earlier repository tag, so this npm release uses `0.3.1`.
+
 | Package               | Owns                                                                                                       | Does not own                                                              |
 | --------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `@legir/pdf-model`    | Document/field/annotation contracts, coordinates, geometry, stamp data and editing policies                | React, AI settings, Tauri, persistence, WASM                              |
