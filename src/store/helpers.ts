@@ -312,6 +312,7 @@ export const initialState: EditorState = {
   ...DEFAULT_EDITOR_UI_STATE,
   isFullscreen: false,
   isDirty: false,
+  savedDocumentRevision: null,
   currentPageIndex: 0,
   pendingViewStateRestore: null,
   fitTrigger: 0,

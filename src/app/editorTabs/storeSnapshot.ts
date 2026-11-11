@@ -121,6 +121,7 @@ export const createEditorTabSnapshotFromState = (options: {
     lastSavedAt: state.lastSavedAt ? new Date(state.lastSavedAt) : null,
 
     isDirty: state.isDirty,
+    savedDocumentRevision: state.savedDocumentRevision,
     currentPageIndex: state.currentPageIndex,
     pendingViewStateRestore: createPendingViewStateSnapshot(
       state,

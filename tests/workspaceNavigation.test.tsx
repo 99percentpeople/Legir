@@ -25,6 +25,17 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { HomePageProps } from "@/pages/HomePage";
 import { createTestEditorStore, page } from "./helpers/editorStore";
 
+// dnd-kit creates its shared observer when the module loads.
+vi.hoisted(() => {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  document.getAnimations = () => [];
+  Element.prototype.getAnimations = () => [];
+});
+
 const probes = vi.hoisted(() => ({ mount: vi.fn(), unmount: vi.fn() }));
 vi.mock("@/pages/EditorPage/index", () => ({
   default: function EditorProbe() {
@@ -226,7 +237,7 @@ describe("workspace navigation", () => {
     expect(home.draggable).toBe(false);
     expect(home.querySelector("button")).toBeNull();
     expect(home.getAttribute("aria-current")).toBe("page");
-    expect(documentTab.draggable).toBe(true);
+    expect(documentTab.draggable).toBe(false);
     expect(documentTab.querySelector("button")).not.toBeNull();
 
     await act(async () => documentTab.click());
@@ -486,6 +497,22 @@ describe("workspace navigation", () => {
     expect(navigation.location).toBe("/");
     expect(tabs.activeTabId).toBeNull();
     expect(tabs.tabs).toHaveLength(1);
+  });
+
+  it("closes without a save prompt after undo restores the original document", async () => {
+    await mount();
+    await add("A");
+    const store = tabs.getTabById("A")!.runtime.store;
+    await act(async () => {
+      store.getState().saveCheckpoint();
+      store.getState().updateMetadata({ title: "edited title" });
+    });
+    expect(store.getState().isDirty).toBe(true);
+    await act(async () => store.getState().undo());
+    await act(async () => closeFlow.requestCloseTab("A"));
+    expect(closeFlow.pendingCloseRequest).toBeNull();
+    expect(tabs.tabs).toHaveLength(0);
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("navigates to dirty close targets, preserves cancel/failure and closes only after success", async () => {

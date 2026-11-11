@@ -17,8 +17,25 @@
   margin-left: calc(-2 * var(--tab-radius));
 }
 
+/* Floating feedback already includes the overlap in its measured position. */
+.editor-tab-slot[data-dnd-dragging] {
+  margin-left: 0;
+}
+
 .editor-tab {
   padding-inline: calc(var(--tab-radius) + 12px);
+}
+
+.editor-tab-slot[data-tab-dragging] {
+  z-index: 3;
+}
+
+.editor-tab-slot[data-tab-dragging] .editor-tab {
+  cursor: grabbing;
+}
+
+.editor-tab-slot[data-tab-dragging] .editor-tab::before {
+  background: var(--tab-active-surface);
 }
 
 /* Paint the selected shoulders above neighbouring hover backgrounds. */

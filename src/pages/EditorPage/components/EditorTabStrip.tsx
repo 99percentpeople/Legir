@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { DragDropProvider } from "@dnd-kit/react";
+import { isSortable, useSortable } from "@dnd-kit/react/sortable";
+import {
+  KeyboardSensor,
+  PointerSensor,
+  PointerActivationConstraints,
+} from "@dnd-kit/dom";
+import { RestrictToElement } from "@dnd-kit/dom/modifiers";
 import { ArrowLeft, ExternalLink, Home, LoaderCircle, X } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import {
@@ -12,25 +20,38 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/utils/cn";
-import type {
-  EditorTabDescriptor,
-  EditorTabDragPayload,
-} from "@/app/editorTabs/types";
+import type { EditorTabDescriptor } from "@/app/editorTabs/types";
 import { useEditorTabsRuntime } from "@/app/editorRuntime";
 import "./EditorTabStrip.css";
 
-const EDITOR_TAB_DRAG_MIME = "application/x-legir-editor-tab";
+const tabSensors = [
+  PointerSensor.configure({
+    activationConstraints(event) {
+      return event.pointerType === "touch"
+        ? [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })]
+        : [new PointerActivationConstraints.Distance({ value: 6 })];
+    },
+    preventActivation: (event) =>
+      event.target instanceof Element && !!event.target.closest("button"),
+  }),
+  KeyboardSensor.configure({
+    keyboardCodes: {
+      ...KeyboardSensor.defaults.keyboardCodes,
+      start: ["Space"],
+    },
+  }),
+];
+const tabModifiers = [
+  RestrictToElement.configure({
+    element: ({ source }) =>
+      source?.element?.closest(".editor-tab-scroller") ?? null,
+  }),
+];
 const TAB_CLASS_NAME =
   "editor-tab group text-muted-foreground relative isolate flex h-[34px] min-w-0 shrink-0 items-center gap-2 bg-transparent text-[13px] leading-5 text-nowrap transition-colors select-none hover:cursor-pointer";
 const ACTIVE_TAB_CLASS_NAME = "editor-tab--active text-foreground";
 const EDITOR_TAB_DIRTY_DOT_CLASS_NAME =
   "absolute left-1/2 top-1/2 block h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/60";
-
-type TabDropIndicator = {
-  tabId: string;
-  targetIndex: number;
-  position: "before" | "after";
-};
 
 export function EditorTabStrip({
   isHomeActive,
@@ -39,32 +60,15 @@ export function EditorTabStrip({
   isHomeActive: boolean;
   onHome: () => void;
 }) {
-  const {
-    windowId,
-    tabs,
-    activeTabId,
-    mergeWindowTargets,
-    refreshMergeWindowTargets,
-    selectTab,
-    closeTab,
-    moveTab,
-    detachTab,
-    mergeTabToWindow,
-    canDetachTabs,
-    canMergeTabs,
-  } = useEditorTabsRuntime();
+  const { windowId, tabs, activeTabId, selectTab, moveTab } =
+    useEditorTabsRuntime();
   const { t } = useLanguage();
-  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
-  const [dropIndicator, setDropIndicator] = useState<TabDropIndicator | null>(
-    null,
-  );
-  const draggedTabPayloadRef = useRef<EditorTabDragPayload | null>(null);
-  const dragImageElementRef = useRef<HTMLDivElement | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const beforeDrag = useRef<string[] | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const draggableTabs = useMemo(
-    () => tabs.filter((tab) => !tab.isPendingTransfer),
-    [tabs],
-  );
+  const sortableIds = tabs
+    .filter((tab) => !tab.isPendingTransfer)
+    .map((tab) => tab.id);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -98,381 +102,255 @@ export function EditorTabStrip({
     return () => scroller.removeEventListener("wheel", onWheel);
   }, []);
 
-  const clearDragImage = () => {
-    dragImageElementRef.current?.remove();
-    dragImageElementRef.current = null;
-  };
-
-  const clearDragState = () => {
-    draggedTabPayloadRef.current = null;
-    clearDragImage();
-    setDraggedTabId(null);
-    setDropIndicator(null);
-  };
-
-  const parseDragPayload = (event: DragEvent<HTMLElement>) => {
-    if (draggedTabPayloadRef.current) {
-      return draggedTabPayloadRef.current;
-    }
-
-    const raw = event.dataTransfer.getData(EDITOR_TAB_DRAG_MIME);
-    if (!raw) return null;
-
-    try {
-      const parsed = JSON.parse(raw) as Partial<EditorTabDragPayload>;
-      if (
-        typeof parsed.tabId !== "string" ||
-        typeof parsed.sourceWindowId !== "string"
-      ) {
-        return null;
-      }
-
-      return {
-        tabId: parsed.tabId,
-        sourceWindowId: parsed.sourceWindowId,
-      } satisfies EditorTabDragPayload;
-    } catch {
-      return null;
-    }
-  };
-
-  const resolveTargetIndex = (
-    dragTabId: string,
-    overTabId: string,
-    position: "before" | "after",
-  ) => {
-    const overIndex = draggableTabs.findIndex((tab) => tab.id === overTabId);
-    const dragIndex = draggableTabs.findIndex((tab) => tab.id === dragTabId);
-    if (overIndex < 0 || dragIndex < 0) return null;
-
-    const rawTargetIndex = position === "after" ? overIndex + 1 : overIndex;
-    if (dragTabId === overTabId) {
-      if (rawTargetIndex === dragIndex || rawTargetIndex === dragIndex + 1) {
-        return null;
-      }
-    }
-
-    return dragIndex < rawTargetIndex ? rawTargetIndex - 1 : rawTargetIndex;
-  };
-
-  const updateDropIndicator = (
-    dragTabId: string,
-    overTabId: string,
-    position: "before" | "after",
-  ) => {
-    const targetIndex = resolveTargetIndex(dragTabId, overTabId, position);
-    if (targetIndex === null) {
-      setDropIndicator(null);
-      return;
-    }
-
-    setDropIndicator({
-      tabId: overTabId,
-      targetIndex,
-      position,
-    });
-  };
-
-  const attachNativeDragImage = (
-    event: DragEvent<HTMLDivElement>,
-    tab: EditorTabDescriptor,
-  ) => {
-    if (typeof document === "undefined") return;
-
-    clearDragImage();
-
-    const sourceRect = event.currentTarget.getBoundingClientRect();
-    const ghost = document.createElement("div");
-    ghost.className =
-      "pointer-events-none fixed left-0 top-0 z-[200] flex min-w-0 max-w-64 items-center gap-1.5 rounded-lg border border-border/80 bg-background/95 px-2.5 py-1.5 text-sm text-foreground shadow-xl backdrop-blur";
-    ghost.style.width = `${Math.ceil(sourceRect.width)}px`;
-    ghost.style.transform = "translate(-10000px, -10000px)";
-
-    const statusSlot = document.createElement("span");
-    statusSlot.className = "relative block h-4 w-4 shrink-0";
-
-    if (tab.isDirty) {
-      const dirtyDot = document.createElement("span");
-      dirtyDot.className = EDITOR_TAB_DIRTY_DOT_CLASS_NAME;
-      statusSlot.append(dirtyDot);
-    }
-
-    const title = document.createElement("span");
-    title.className = "truncate";
-    title.textContent = tab.title;
-
-    ghost.append(title, statusSlot);
-    document.body.appendChild(ghost);
-    dragImageElementRef.current = ghost;
-
-    event.dataTransfer.setDragImage(ghost, 28, sourceRect.height / 2);
-  };
-
-  const allowMoveDrop = (event: DragEvent<HTMLElement>) => {
-    const payload = parseDragPayload(event);
-    if (!payload || payload.sourceWindowId !== windowId) return false;
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    return true;
-  };
-
   return (
-    <div className="editor-tab-strip flex h-10 shrink-0 items-end pt-1.5 sm:px-1">
+    <DragDropProvider
+      sensors={tabSensors}
+      modifiers={tabModifiers}
+      onDragStart={(event) => {
+        beforeDrag.current = sortableIds;
+        setDragging(true);
+        const tabId = event.operation.source?.id;
+        if (
+          typeof tabId === "string" &&
+          sortableIds.includes(tabId) &&
+          (isHomeActive || tabId !== activeTabId)
+        ) {
+          selectTab(tabId);
+        }
+      }}
+      onDragEnd={(event) => {
+        setDragging(false);
+        const snapshot = beforeDrag.current;
+        beforeDrag.current = null;
+        const { source } = event.operation;
+        // Sorting previews stay in dnd-kit; commit once, only if the live tabs
+        // have not been closed, opened or transferred during this gesture.
+        if (
+          event.canceled ||
+          !isSortable(source) ||
+          !snapshot ||
+          snapshot.length !== sortableIds.length ||
+          !snapshot.every((id, index) => id === sortableIds[index]) ||
+          source.initialIndex === source.index ||
+          source.index < 0 ||
+          source.index >= snapshot.length
+        )
+          return;
+        moveTab(String(source.id), {
+          intent: "reorder",
+          windowId,
+          targetIndex: source.index,
+        });
+      }}
+    >
       <div
-        ref={scrollerRef}
-        className="editor-tab-scroller no-scrollbar flex min-w-0 flex-1 items-end overflow-x-auto"
-        onDragEnter={(event) => {
-          allowMoveDrop(event);
-        }}
-        onDragOver={(event) => {
-          allowMoveDrop(event);
-        }}
-        onDragLeave={(event) => {
-          if (
-            event.currentTarget.contains(event.relatedTarget as Node | null)
-          ) {
-            return;
-          }
-          setDropIndicator(null);
-        }}
+        className="editor-tab-strip flex h-10 shrink-0 items-end pt-1.5 sm:px-1"
+        data-app-keyboard-dragging={dragging ? "true" : undefined}
       >
-        <div className="editor-tab-slot relative shrink-0">
+        <div
+          ref={scrollerRef}
+          className="editor-tab-scroller no-scrollbar flex min-w-0 flex-1 items-end overflow-x-auto"
+        >
+          <div className="editor-tab-slot relative shrink-0">
+            <button
+              type="button"
+              draggable={false}
+              className={cn(
+                TAB_CLASS_NAME,
+                isHomeActive && ACTIVE_TAB_CLASS_NAME,
+              )}
+              aria-current={isHomeActive ? "page" : undefined}
+              onClick={onHome}
+            >
+              <Home size={16} className="shrink-0" />
+              <span>{t("tabs.home")}</span>
+            </button>
+          </div>
+          {tabs.map((tab) => (
+            <SortableEditorTab
+              key={tab.id}
+              tab={tab}
+              active={tab.id === activeTabId}
+              index={sortableIds.indexOf(tab.id)}
+              dragging={dragging}
+            />
+          ))}
+        </div>
+      </div>
+    </DragDropProvider>
+  );
+}
+
+function SortableEditorTab({
+  tab,
+  active,
+  index,
+  dragging,
+}: {
+  tab: EditorTabDescriptor;
+  active: boolean;
+  index: number;
+  dragging: boolean;
+}) {
+  const {
+    canDetachTabs,
+    canMergeTabs,
+    mergeWindowTargets,
+    refreshMergeWindowTargets,
+    selectTab,
+    closeTab,
+    detachTab,
+    mergeTabToWindow,
+  } = useEditorTabsRuntime();
+  const { t } = useLanguage();
+  const isPendingTransfer = !!tab.isPendingTransfer;
+  const showDetachAction = canDetachTabs;
+  const showMergeAction = canMergeTabs && mergeWindowTargets.length > 0;
+  const { ref, handleRef, isDragSource } = useSortable({
+    id: tab.id,
+    index,
+    disabled: isPendingTransfer,
+    transition: {
+      duration: 200,
+      easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+      idle: true,
+    },
+  });
+  const tabNode = (
+    <div
+      role={isPendingTransfer ? undefined : "button"}
+      tabIndex={isPendingTransfer ? -1 : 0}
+      aria-disabled={isPendingTransfer || undefined}
+      aria-current={active ? "page" : undefined}
+      data-editor-tab-id={tab.id}
+      ref={handleRef}
+      draggable={false}
+      data-app-keyboard-handle="editor-tab-sort"
+      onClick={() => {
+        if (isPendingTransfer) return;
+        selectTab(tab.id);
+      }}
+      onKeyDown={(event) => {
+        if (
+          isPendingTransfer ||
+          event.defaultPrevented ||
+          event.target !== event.currentTarget
+        )
+          return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        selectTab(tab.id);
+      }}
+      className={cn(
+        TAB_CLASS_NAME,
+        active && ACTIVE_TAB_CLASS_NAME,
+        isPendingTransfer && "hover:cursor-default",
+      )}
+    >
+      <span className="max-w-40 min-w-0 flex-1 truncate text-left sm:max-w-52">
+        {tab.title}
+      </span>
+      {isPendingTransfer ? (
+        <LoaderCircle size={14} className="shrink-0 animate-spin" />
+      ) : (
+        <span className="relative block h-5 w-5 shrink-0">
+          {tab.isDirty && (
+            <span className="pointer-events-none absolute inset-0 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0">
+              <span className={EDITOR_TAB_DIRTY_DOT_CLASS_NAME} />
+            </span>
+          )}
           <button
             type="button"
             draggable={false}
             className={cn(
-              TAB_CLASS_NAME,
-              isHomeActive && ACTIVE_TAB_CLASS_NAME,
+              "text-muted-foreground hover:text-foreground hover:bg-foreground/10 focus-visible:ring-ring absolute inset-0 flex items-center justify-center rounded-full transition-colors duration-150 outline-none focus-visible:ring-2",
+              tab.isDirty
+                ? "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
+                : "opacity-100",
             )}
-            aria-current={isHomeActive ? "page" : undefined}
-            onClick={onHome}
+            aria-label={t("common.actions.close")}
+            onClick={(event) => {
+              event.stopPropagation();
+              closeTab(tab.id);
+            }}
           >
-            <Home size={16} className="shrink-0" />
-            <span>{t("tabs.home")}</span>
+            <X size={14} />
           </button>
-        </div>
-        {tabs.map((tab) => {
-          const active = tab.id === activeTabId;
-          const showDetachAction = canDetachTabs;
-          const showMergeAction = canMergeTabs && mergeWindowTargets.length > 0;
-          const isPendingTransfer = !!tab.isPendingTransfer;
-          const showDropBefore =
-            dropIndicator?.tabId === tab.id &&
-            dropIndicator.position === "before";
-          const showDropAfter =
-            dropIndicator?.tabId === tab.id &&
-            dropIndicator.position === "after";
+        </span>
+      )}
+    </div>
+  );
 
-          const tabNode = (
-            <div
-              role={isPendingTransfer ? undefined : "button"}
-              tabIndex={isPendingTransfer ? -1 : 0}
-              aria-disabled={isPendingTransfer || undefined}
-              aria-current={active ? "page" : undefined}
-              data-editor-tab-id={tab.id}
-              draggable={!isPendingTransfer}
-              onDragStart={(event) => {
-                if (isPendingTransfer) return;
+  const wrappedTabNode = (
+    <div
+      ref={ref}
+      className="editor-tab-slot relative shrink-0"
+      data-tab-dragging={isDragSource || undefined}
+    >
+      {tabNode}
+    </div>
+  );
+  if (isPendingTransfer) return wrappedTabNode;
 
-                const payload: EditorTabDragPayload = {
-                  tabId: tab.id,
-                  sourceWindowId: windowId,
-                };
-
-                draggedTabPayloadRef.current = payload;
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData(
-                  EDITOR_TAB_DRAG_MIME,
-                  JSON.stringify(payload),
-                );
-                event.dataTransfer.setData("text/plain", tab.id);
-                attachNativeDragImage(event, tab);
-                setDraggedTabId(tab.id);
-                setDropIndicator(null);
-              }}
-              onDragEnd={() => {
-                clearDragState();
-              }}
-              onDragEnter={(event) => {
-                if (isPendingTransfer) return;
-                allowMoveDrop(event);
-              }}
-              onDragOver={(event) => {
-                if (isPendingTransfer) return;
-                const allowed = allowMoveDrop(event);
-                if (!allowed) return;
-                const payload = parseDragPayload(event);
-                if (!payload) return;
-
-                const rect = event.currentTarget.getBoundingClientRect();
-                const position =
-                  event.clientX - rect.left < rect.width / 2
-                    ? "before"
-                    : "after";
-                updateDropIndicator(payload.tabId, tab.id, position);
-              }}
-              onDrop={(event) => {
-                if (isPendingTransfer) return;
-                const payload = parseDragPayload(event);
-                if (!payload || payload.sourceWindowId !== windowId) return;
-
-                event.preventDefault();
-
-                const rect = event.currentTarget.getBoundingClientRect();
-                const position =
-                  event.clientX - rect.left < rect.width / 2
-                    ? "before"
-                    : "after";
-                const targetIndex = resolveTargetIndex(
-                  payload.tabId,
-                  tab.id,
-                  position,
-                );
-
-                clearDragState();
-                if (targetIndex === null) return;
-
-                moveTab(payload.tabId, {
-                  intent: "reorder",
-                  windowId,
-                  targetIndex,
-                });
-              }}
-              onClick={() => {
-                if (isPendingTransfer) return;
-                selectTab(tab.id);
-              }}
-              onKeyDown={(event) => {
-                if (isPendingTransfer) return;
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                selectTab(tab.id);
-              }}
-              className={cn(
-                TAB_CLASS_NAME,
-                active && ACTIVE_TAB_CLASS_NAME,
-                isPendingTransfer && "hover:cursor-default",
-                draggedTabId === tab.id && "opacity-60",
-              )}
-            >
-              <span className="max-w-40 min-w-0 flex-1 truncate text-left sm:max-w-52">
-                {tab.title}
-              </span>
-              {isPendingTransfer ? (
-                <LoaderCircle size={14} className="shrink-0 animate-spin" />
-              ) : (
-                <span className="relative block h-5 w-5 shrink-0">
-                  {tab.isDirty && (
-                    <span className="pointer-events-none absolute inset-0 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0">
-                      <span className={EDITOR_TAB_DIRTY_DOT_CLASS_NAME} />
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    draggable={false}
-                    className={cn(
-                      "text-muted-foreground hover:text-foreground hover:bg-foreground/10 focus-visible:ring-ring absolute inset-0 flex items-center justify-center rounded-full transition-colors duration-150 outline-none focus-visible:ring-2",
-                      tab.isDirty
-                        ? "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
-                        : "opacity-100",
-                    )}
-                    aria-label={t("common.actions.close")}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      closeTab(tab.id);
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </span>
-              )}
-            </div>
-          );
-
-          if (isPendingTransfer) {
-            return (
-              <div key={tab.id} className="editor-tab-slot relative shrink-0">
-                {tabNode}
-              </div>
-            );
-          }
-
-          const wrappedTabNode = (
-            <div className="editor-tab-slot relative shrink-0">
-              {showDropBefore && (
-                <div className="bg-primary pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 -translate-x-1/2 rounded-full" />
-              )}
-              {showDropAfter && (
-                <div className="bg-primary pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 translate-x-1/2 rounded-full" />
-              )}
-              {tabNode}
-            </div>
-          );
-
-          return (
-            <ContextMenu
-              key={tab.id}
-              modal={false}
-              onOpenChange={(open) => {
-                if (!open) return;
-                void refreshMergeWindowTargets();
-              }}
-            >
-              <ContextMenuTrigger asChild>{wrappedTabNode}</ContextMenuTrigger>
-              <ContextMenuContent
-                className="min-w-44"
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                }}
-              >
-                {showDetachAction && (
-                  <ContextMenuItem
-                    onSelect={() => {
-                      void detachTab(tab.id);
-                    }}
-                  >
-                    <ExternalLink size={14} />
-                    {t("tabs.detach_to_new_window")}
-                  </ContextMenuItem>
-                )}
-                {showMergeAction && (
-                  <ContextMenuSub>
-                    <ContextMenuSubTrigger>
-                      <ArrowLeft size={14} />
-                      {t("tabs.merge_to_window")}
-                    </ContextMenuSubTrigger>
-                    <ContextMenuSubContent className="min-w-52">
-                      {mergeWindowTargets.map((target) => (
-                        <ContextMenuItem
-                          key={target.windowId}
-                          onSelect={() => {
-                            void mergeTabToWindow(tab.id, target.windowId);
-                          }}
-                        >
-                          {target.label}
-                        </ContextMenuItem>
-                      ))}
-                    </ContextMenuSubContent>
-                  </ContextMenuSub>
-                )}
-                {(showDetachAction || showMergeAction) && (
-                  <ContextMenuSeparator />
-                )}
+  return (
+    <ContextMenu
+      key={tab.id}
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) return;
+        void refreshMergeWindowTargets();
+      }}
+    >
+      <ContextMenuTrigger asChild disabled={dragging}>
+        {wrappedTabNode}
+      </ContextMenuTrigger>
+      <ContextMenuContent
+        className="min-w-44"
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
+      >
+        {showDetachAction && (
+          <ContextMenuItem
+            onSelect={() => {
+              void detachTab(tab.id);
+            }}
+          >
+            <ExternalLink size={14} />
+            {t("tabs.detach_to_new_window")}
+          </ContextMenuItem>
+        )}
+        {showMergeAction && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <ArrowLeft size={14} />
+              {t("tabs.merge_to_window")}
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="min-w-52">
+              {mergeWindowTargets.map((target) => (
                 <ContextMenuItem
-                  variant="destructive"
+                  key={target.windowId}
                   onSelect={() => {
-                    closeTab(tab.id);
+                    void mergeTabToWindow(tab.id, target.windowId);
                   }}
                 >
-                  <X size={14} />
-                  {t("common.actions.close")}
+                  {target.label}
                 </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
-          );
-        })}
-      </div>
-    </div>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+        {(showDetachAction || showMergeAction) && <ContextMenuSeparator />}
+        <ContextMenuItem
+          variant="destructive"
+          onSelect={() => {
+            closeTab(tab.id);
+          }}
+        >
+          <X size={14} />
+          {t("common.actions.close")}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

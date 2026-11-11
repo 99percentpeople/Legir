@@ -65,6 +65,7 @@ export const documentKeys = [
   "processingStatus",
   "isSaving",
   "isDirty",
+  "savedDocumentRevision",
   "currentPageIndex",
   "pendingViewStateRestore",
   "fitTrigger",

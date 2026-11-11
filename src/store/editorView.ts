@@ -7,6 +7,7 @@ import type {
 import type { EditorActions, EditorStore } from "./store.types";
 import { normalizeControlSelection } from "./controlSelection";
 import { createEditorActions } from "./createEditorActions";
+import { captureDocumentRevision } from "./documentRevision";
 import { initialState } from "./helpers";
 import {
   documentKeys,
@@ -155,6 +156,16 @@ export function createEditorView(
       ...requested,
       ...normalizeControlSelection(previous, requested),
     };
+    // Capture the loaded content immediately before its first edit. Loading and
+    // background hydration finish before this, and UI-only changes stay free.
+    if (
+      requested.isDirty === true &&
+      !previous.isDirty &&
+      !previous.savedDocumentRevision &&
+      !("savedDocumentRevision" in requested)
+    ) {
+      patch.savedDocumentRevision = captureDocumentRevision(previous);
+    }
     batching = true;
     try {
       const values = <K extends keyof EditorState>(keys: readonly K[]) =>

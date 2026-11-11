@@ -2,6 +2,11 @@ import type { EditorState, HistorySnapshot } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 import { getPageId, mapPageIndexes } from "@legir/pdf-core/lib/pageStructure";
 import { revokeObjectUrlIfNeeded } from "../helpers";
+import {
+  captureDocumentRevision,
+  matchesDocumentRevision,
+} from "../documentRevision";
+import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@legir/pdf-model/pdfPermissions";
 
 export const captureHistorySnapshot = (
   state: EditorState,
@@ -47,7 +52,7 @@ export const createHistorySlice: EditorStoreSlice<
       snapshot.currentPageIndex ?? state.currentPageIndex,
       Math.max(0, pages.length - 1),
     );
-    return {
+    const restored = {
       ...snapshot,
       pages,
       pageSources: snapshot.pageSources ?? state.pageSources,
@@ -60,7 +65,6 @@ export const createHistorySlice: EditorStoreSlice<
         ) ?? [],
       currentPageIndex,
       selectedId: null,
-      isDirty: true,
       ...(state.pages !== pages
         ? {
             thumbnailImages: images,
@@ -68,6 +72,18 @@ export const createHistorySlice: EditorStoreSlice<
             pageTranslateParagraphCandidates: [],
             pageTranslateSelectedParagraphIds: [],
           }
+        : {}),
+    };
+    const saved =
+      state.savedDocumentRevision ??
+      (!state.isDirty ? captureDocumentRevision(state) : null);
+    const isDirty =
+      !saved || !matchesDocumentRevision({ ...state, ...restored }, saved);
+    return {
+      ...restored,
+      isDirty,
+      ...(!isDirty
+        ? { dirtyPermissionScopes: { ...EMPTY_PDF_PERMISSION_DIRTY_SCOPES } }
         : {}),
     };
   };

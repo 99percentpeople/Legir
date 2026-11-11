@@ -260,6 +260,8 @@ export interface DocumentState {
   processingStatus: string | null;
   isSaving: boolean;
   isDirty: boolean;
+  /** Last clean PDF content; excluded from undo history itself. */
+  savedDocumentRevision: SavedDocumentRevision | null;
   currentPageIndex: number;
   pendingViewStateRestore: {
     scale: number;
@@ -296,6 +298,21 @@ export interface DocumentState {
     id: number;
   } | null;
 }
+
+export type SavedDocumentRevision = Pick<
+  DocumentState,
+  | "pdfBytes"
+  | "pages"
+  | "pageSources"
+  | "fields"
+  | "annotations"
+  | "metadata"
+  | "outline"
+  | "preservedSourceAnnotations"
+  | "exportPassword"
+  | "pdfOwnerPassword"
+  | "preservePdfOwnerRestrictionsOnSave"
+> & { removeTextUnderFlattenedFreetext: boolean };
 
 export interface EditorPreferencesState {
   penStyle: PenStyle;

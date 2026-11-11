@@ -45,6 +45,7 @@ export type EditorTabSnapshot = Pick<
   | "pageTranslateSelectedParagraphIds"
   | "lastSavedAt"
   | "isDirty"
+  | "savedDocumentRevision"
   | "currentPageIndex"
   | "pendingViewStateRestore"
   | "fitTrigger"
@@ -84,11 +85,6 @@ export type EditorTabDropIntent =
   | "reorder"
   | "merge-to-window"
   | "detach-to-new-window";
-
-export interface EditorTabDragPayload {
-  tabId: string;
-  sourceWindowId: EditorWindowId;
-}
 
 export interface EditorTabDropTarget {
   intent: EditorTabDropIntent;
