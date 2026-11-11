@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/utils/cn";
 import { getSessionTitle } from "./utils";
-import type { AiChatSessionSummary } from "@/services/ai/chat/types";
+import type { AiChatSessionSummary } from "@/services/ai/chat/presentationTypes";
 
 const SESSION_TREE_BASE_PADDING_PX = 8;
 const SESSION_TREE_INDENT_PX = 12;

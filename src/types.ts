@@ -63,7 +63,7 @@ import type {
 import type {
   AiReasoningDisplayPolicy,
   AiReasoningLevel,
-} from "@/services/ai/providers/runtimeAdapters/types";
+} from "@/services/ai/providers/reasoningTypes";
 import type { StampKind, StampPresetId } from "@legir/pdf-model/stamps";
 
 export type EditorSaveTarget =
@@ -95,12 +95,7 @@ export type AppLLMModelOption = {
 };
 
 export type LLMModelModality =
-  | "text"
-  | "image"
-  | "audio"
-  | "video"
-  | "file"
-  | (string & {});
+  "text" | "image" | "audio" | "video" | "file" | (string & {});
 
 export interface LLMModelCapabilities {
   inputModalities: LLMModelModality[];
@@ -180,13 +175,7 @@ export interface PenStyle {
 export type DialogName = "shortcuts" | "settings" | null;
 
 export type PageTranslateContextWindow =
-  | "none"
-  | "prev"
-  | "next"
-  | "prev_next"
-  | "all_prev"
-  | "all_next"
-  | "all";
+  "none" | "prev" | "next" | "prev_next" | "all_prev" | "all_next" | "all";
 
 export interface PageTranslateOptions {
   fontFamily: string;
@@ -359,10 +348,7 @@ export interface EditorPreferencesState {
 
 export type SidebarTab = "thumbnails" | "outline" | "fields" | "annotations";
 export type RightPanelTab =
-  | "document"
-  | "properties"
-  | "ai_chat"
-  | "page_translate";
+  "document" | "properties" | "ai_chat" | "page_translate";
 
 export interface EditorUiViewState {
   activeDialog: "shortcuts" | "settings" | null;

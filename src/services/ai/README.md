@@ -34,6 +34,11 @@ assistant output. It should not know provider API request shapes directly.
   as returned rather than assuming a casing conversion.
 - `chat/types.ts` owns chat-specific records, tool contracts, and stream update
   types.
+- `chat/presentationTypes.ts` owns SDK-independent timeline, attachment, session
+  summary, and usage display contracts. Shared UI and the marketing demo import
+  these directly so their typechecking does not require the AI SDK.
+- `providers/reasoningTypes.ts` owns SDK-independent reasoning preferences and
+  capabilities. Runtime adapter contracts remain in `providers/runtimeAdapters/types.ts`.
 - `chat/workspace.ts` defines the current-window document access boundary.
 - `chat/workspaceToolRegistry.ts` wraps document tools with `{ document_id, args }`
   targeting and adds `list_open_documents`. Default targets are fixed per turn;

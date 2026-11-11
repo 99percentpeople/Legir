@@ -38,6 +38,11 @@ bun run dev
 Desktop: `bun run dev:app`  
 Landing site: `bun run dev:www`
 
+The app and landing site declare their dependencies separately in `package.json`
+and `www/package.json`, with one workspace lockfile. See the [landing site guide](www/README.md)
+to install and build only the site. To install only the app and its PDF packages,
+run `bun install --frozen-lockfile --filter './'`.
+
 To build native installers, run `bun run build:app --ci -- --locked` after installing the platform prerequisites. Rust is pinned in `rust-toolchain.toml` and does not require nightly. See [Desktop builds and releases](docs/DESKTOP_RELEASE.md) for OS-specific commands, signing requirements, and the tag-driven release pipeline.
 
 ## PDF Engine
@@ -85,6 +90,10 @@ Deploy the repository root as the app project at `https://legir.app`, and deploy
 The landing project shares source files and assets with the repository root, so enable **Include source files outside of the Root Directory in the Build Step** in its Vercel settings.
 
 Keep the landing project's Build Command as `bun run build` and Output Directory as `dist`. The landing site typechecks its own source and the shared UI it imports, then builds with Vite. It builds the lightweight model package, but does not build or depend on the PDFium SDK or its generated `packages/pdfium/dist` directory.
+
+Both projects' `vercel.json` files select their own dependency graph during
+installation. The landing site has a separate `build-www` CI workflow that
+installs only its dependencies before building from a clean checkout.
 
 The landing site's app links default to `https://legir.app`, including on preview deployments. Local development uses `http://localhost:5173`. To explicitly configure the destination, set `VITE_APP_URL` in the landing project's environment:
 

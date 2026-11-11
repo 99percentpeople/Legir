@@ -2,7 +2,7 @@ import type {
   AiChatMessageAttachment,
   AiChatTimelineItem,
   AiChatToolPreviewImage,
-} from "@/services/ai/chat/types";
+} from "@/services/ai/chat/presentationTypes";
 
 export type TranslateFn = (
   key: string,

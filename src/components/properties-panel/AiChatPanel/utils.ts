@@ -2,7 +2,7 @@ import type {
   AiChatMessageAttachment,
   AiChatSessionSummary,
   AiChatTimelineItem,
-} from "@/services/ai/chat/types";
+} from "@/services/ai/chat/presentationTypes";
 import type { MessageTimelineItem, TranslateFn } from "./types";
 
 export const getAnnotationAttachmentTypeLabel = (

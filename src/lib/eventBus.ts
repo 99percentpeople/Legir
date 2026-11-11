@@ -1,11 +1,9 @@
-import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
+import type { AiChatMessageAttachment } from "@/services/ai/chat/presentationTypes";
 
 export type Unsubscribe = () => void;
 
 type ShapeDraftTool =
-  | "draw_shape_polyline"
-  | "draw_shape_polygon"
-  | "draw_shape_cloud_polygon";
+  "draw_shape_polyline" | "draw_shape_polygon" | "draw_shape_cloud_polygon";
 
 export class EventBus<Events extends Record<string, unknown>> {
   private listeners = new Map<keyof Events, Set<(payload: unknown) => void>>();

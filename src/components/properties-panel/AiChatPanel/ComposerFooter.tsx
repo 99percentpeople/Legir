@@ -18,11 +18,11 @@ import { Spinner } from "@/components/ui/spinner";
 import type {
   AiChatMessageAttachment,
   AiChatTokenUsageSummary,
-} from "@/services/ai/chat/types";
+} from "@/services/ai/chat/presentationTypes";
 import type {
   AiReasoningLevel,
   AiReasoningLevelControl,
-} from "@/services/ai/providers/runtimeAdapters/types";
+} from "@/services/ai/providers/reasoningTypes";
 import { MessageAttachmentChip } from "./MessagePrimitives";
 import { cn } from "@/utils/cn";
 import { getMessageAttachmentKey } from "./utils";

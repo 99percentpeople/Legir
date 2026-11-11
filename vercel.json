@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "framework": "vite",
-  "installCommand": "bun install",
+  "installCommand": "bun install --frozen-lockfile --filter './'",
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
   "routes": [

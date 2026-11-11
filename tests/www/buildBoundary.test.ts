@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { expect, it } from "vitest";
 
-it("keeps the landing site's type dependencies independent of the PDF runtime", () => {
+it("keeps the landing site's type dependencies independent of app runtimes", () => {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const configPath = path.join(root, "www/tsconfig.json");
   const { config, error } = ts.readConfigFile(configPath, ts.sys.readFile);
@@ -27,6 +27,9 @@ it("keeps the landing site's type dependencies independent of the PDF runtime", 
     .filter(
       (file) =>
         file.startsWith("packages/pdfium/") ||
+        file.startsWith("packages/pdf-core/") ||
+        file.startsWith("packages/pdf-renderer/") ||
+        /(?:^|\/)node_modules\/(?:ai\/|@ai-sdk\/|@tauri-apps\/)/.test(file) ||
         file.startsWith("src/services/pdfService/") ||
         file.startsWith("src/hooks/useAiChatController/") ||
         file === "src/app/editorTabs/runtimeContext.ts",

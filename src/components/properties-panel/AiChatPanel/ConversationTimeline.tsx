@@ -12,7 +12,7 @@ import type {
   AiDocumentLinkTarget,
   AiChatSessionSummary,
   AiChatTimelineItem,
-} from "@/services/ai/chat/types";
+} from "@/services/ai/chat/presentationTypes";
 import {
   type InlineEditState,
   type MessageTimelineItem,

@@ -10,7 +10,7 @@ import {
   MIN_PAGE_THUMBNAIL_SCALE,
   MAX_PAGE_THUMBNAIL_SCALE,
 } from "@/constants";
-import type { AiChatTokenUsageSummary } from "@/services/ai/chat/types";
+import type { AiChatTokenUsageSummary } from "@/services/ai/chat/presentationTypes";
 
 export const DOCUMENT_TITLE = "reading-notes.pdf";
 export const QUOTE =
@@ -24,11 +24,7 @@ export const PAGE_TITLES = [
   "Keep the thought going.",
 ];
 export type SidebarView =
-  | "thumbnails"
-  | "outline"
-  | "annotations"
-  | "fields"
-  | "search";
+  "thumbnails" | "outline" | "annotations" | "fields" | "search";
 export type Tool = EditorTool;
 export type AnswerKind = "summary" | "actions" | "selection" | "fallback";
 export type DemoTokenStats = {

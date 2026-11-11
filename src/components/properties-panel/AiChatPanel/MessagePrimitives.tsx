@@ -37,7 +37,7 @@ import { getMessageAttachmentLocationLabel, getSessionTitle } from "./utils";
 import type {
   AiChatMessageAttachment,
   AiChatSessionSummary,
-} from "@/services/ai/chat/types";
+} from "@/services/ai/chat/presentationTypes";
 
 export const PromptButton = ({
   children,

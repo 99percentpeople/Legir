@@ -1,4 +1,4 @@
-import type { AiChatTimelineItem } from "@/services/ai/chat/types";
+import type { AiChatTimelineItem } from "@/services/ai/chat/presentationTypes";
 import type { TimelineContentEntry, TimelineRenderEntry } from "./types";
 
 const groupParallelTools = (

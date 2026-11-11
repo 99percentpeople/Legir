@@ -9,6 +9,9 @@ const workspaceRoot = path.resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(
   readFileSync(path.resolve(workspaceRoot, "package.json"), "utf-8"),
 );
+const sitePackageJson = JSON.parse(
+  readFileSync(path.resolve(import.meta.dirname, "package.json"), "utf-8"),
+);
 
 export default defineConfig(({ command }) => ({
   root: import.meta.dirname,
@@ -25,6 +28,8 @@ export default defineConfig(({ command }) => ({
     "process.env.APP_NAME": JSON.stringify(packageJson.displayName),
   },
   resolve: {
+    // Shared src/ components use the site's dependency versions, including React.
+    dedupe: Object.keys(sitePackageJson.dependencies),
     alias: [
       ...(command === "serve" ? workspacePackageAliases : []),
       { find: "@", replacement: path.resolve(workspaceRoot, "src") },

@@ -12,8 +12,8 @@ import type { InlineEditState } from "@/components/properties-panel/AiChatPanel/
 import type {
   AiChatTimelineItem,
   AiChatMessageAttachment,
-} from "@/services/ai/chat/types";
-import type { AiReasoningLevel } from "@/services/ai/providers/runtimeAdapters/types";
+} from "@/services/ai/chat/presentationTypes";
+import type { AiReasoningLevel } from "@/services/ai/providers/reasoningTypes";
 import type { DemoCopy } from "./copy";
 import {
   sourcePageNumber,

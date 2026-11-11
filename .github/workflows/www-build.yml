@@ -1,0 +1,50 @@
+name: build-www
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+    paths:
+      - "www/**"
+      - "src/**"
+      - "public/**"
+      - "packages/pdf-model/**"
+      - "config/vite/workspacePackages.ts"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - ".github/workflows/www-build.yml"
+  pull_request:
+    paths:
+      - "www/**"
+      - "src/**"
+      - "public/**"
+      - "packages/pdf-model/**"
+      - "config/vite/workspacePackages.ts"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - ".github/workflows/www-build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: www-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      # Shared src/ imports need hoisted resolution, but only www's dependency
+      # graph is installed. No app install or generated PDF engine is available.
+      - run: bun install --frozen-lockfile --filter '!./' --filter legir-www --linker hoisted --ignore-scripts
+      - run: bun run build:www
