@@ -3,7 +3,7 @@ import {
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
 } from "lucide-react";
-import type { FormField } from "@/types";
+import type { VerticalAlignment } from "@legir/pdf-model";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/utils/cn";
@@ -12,8 +12,8 @@ export function VerticalAlignmentProperty({
   value,
   onChange,
 }: {
-  value: NonNullable<FormField["verticalAlignment"]>;
-  onChange: (value: NonNullable<FormField["verticalAlignment"]>) => void;
+  value: VerticalAlignment;
+  onChange: (value: VerticalAlignment) => void;
 }) {
   const { t } = useLanguage();
   return (

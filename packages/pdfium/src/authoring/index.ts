@@ -3,6 +3,7 @@ export * from "./objects.js";
 export * from "./document.js";
 export * from "./fonts.js";
 export * from "./forms.js";
+export * from "./textAlignment.js";
 export * from "./attachments.js";
 export * from "./operators.js";
 export { PDFImage } from "./images.js";

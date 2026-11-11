@@ -1,4 +1,5 @@
 import {
+  toPdfTextAlignment,
   PDFDocument,
   PDFPage,
   rgb,
@@ -533,9 +534,9 @@ export class FreeTextExporter implements IAnnotationExporter {
     const lines = wrapFreeText(text, contentW, measureWidth);
     const alignedOffset = (line: string) => {
       const width = measureWidth(line);
-      return annotation.alignment === "right"
+      return annotation.horizontalAlignment === "right"
         ? contentW - width
-        : annotation.alignment === "center"
+        : annotation.horizontalAlignment === "center"
           ? (contentW - width) / 2
           : 0;
     };
@@ -874,12 +875,7 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     // 5. Create Annotation
     const da = `/${baseResourceName} ${fontSize} Tf ${r} ${g} ${bb} rg ${pdfNum(lineHeight)} TL`;
-    const q =
-      annotation.alignment === "center"
-        ? 1
-        : annotation.alignment === "right"
-          ? 2
-          : 0;
+    const q = toPdfTextAlignment(annotation.horizontalAlignment ?? "left");
 
     const pdfRotation = (() => {
       const d = ((pdfRotationDeg % 360) + 360) % 360;

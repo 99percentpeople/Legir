@@ -282,18 +282,21 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
                   key={alignment}
                   type="button"
                   onClick={() => {
-                    if ((data.alignment || "left") === alignment) return;
+                    if ((data.horizontalAlignment || "left") === alignment)
+                      return;
                     onTriggerHistorySave();
-                    onChange({ alignment });
+                    onChange({ horizontalAlignment: alignment });
                   }}
                   className={cn(
                     "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                    (data.alignment || "left") === alignment &&
+                    (data.horizontalAlignment || "left") === alignment &&
                       "bg-background text-foreground shadow-sm",
                   )}
                   title={t(`properties.alignment_options.${alignment}`)}
                   aria-label={t(`properties.alignment_options.${alignment}`)}
-                  aria-pressed={(data.alignment || "left") === alignment}
+                  aria-pressed={
+                    (data.horizontalAlignment || "left") === alignment
+                  }
                 >
                   <Icon size={16} />
                 </button>

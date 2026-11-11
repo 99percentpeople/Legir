@@ -99,6 +99,23 @@ const ink = async (bytes: Uint8Array) => {
 };
 
 describe("FreeText content layout", () => {
+  it("round-trips both alignment properties", async () => {
+    const output = await exportPDF(await fixture(), [], undefined, [
+      {
+        ...annotation,
+        horizontalAlignment: "center",
+        verticalAlignment: "middle",
+      },
+    ]);
+    const loaded = await read(output);
+    try {
+      expect(loaded.annotations[0].horizontalAlignment).toBe("center");
+      expect(loaded.annotations[0].verticalAlignment).toBe("middle");
+      expect(loaded.annotations[0]).not.toHaveProperty("alignment");
+    } finally {
+      loaded.dispose();
+    }
+  });
   it("aligns the whole wrapped block and keeps overflow at the top", () => {
     expect(getFreeTextVerticalOffset(undefined, 100, 2, 20)).toBe(0);
     expect(getFreeTextVerticalOffset("middle", 100, 2, 20)).toBe(30);

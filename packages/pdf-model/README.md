@@ -13,10 +13,14 @@ import { getEffectivePdfPermissions } from "@legir/pdf-model/pdfPermissions";
 ```
 
 The root exports document, page, form, annotation, history and stamp types.
-Text `FormField`s expose optional `verticalAlignment` (`top`, `middle`, `bottom`)
-alongside horizontal `alignment`. Omission retains legacy layout; consumers
-must not rewrite existing records just to add a default. FreeText `Annotation`s
-also expose `verticalAlignment`; omission preserves top alignment.
+Text `FormField`s and FreeText `Annotation`s share `TextAlignmentOptions`:
+`horizontalAlignment: "left" | "center" | "right"` and
+`verticalAlignment: "top" | "middle" | "bottom"`. The root also exports
+`HorizontalAlignment` and `VerticalAlignment` types. Omission retains the
+existing defaults (single-line fields center vertically; multiline/FreeText top).
+Use `horizontalAlignment` and `verticalAlignment` for both input and parsed
+output. There are no alias properties or values: horizontal centering is
+`center`, vertical centering is `middle`.
 Subpath exports contain rotation, shape/ink geometry, layer ordering, stamp
 layout, font naming and permission helpers. Existing coordinate conventions,
 field names and serialized values are preserved; this extraction is not a data

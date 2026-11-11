@@ -5,6 +5,7 @@ import { DocumentSession } from "@legir/pdf-core";
 import { getPDFium } from "@legir/pdf-core/runtime";
 import { FieldType, type FormField } from "@legir/pdf-model";
 import { PDFDocument, PDFName, PDFStream } from "@legir/pdfium/authoring";
+import { parseFieldStyle } from "../dist/lib/control-parsing.js";
 
 const alignments = ["top", "middle", "bottom"] as const;
 const hash = (bytes: Uint8Array) =>
@@ -43,6 +44,93 @@ function textPositions(doc: PDFDocument, name = "text") {
 }
 
 describe("text field vertical alignment", () => {
+  it("keeps explicit left alignment and only falls back when the primary PDF code is absent or invalid", async () => {
+    const doc = await PDFDocument.create();
+    try {
+      const field = doc.getForm().createTextField("text");
+      const read = (textAlignment: number | undefined) =>
+        parseFieldStyle(
+          {
+            subtype: "Widget",
+            rect: [0, 0, 100, 40],
+            fieldName: "text",
+            textAlignment,
+          },
+          doc,
+          new Map(),
+          undefined,
+        ).horizontalAlignment;
+      field.setHorizontalAlignment("left");
+      expect(read(2)).toBe("left");
+      field.setHorizontalAlignment(undefined);
+      expect(read(2)).toBe("right");
+      expect(read(1)).toBe("center");
+      expect(read(undefined)).toBe("left");
+      expect(read(99)).toBe("left");
+      field.acroField.dict.set(PDFName.of("Q"), doc.context.obj(99));
+      expect(read(2)).toBe("right");
+    } finally {
+      doc.destroy();
+    }
+  });
+  it("uses symmetric alignment APIs with horizontal center and vertical middle", async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([300, 300]);
+    const source = await doc.save();
+    const session = new DocumentSession(await getPDFium(), source);
+    try {
+      const bytes = await session.export({
+        fields: [
+          {
+            id: "text",
+            name: "text",
+            type: FieldType.TEXT,
+            pageIndex: 0,
+            rect: { x: 20, y: 20, width: 180, height: 80 },
+            value: "Text",
+            horizontalAlignment: "center",
+            verticalAlignment: "middle",
+          },
+        ],
+        annotations: [],
+      });
+      const reopened = new DocumentSession(await getPDFium(), bytes);
+      try {
+        const field = (await reopened.parse({}, async () => undefined))
+          .fields[0];
+        expect(field.horizontalAlignment).toBe("center");
+        expect(field.verticalAlignment).toBe("middle");
+        expect(field).not.toHaveProperty("alignment");
+      } finally {
+        reopened.dispose();
+      }
+      const authoring = await PDFDocument.load(bytes);
+      try {
+        const field = authoring.getForm().getTextField("text");
+        expect(field.getHorizontalAlignment()).toBe("center");
+        expect(field.getVerticalAlignment()).toBe("middle");
+        field.setHorizontalAlignment("right");
+        expect(field.getHorizontalAlignment()).toBe("right");
+        field.setVerticalAlignment("top");
+        expect(field.getVerticalAlignment()).toBe("top");
+        expect(() => field.setVerticalAlignment("center" as "middle")).toThrow(
+          /alignment/,
+        );
+        field.setHorizontalAlignment(undefined);
+        field.setVerticalAlignment(undefined);
+        expect(field.getHorizontalAlignment()).toBeUndefined();
+        expect(field.getVerticalAlignment()).toBeUndefined();
+        expect(() => field.setHorizontalAlignment("bad" as "left")).toThrow(
+          /alignment/,
+        );
+      } finally {
+        authoring.destroy();
+      }
+    } finally {
+      session.dispose();
+      doc.destroy();
+    }
+  });
   it.each([false, true])(
     "persists all alignments and renders identical editable/flattened output, multiline=%s",
     async (multiline) => {
@@ -71,7 +159,7 @@ describe("text field vertical alignment", () => {
                 borderWidth: 0,
                 isTransparent: true,
               },
-              alignment: "right",
+              horizontalAlignment: "right",
               verticalAlignment,
               multiline,
               rotationDeg: rotation,
@@ -85,7 +173,7 @@ describe("text field vertical alignment", () => {
             const doc = await PDFDocument.load(editable);
             const tf = doc.getForm().getTextField("text");
             expect(tf.getVerticalAlignment()).toBe(verticalAlignment);
-            expect(tf.getAlignment()).toBe(2);
+            expect(tf.getHorizontalAlignment()).toBe("right");
             const lines = textPositions(doc);
             expect(lines).toHaveLength(multiline ? 2 : 1);
             if (multiline) expect(lines[0].y).toBeGreaterThan(lines[1].y);
@@ -96,21 +184,21 @@ describe("text field vertical alignment", () => {
               expect(parsed.fields[0].verticalAlignment).toBe(
                 verticalAlignment,
               );
-              expect(parsed.fields[0].alignment).toBe("right");
+              expect(parsed.fields[0].horizontalAlignment).toBe("right");
               const next = await restored.export({
                 ...request,
                 fields: [
                   {
                     ...parsed.fields[0],
-                    alignment: "left",
+                    horizontalAlignment: "left",
                     verticalAlignment: "middle",
                   },
                 ],
               });
               const nextDoc = await PDFDocument.load(next);
               expect(
-                nextDoc.getForm().getTextField("text").getAlignment(),
-              ).toBe(0);
+                nextDoc.getForm().getTextField("text").getHorizontalAlignment(),
+              ).toBe("left");
               expect(
                 nextDoc.getForm().getTextField("text").getVerticalAlignment(),
               ).toBe("middle");
@@ -205,7 +293,7 @@ describe("text field vertical alignment", () => {
             borderWidth: 2,
             isTransparent: true,
           },
-          alignment: "center",
+          horizontalAlignment: "center",
           verticalAlignment,
         };
         const request = {

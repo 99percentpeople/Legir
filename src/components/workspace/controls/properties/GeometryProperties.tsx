@@ -15,13 +15,6 @@ import { RotateCcw, Type } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { registry } from "@/components/workspace/controls/registry/ControlRegistry";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   normalizeRotationDeg,
   normalizeRightAngleRotationDeg,
   rotateOuterRectKeepingCenter,
@@ -31,6 +24,7 @@ export const GeometryProperties: React.FC<
   PropertyPanelProps<FormField | Annotation>
 > = ({ data, onChange, onTriggerHistorySave }) => {
   const { t } = useLanguage();
+  const rotationHistorySaved = React.useRef(false);
   if (!data.rect) return null;
   const rect = data.rect;
   const controlConfig = registry.get(data.type);
@@ -189,15 +183,33 @@ export const GeometryProperties: React.FC<
         </div>
       </div>
       {isFormField && (
-        <div className="mt-4 space-y-1">
-          <Label className="text-xs">{t("properties.rotation")}</Label>
-          <Select
-            value={String(rotationDeg)}
-            onValueChange={(value) => {
-              const nextRotation = normalizeRightAngleRotationDeg(
-                Number.parseInt(value, 10),
-              );
-              onTriggerHistorySave?.();
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">{t("properties.rotation")}</Label>
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {rotationDeg}°
+            </span>
+          </div>
+          <Slider
+            aria-label={t("properties.rotation")}
+            aria-valuetext={`${rotationDeg}°`}
+            className="h-5"
+            value={[rotationDeg]}
+            min={0}
+            max={270}
+            step={90}
+            onPointerDownCapture={() => {
+              rotationHistorySaved.current = false;
+            }}
+            onKeyDownCapture={() => {
+              rotationHistorySaved.current = false;
+            }}
+            onValueChange={([nextRotation]) => {
+              if (nextRotation === rotationDeg) return;
+              if (!rotationHistorySaved.current) {
+                onTriggerHistorySave();
+                rotationHistorySaved.current = true;
+              }
               onChange({
                 rect: rotateOuterRectKeepingCenter(
                   rect,
@@ -207,18 +219,19 @@ export const GeometryProperties: React.FC<
                 rotationDeg: nextRotation,
               });
             }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[0, 90, 180, 270].map((value) => (
-                <SelectItem key={value} value={String(value)}>
-                  {value}°
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
+          <div aria-hidden="true" className="relative mx-2 h-6">
+            {[0, 90, 180, 270].map((value) => (
+              <span
+                key={value}
+                className={`absolute flex -translate-x-1/2 flex-col items-center gap-1 text-[10px] tabular-nums ${rotationDeg === value ? "text-primary font-medium" : "text-muted-foreground"}`}
+                style={{ left: `${(value / 270) * 100}%` }}
+              >
+                <span className="h-1 w-px bg-current opacity-50" />
+                {value}°
+              </span>
+            ))}
+          </div>
         </div>
       )}
       {(isFreeText || isShape || isStamp) && (

@@ -384,7 +384,8 @@ export const createControlSlice: EditorStoreSlice<
         "toolTip",
         "multiline",
         "maxLength",
-        "alignment",
+        "horizontalAlignment",
+        "verticalAlignment",
       ];
 
       if (targetField.type !== FieldType.RADIO) {
@@ -395,7 +396,12 @@ export const createControlSlice: EditorStoreSlice<
       const syncUpdates: Partial<FormField> = {};
       propsToSync.forEach((key) => {
         const typedKey = key as keyof FormField;
-        if (updates[typedKey] !== undefined) {
+        if (
+          updates[typedKey] !== undefined ||
+          ((typedKey === "horizontalAlignment" ||
+            typedKey === "verticalAlignment") &&
+            Object.prototype.hasOwnProperty.call(updates, typedKey))
+        ) {
           // @ts-expect-error index signature mismatch for dynamic keyof assignment
           syncUpdates[typedKey] = updates[typedKey];
         }

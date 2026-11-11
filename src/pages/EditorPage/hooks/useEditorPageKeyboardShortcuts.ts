@@ -280,6 +280,7 @@ export function useEditorPageKeyboardShortcuts({
 
       if (
         !isKeyboardHandleTarget &&
+        !target.closest('[role="slider"]') &&
         currentState.selectedId &&
         isMoveKey &&
         ((currentState.mode === "form" && isSelectedField) ||

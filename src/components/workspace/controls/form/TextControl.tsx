@@ -81,15 +81,15 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
     style.borderWidth,
   ]);
   const textAnchor =
-    data.alignment === "center"
+    data.horizontalAlignment === "center"
       ? "middle"
-      : data.alignment === "right"
+      : data.horizontalAlignment === "right"
         ? "end"
         : "start";
   const textX =
-    data.alignment === "center"
+    data.horizontalAlignment === "center"
       ? "50%"
-      : data.alignment === "right"
+      : data.horizontalAlignment === "right"
         ? "100%"
         : "0";
 
@@ -231,7 +231,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             )}
             style={{
               boxSizing: "border-box",
-              textAlign: data.alignment,
+              textAlign: data.horizontalAlignment,
               padding: "calc(1px * var(--scale, 1))",
             }}
             value={
@@ -265,7 +265,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
               paddingBlock: data.verticalAlignment
                 ? "calc(1px * var(--scale, 1))"
                 : 0,
-              textAlign: data.alignment,
+              textAlign: data.horizontalAlignment,
               paddingInline: "calc(1px * var(--scale, 1))",
             }}
             value={

@@ -3,11 +3,23 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createPDFium } from "@legir/pdfium";
-import { NativeEditingContext } from "@legir/pdfium/authoring";
+import {
+  NativeEditingContext,
+  fromPdfTextAlignment,
+  toPdfTextAlignment,
+} from "@legir/pdfium/authoring";
 import { DocumentSession } from "@legir/pdf-core";
 import { FieldType } from "@legir/pdf-model";
 import { PDFWorkerService } from "@legir/pdf-renderer";
 
+for (const [code, alignment] of ["left", "center", "right"].entries()) {
+  assert.equal(fromPdfTextAlignment(code), alignment);
+  assert.equal(toPdfTextAlignment(alignment), code);
+}
+for (const invalid of [undefined, -1, 3, 0.5, NaN]) {
+  assert.equal(fromPdfTextAlignment(invalid), undefined);
+}
+assert.throws(() => toPdfTextAlignment("middle"), /alignment/);
 assert.equal(typeof globalThis.window, "undefined");
 assert.equal(typeof globalThis.Worker, "undefined");
 for (const specifier of [
@@ -130,7 +142,8 @@ try {
       ? {
           ...field,
           value: "Independent package consumer",
-          verticalAlignment: "bottom",
+          horizontalAlignment: "center",
+          verticalAlignment: "middle",
         }
       : field.type === FieldType.CHECKBOX
         ? { ...field, isChecked: true }
@@ -164,15 +177,26 @@ try {
       .getForm()
       .getTextField("project_name")
       .getVerticalAlignment(),
-    "bottom",
+    "middle",
+  );
+  assert.equal(
+    filled.document
+      .getForm()
+      .getTextField("project_name")
+      .getHorizontalAlignment(),
+    "center",
   );
   const reopened = new DocumentSession(engine, completed);
   try {
+    const aligned = (
+      await reopened.parse({}, async () => undefined)
+    ).fields.find((field) => field.name === "project_name");
+    assert.equal(aligned.horizontalAlignment, "center");
     assert.equal(
       (await reopened.parse({}, async () => undefined)).fields.find(
         (field) => field.name === "project_name",
       ).verticalAlignment,
-      "bottom",
+      "middle",
     );
   } finally {
     reopened.dispose();

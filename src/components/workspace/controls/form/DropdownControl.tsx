@@ -1,6 +1,5 @@
 import React from "react";
-import { ChevronDown, Check } from "lucide-react";
-import { ListBox, ListBoxItem } from "react-aria-components";
+import { ChevronDown } from "lucide-react";
 import { isListBoxField } from "@legir/pdf-model/choiceFields";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
@@ -36,6 +35,14 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
         : [],
     ),
   );
+  const listBoxRef = React.useRef<HTMLSelectElement>(null);
+  React.useLayoutEffect(() => {
+    // React falls back to the first option when a single select has no matching value.
+    // PDF lists can have no selection, including after clearing or removing an option.
+    if (listBoxRef.current && !data.isMultiSelect && selectedKeys.size === 0) {
+      listBoxRef.current.selectedIndex = -1;
+    }
+  });
   const setValue = (value: string) => {
     if (!canFill || value === (data.value ?? "")) return;
     props.onTriggerHistorySave?.();
@@ -81,19 +88,23 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
           <div className="pointer-events-none absolute inset-0 z-10 border border-dashed border-blue-400/50" />
         )}
         {listBox ? (
-          <ListBox
+          <select
+            ref={listBoxRef}
             aria-label={data.toolTip || data.name}
-            className="h-full w-full space-y-0.5 overflow-auto bg-transparent p-1 text-inherit outline-none"
+            className="m-0 h-full w-full rounded-none border-0 bg-transparent p-0 text-inherit outline-none disabled:opacity-100"
             style={{ font: "inherit" }}
-            selectionMode={data.isMultiSelect ? "multiple" : "single"}
-            selectionBehavior={data.isMultiSelect ? "toggle" : "replace"}
-            disabledKeys={
-              canFill ? [] : options.map((_, index) => String(index))
+            size={Math.max(2, options.length)}
+            multiple={!!data.isMultiSelect}
+            disabled={!canFill}
+            value={
+              data.isMultiSelect
+                ? [...selectedKeys]
+                : ([...selectedKeys][0] ?? "")
             }
-            selectedKeys={selectedKeys}
-            onSelectionChange={(keys) => {
-              const selected = options.filter(
-                (_, index) => keys === "all" || keys.has(String(index)),
+            onChange={(event) => {
+              const selected = Array.from(
+                event.currentTarget.selectedOptions,
+                (option) => options[Number(option.value)],
               );
               setValue(
                 data.isMultiSelect
@@ -109,35 +120,11 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
             }}
           >
             {options.map((option, index) => (
-              <ListBoxItem
-                key={index}
-                id={String(index)}
-                textValue={option || " "}
-                className={({ isSelected }) =>
-                  cn(
-                    "data-focus-visible:ring-ring/50 flex w-full items-center justify-between rounded px-1 outline-none data-focus-visible:ring-2",
-                    canFill && "cursor-pointer hover:bg-black/5",
-                    isSelected && "bg-black/10 font-medium",
-                  )
-                }
-              >
-                {({ isSelected }) => (
-                  <>
-                    <span className="min-w-0 flex-1 truncate text-left">
-                      {option || "\u00a0"}
-                    </span>
-                    {isSelected && (
-                      <Check
-                        size={12}
-                        className="ml-1 shrink-0"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </>
-                )}
-              </ListBoxItem>
+              <option key={index} value={String(index)}>
+                {option || "\u00a0"}
+              </option>
             ))}
-          </ListBox>
+          </select>
         ) : (
           <>
             <div className="flex w-full items-center justify-between px-1">

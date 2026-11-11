@@ -3,6 +3,11 @@ import { MIN_FIELD_SIZE } from "@/constants";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { ControlProps } from "./types";
+import {
+  CONTROL_SELECTION_FILL,
+  CONTROL_SELECTION_FRAME,
+  CONTROL_SELECTION_LABEL,
+} from "./selectionStyles";
 import { useEditorEventBus } from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getMoveDelta } from "@legir/pdf-model/controlMovement";
@@ -467,7 +472,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
           transformOrigin: "50% 50%",
         }}
       >
-        <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
+        <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-blue-500" />
         <div
           className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
           onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
@@ -511,7 +516,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
 
   const renderRotateHandle = () => (
     <>
-      <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
+      <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-blue-500" />
       <div
         className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
         onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
@@ -573,8 +578,13 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
           <div className="pointer-events-none absolute inset-0">
             {shouldRenderRotatedOverlay ? (
               <>
-                <div className="absolute inset-px border border-dashed border-blue-500" />
-                <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap shadow-sm">
+                <div className="absolute inset-0 border border-blue-500/55" />
+                <span
+                  className={cn(
+                    "absolute bottom-full left-0 z-30 mb-1.5",
+                    CONTROL_SELECTION_LABEL,
+                  )}
+                >
                   {label}
                 </span>
                 <div
@@ -596,15 +606,32 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                     transformOrigin: "50% 50%",
                   }}
                 >
-                  <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
+                  <div
+                    className={cn(
+                      "absolute inset-0",
+                      CONTROL_SELECTION_FRAME,
+                      CONTROL_SELECTION_FILL,
+                    )}
+                  />
                   {canModify && renderResizeHandles()}
                   {canModify && renderRotateHandle()}
                 </div>
               </>
             ) : (
               <>
-                <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
-                <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap shadow-sm">
+                <div
+                  className={cn(
+                    "absolute inset-0",
+                    CONTROL_SELECTION_FRAME,
+                    CONTROL_SELECTION_FILL,
+                  )}
+                />
+                <span
+                  className={cn(
+                    "absolute bottom-full left-0 z-30 mb-1.5",
+                    CONTROL_SELECTION_LABEL,
+                  )}
+                >
                   {label}
                 </span>
                 {canModify && renderResizeHandles()}
@@ -630,12 +657,24 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                   transformOrigin: "50% 50%",
                 }}
               >
-                <div className="absolute -inset-0.5 border border-dashed border-blue-500" />
+                <div
+                  className={cn(
+                    "absolute inset-0",
+                    CONTROL_SELECTION_FRAME,
+                    CONTROL_SELECTION_FILL,
+                  )}
+                />
                 {supportsRotation && canModify && renderRotateHandle()}
               </div>
             ) : (
               <>
-                <div className="absolute inset-0 border border-dashed border-blue-500" />
+                <div
+                  className={cn(
+                    "absolute inset-0",
+                    CONTROL_SELECTION_FRAME,
+                    CONTROL_SELECTION_FILL,
+                  )}
+                />
                 {supportsRotation && canModify && renderRotateHandle()}
               </>
             )}

@@ -3,7 +3,6 @@ import {
   PDFForm,
   PDFName,
   PDFString,
-  TextAlignment,
   type PDFFont,
 } from "@legir/pdfium/authoring";
 import { FormField, FieldType } from "@legir/pdf-model";
@@ -76,9 +75,7 @@ export class TextControlExporter implements IControlExporter {
 
     if (field.style?.fontSize) tf.setFontSize(field.style.fontSize);
 
-    if (field.alignment === "center") tf.setAlignment(TextAlignment.Center);
-    else if (field.alignment === "right") tf.setAlignment(TextAlignment.Right);
-    else if (field.alignment === "left") tf.setAlignment(TextAlignment.Left);
+    tf.setHorizontalAlignment(field.horizontalAlignment);
     tf.setVerticalAlignment(field.verticalAlignment);
 
     if (field.multiline) tf.enableMultiline();

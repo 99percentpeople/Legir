@@ -1,7 +1,10 @@
 import { DEFAULT_FIELD_STYLE } from "@legir/pdf-model/constants";
-import type { FieldStyle } from "@legir/pdf-model";
+import type { FieldStyle, HorizontalAlignment } from "@legir/pdf-model";
 import type { ParserContext, PdfJsAnnotation } from "../types.js";
-import type { PDFDocument } from "@legir/pdfium/authoring";
+import {
+  fromPdfTextAlignment,
+  type PDFDocument,
+} from "@legir/pdfium/authoring";
 import { normalizePdfColorToRgb255, rgbArrayToHex } from "./colors.js";
 import {
   getFieldPropertiesFromPdfLib,
@@ -21,8 +24,8 @@ export const parseFieldStyle = (
   fontMap: Map<string, string>,
   globalDA: string | undefined,
   systemFontFamilies?: string[],
-): { style: FieldStyle; alignment: "left" | "center" | "right" } => {
-  let alignment: "left" | "center" | "right" = "left";
+): { style: FieldStyle; horizontalAlignment: HorizontalAlignment } => {
+  let horizontalAlignment: HorizontalAlignment | undefined;
   const importedStyle: FieldStyle = { ...DEFAULT_FIELD_STYLE };
 
   if (annotation.color) {
@@ -73,10 +76,7 @@ export const parseFieldStyle = (
       if (libProps.da) {
         da = libProps.da;
       }
-      if (libProps.q !== undefined) {
-        if (libProps.q === 1) alignment = "center";
-        else if (libProps.q === 2) alignment = "right";
-      }
+      horizontalAlignment = fromPdfTextAlignment(libProps.q);
     }
   }
 
@@ -89,10 +89,11 @@ export const parseFieldStyle = (
     importedStyle.textColor = parsed.textColor;
   }
 
-  if (alignment === "left" && typeof annotation.textAlignment === "number") {
-    if (annotation.textAlignment === 1) alignment = "center";
-    else if (annotation.textAlignment === 2) alignment = "right";
-  }
-
-  return { style: importedStyle, alignment };
+  return {
+    style: importedStyle,
+    horizontalAlignment:
+      horizontalAlignment ??
+      fromPdfTextAlignment(annotation.textAlignment) ??
+      "left",
+  };
 };

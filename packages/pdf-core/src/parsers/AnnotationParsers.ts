@@ -1,4 +1,5 @@
 import {
+  fromPdfTextAlignment,
   PDFName,
   PDFArray,
   PDFDict,
@@ -1816,12 +1817,8 @@ export class FreeTextParser implements IAnnotationParser {
             annotation.rectDifferences,
             styleScale,
           ),
-          alignment:
-            annotation.textAlignment === 1
-              ? "center"
-              : annotation.textAlignment === 2
-                ? "right"
-                : "left",
+          horizontalAlignment:
+            fromPdfTextAlignment(annotation.textAlignment) ?? "left",
           color: color,
           backgroundColor,
           borderColor,

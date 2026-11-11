@@ -55,14 +55,29 @@ its own assets. A host should serialize document jobs in one worker.
 
 ## Editing API
 
-The authoring entry point exposes `PDFTextField.setVerticalAlignment("top" |
-"middle" | "bottom" | undefined)` and `getVerticalAlignment()`. Alignment moves
-the whole text block within the widget's padded, rotated content box; it works
-with single-line, multiline, wrapped and combed text. Setting it marks the
-appearance dirty. `undefined` restores the previous default layout. The optional
-value is stored as `/LegirVAlign`; other PDF readers can display its normal
-appearance, but may reset placement when they regenerate it after editing.
-`defaultTextFieldAppearanceProvider` is available for custom export pipelines.
+The authoring entry point exposes symmetric string-based text alignment:
+
+```ts
+field.setHorizontalAlignment("center"); // left | center | right | undefined
+field.setVerticalAlignment("middle"); // top | middle | bottom | undefined
+field.getHorizontalAlignment();
+field.getVerticalAlignment();
+```
+
+`fromPdfTextAlignment` and `toPdfTextAlignment` convert between string values
+and PDF `/Q` codes. Decoding absent or invalid codes returns `undefined`;
+callers apply the appropriate default. Encoding rejects invalid values.
+
+Both setters mark the appearance dirty; `undefined` removes the explicit setting
+so inherited/default layout applies. Getters return the inherited explicit value,
+or `undefined` when absent. Only the string-based horizontal and vertical
+methods are exposed; numeric `setAlignment` / `getAlignment` are removed.
+Horizontal values use PDF `/Q`; vertical values use `/LegirVAlign` with `middle`
+for centering. The whole text block moves within the padded, rotated content
+box, including wrapped and combed text.
+Other readers display the normal appearance but may reset vertical placement
+when they regenerate it. `defaultTextFieldAppearanceProvider` is available for
+custom export pipelines.
 
 - `getTrailer`, `findPage`, `PDFObject.get/put/delete/push`, `readStream` and
   `writeStream` expose the native object graph without a second PDF parser.

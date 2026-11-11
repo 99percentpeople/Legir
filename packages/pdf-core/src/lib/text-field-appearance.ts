@@ -1,4 +1,5 @@
 import {
+  toPdfTextAlignment,
   cmyk,
   componentsToColor,
   defaultTextFieldAppearanceProvider,
@@ -156,7 +157,9 @@ export const flattenTextFieldAppearanceProvider: AppearanceProviderFor<
   if (textField.isMultiline()) {
     const inputFontSize = widgetFontSize ?? fieldFontSize;
     const layout = layoutMultilineText(text, {
-      alignment: textField.getAlignment(),
+      alignment: toPdfTextAlignment(
+        textField.getHorizontalAlignment() ?? "left",
+      ),
       fontSize: inputFontSize,
       font,
       bounds,
@@ -183,7 +186,9 @@ export const flattenTextFieldAppearanceProvider: AppearanceProviderFor<
   } else {
     const inputFontSize = widgetFontSize ?? fieldFontSize;
     const layout = layoutSinglelineText(text, {
-      alignment: textField.getAlignment(),
+      alignment: toPdfTextAlignment(
+        textField.getHorizontalAlignment() ?? "left",
+      ),
       fontSize: inputFontSize,
       font,
       bounds,

@@ -1,6 +1,16 @@
 /** Shared PDF/editor data contracts. No UI, persistence or AI dependencies. */
 import type { StampKind, StampPresetId } from "./stamps.js";
 
+export type HorizontalAlignment = "left" | "center" | "right";
+export type VerticalAlignment = "top" | "middle" | "bottom";
+
+/** Shared text alignment contract for form fields and FreeText annotations. */
+export interface TextAlignmentOptions {
+  horizontalAlignment?: HorizontalAlignment;
+  /** Omission retains single-line center / multiline and FreeText top layout. */
+  verticalAlignment?: VerticalAlignment;
+}
+
 export enum FieldType {
   TEXT = "Text",
   CHECKBOX = "Checkbox",
@@ -65,7 +75,7 @@ export interface FieldStyle {
   isTransparent?: boolean;
 }
 
-export interface FormField {
+export interface FormField extends TextAlignmentOptions {
   id: string;
   pageIndex: number;
   layerOrder?: number;
@@ -128,14 +138,11 @@ export interface FormField {
   readOnly?: boolean;
   multiline?: boolean; // For Text
   maxLength?: number; // For Text
-  alignment?: "left" | "center" | "right"; // For Text
-  /** Text block placement. Omit to retain legacy single-line/multiline layout. */
-  verticalAlignment?: "top" | "middle" | "bottom";
   rotationDeg?: number;
   sourcePdfRef?: { objectNumber: number; generationNumber: number };
 }
 
-export interface Annotation {
+export interface Annotation extends TextAlignmentOptions {
   id: string;
   pageIndex: number;
   layerOrder?: number;
@@ -171,8 +178,6 @@ export interface Annotation {
     | { top: number; right: number; bottom: number; left: number };
   fontFamily?: string; // For text
   rotationDeg?: number;
-  alignment?: "left" | "center" | "right"; // For comment text alignment
-  verticalAlignment?: "top" | "middle" | "bottom"; // FreeText; omission means top
   subtype?: string; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
   updatedAt?: string; // ISO Date string for modification date

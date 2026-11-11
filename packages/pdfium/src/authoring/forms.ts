@@ -1,5 +1,10 @@
 // Copyright (c) 2026 Legir contributors. MIT; see ../../LICENSE.
 import {
+  fromPdfTextAlignment,
+  toPdfTextAlignment,
+  type TextHorizontalAlignment,
+} from "./textAlignment.js";
+import {
   PDFArray,
   PDFDict,
   PDFHexString,
@@ -15,7 +20,6 @@ import { PDFFont, StandardFonts } from "./fonts.js";
 import {
   type Color,
   type Rotation,
-  TextAlignment,
   colorComponents,
   componentsToColor,
   drawEllipse,
@@ -469,7 +473,12 @@ export function defaultTextFieldAppearanceProvider(
       ? "*".repeat((field.getText() ?? "").length)
       : (field.getText() ?? ""),
     textColor = appearanceColor(da);
-  const options = { font, fontSize, bounds, alignment: field.getAlignment() };
+  const options = {
+    font,
+    fontSize,
+    bounds,
+    alignment: toPdfTextAlignment(field.getHorizontalAlignment() ?? "left"),
+  };
   const layout = field.isMultiline()
     ? layoutMultilineText(text, options)
     : field.isCombed()
@@ -542,12 +551,19 @@ export class PDFTextField extends PDFField {
     }
     this.doc.getForm().markFieldAsDirty(this.ref);
   }
-  getAlignment() {
-    const q = inherited(this.acroField.dict, "Q");
-    return q instanceof PDFNumber ? q.asNumber() : TextAlignment.Left;
+  getHorizontalAlignment(): TextHorizontalAlignment | undefined {
+    const value = inherited(this.acroField.dict, "Q");
+    if (!(value instanceof PDFNumber)) return undefined;
+    return fromPdfTextAlignment(value.asNumber());
   }
-  setAlignment(value: TextAlignment) {
-    this.acroField.dict.set(key("Q"), PDFNumber.of(value));
+  setHorizontalAlignment(value: TextHorizontalAlignment | undefined) {
+    if (value === undefined) this.acroField.dict.delete(key("Q"));
+    else {
+      this.acroField.dict.set(
+        key("Q"),
+        PDFNumber.of(toPdfTextAlignment(value)),
+      );
+    }
     this.doc.getForm().markFieldAsDirty(this.ref);
   }
   getVerticalAlignment(): TextVerticalAlignment | undefined {

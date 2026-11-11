@@ -918,7 +918,7 @@ const getFreetextAnnotationStylePatch = (
   size: style?.fontSize ?? defaults.size,
   fontFamily: style?.fontFamily,
   lineHeight: style?.lineHeight,
-  alignment: style?.alignment,
+  horizontalAlignment: style?.alignment,
   flatten: style?.flatten,
   rotationDeg: style?.rotationDeg,
 });
@@ -1089,7 +1089,12 @@ const getAnnotationStyleUpdatePatch = (
   }
 
   if (style.alignment !== undefined && target.type === "freetext") {
-    setChanged("alignment", target.alignment, style.alignment, "alignment");
+    setChanged(
+      "horizontalAlignment",
+      target.horizontalAlignment,
+      style.alignment,
+      "alignment",
+    );
   }
 
   if (style.flatten !== undefined && target.type === "freetext") {
@@ -1842,8 +1847,8 @@ export const createAiChatToolContext = (options: {
       if (update.alignment !== undefined) {
         if (target.type !== FieldType.TEXT) {
           reason = "alignment can only be updated on text fields.";
-        } else if (target.alignment !== update.alignment) {
-          patch.alignment = update.alignment;
+        } else if (target.horizontalAlignment !== update.alignment) {
+          patch.horizontalAlignment = update.alignment;
           updatedProperties.push("alignment");
           shouldSyncGroupProperties = true;
         }
@@ -2102,7 +2107,8 @@ export const createAiChatToolContext = (options: {
               : undefined,
           multiline:
             fieldType === FieldType.TEXT ? item.multiline === true : undefined,
-          alignment: fieldType === FieldType.TEXT ? item.alignment : undefined,
+          horizontalAlignment:
+            fieldType === FieldType.TEXT ? item.alignment : undefined,
           exportValue,
           radioValue:
             fieldType === FieldType.RADIO

@@ -45,6 +45,10 @@ import {
 import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionPopover";
 import PDFPage from "./layers/PDFPage";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
+import {
+  CONTROL_SELECTION_FRAME,
+  CONTROL_SELECTION_LABEL,
+} from "./controls/selectionStyles";
 import { useWorkspaceDerivedPages } from "./hooks/useWorkspaceDerivedPages";
 import { constrainResizedField } from "./lib/fieldSizing";
 import { previewSelectedControls } from "./lib/controlSelectionPreview";
@@ -3661,35 +3665,55 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   dy -
                   y;
                 return (
-                  <svg
-                    className="pointer-events-none absolute inset-0 z-50 overflow-visible"
-                    data-control-selection-count={rects.length}
-                    viewBox={`0 0 ${page.width} ${page.height}`}
-                  >
-                    {rects.map((rect) => (
-                      <rect
-                        key={rect.id}
-                        x={rect.x + dx}
-                        y={rect.y + dy}
-                        width={rect.width}
-                        height={rect.height}
-                        fill="none"
-                        stroke="#3b82f6"
-                        strokeOpacity={0.6}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ))}
-                    <rect
-                      x={x}
-                      y={y}
-                      width={width}
-                      height={height}
-                      fill="none"
-                      stroke="#3b82f6"
-                      strokeDasharray="4 3"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
+                  <>
+                    <svg
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 z-50 h-full w-full overflow-visible"
+                      data-control-selection-count={rects.length}
+                      viewBox={`0 0 ${page.width} ${page.height}`}
+                    >
+                      {rects.map((rect) => (
+                        <rect
+                          key={rect.id}
+                          x={rect.x + dx}
+                          y={rect.y + dy}
+                          width={rect.width}
+                          height={rect.height}
+                          className="fill-blue-500/[0.06] stroke-blue-500/55"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      ))}
+                    </svg>
+                    <div
+                      aria-hidden="true"
+                      className={cn(
+                        "pointer-events-none absolute z-50",
+                        CONTROL_SELECTION_FRAME,
+                      )}
+                      style={{
+                        left: x * editorState.scale - 4,
+                        top: y * editorState.scale - 4,
+                        width: width * editorState.scale + 8,
+                        height: height * editorState.scale + 8,
+                      }}
+                    >
+                      {rects.length > 1 && (
+                        <span
+                          className={cn(
+                            "absolute left-0",
+                            CONTROL_SELECTION_LABEL,
+                            y * editorState.scale >= 32
+                              ? "bottom-full mb-1.5"
+                              : "top-1 left-1",
+                          )}
+                        >
+                          {t("properties.multi_selected", {
+                            count: rects.length,
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  </>
                 );
               })()}
 

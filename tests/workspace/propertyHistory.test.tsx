@@ -208,3 +208,33 @@ it("saves one undo checkpoint for vertical alignment and restores the legacy def
     store.dispose();
   }
 });
+
+it("synchronizes both alignment axes and resets across widgets", () => {
+  const store = createTestEditorStore({
+    fields: [
+      field("first", { name: "shared", horizontalAlignment: "left" }),
+      field("second", { name: "shared", horizontalAlignment: "left" }),
+    ],
+  });
+  try {
+    store.getState().updateField("first", {
+      horizontalAlignment: "right",
+      verticalAlignment: "middle",
+    });
+    for (const item of store.getState().fields) {
+      expect(item.horizontalAlignment).toBe("right");
+      expect(item.verticalAlignment).toBe("middle");
+    }
+    store.getState().updateField("first", {
+      horizontalAlignment: undefined,
+      verticalAlignment: undefined,
+    });
+    for (const item of store.getState().fields) {
+      expect(item.horizontalAlignment).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(item))).not.toHaveProperty("alignment");
+      expect(item.verticalAlignment).toBeUndefined();
+    }
+  } finally {
+    store.dispose();
+  }
+});

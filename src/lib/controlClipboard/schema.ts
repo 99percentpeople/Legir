@@ -95,7 +95,7 @@ const field = base
     readOnly: flag,
     multiline: flag,
     maxLength: numeric,
-    alignment,
+    horizontalAlignment: alignment,
     verticalAlignment,
   })
   .transform(({ signatureData, imageScaleMode, ...value }) =>
@@ -154,7 +154,7 @@ const annotation = base.extend({
     ])
     .optional(),
   fontFamily: text,
-  alignment,
+  horizontalAlignment: alignment,
   verticalAlignment,
   subtype: text,
   intent: text,
@@ -224,7 +224,11 @@ const envelope = { version: z.literal(1), sourceDocumentId: z.string() };
 export const controlClipboardSchema: z.ZodType<ControlClipboard> =
   z.discriminatedUnion("type", [
     z.object({ ...envelope, type: z.literal("field"), data: field }),
-    z.object({ ...envelope, type: z.literal("annotation"), data: annotation }),
+    z.object({
+      ...envelope,
+      type: z.literal("annotation"),
+      data: annotation,
+    }),
   ]);
 
 export const controlClipboardPayloadSchema: z.ZodType<ControlClipboardPayload> =

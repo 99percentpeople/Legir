@@ -51,7 +51,7 @@ export class TextControlParser implements IControlParser {
           viewport: getViewportSummary(viewport),
         }));
 
-        const { style, alignment } = parseFieldStyle(
+        const { style, horizontalAlignment } = parseFieldStyle(
           annotation,
           pdfDoc,
           fontMap,
@@ -79,7 +79,7 @@ export class TextControlParser implements IControlParser {
             typeof annotation.placeholder === "string"
               ? annotation.placeholder
               : undefined,
-          alignment: alignment,
+          horizontalAlignment,
           verticalAlignment: annotation.verticalAlignment,
           multiline: !!(fieldFlags & 4096),
           maxLength: annotation.maxLen,
@@ -264,7 +264,7 @@ export class DropdownControlParser implements IControlParser {
           viewport: getViewportSummary(viewport),
         }));
 
-        const { style, alignment } = parseFieldStyle(
+        const { style, horizontalAlignment } = parseFieldStyle(
           annotation,
           pdfDoc,
           fontMap,
@@ -314,7 +314,7 @@ export class DropdownControlParser implements IControlParser {
           isListBox: !(fieldFlags & (1 << 17)),
           isMultiSelect: isMultiSelect,
           allowCustomValue: allowCustomValue,
-          alignment: alignment,
+          horizontalAlignment,
           toolTip: annotation.alternativeText || undefined,
           rotationDeg:
             typeof annotation.rotation === "number" &&

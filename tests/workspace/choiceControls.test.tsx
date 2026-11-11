@@ -97,13 +97,12 @@ describe("list-box canvas presentation", () => {
           isAnnotationMode={!design}
         />,
       );
-      expect(host.querySelector("select")).toBeNull();
-      expect(host.querySelector('[role="listbox"]')).not.toBeNull();
-      expect(host.querySelectorAll('[role="option"]')).toHaveLength(3);
-      expect(
-        host.querySelector('[role="option"][aria-selected="true"]')
-          ?.textContent,
-      ).toBe("Two");
+      const select = host.querySelector("select")!;
+      expect(select.size).toBeGreaterThan(1);
+      expect(select.multiple).toBe(false);
+      expect(select.disabled).toBe(design);
+      expect(select.options).toHaveLength(3);
+      expect(select.selectedOptions[0].textContent).toBe("Two");
       expect(host.querySelector(".lucide-chevron-down")).toBeNull();
     },
   );
@@ -115,14 +114,9 @@ describe("list-box canvas presentation", () => {
         isAnnotationMode={false}
       />,
     );
-    expect(
-      host
-        .querySelector('[role="listbox"]')
-        ?.getAttribute("aria-multiselectable"),
-    ).toBe("true");
-    expect(
-      host.querySelectorAll('[role="option"][aria-selected="true"]'),
-    ).toHaveLength(2);
+    const select = host.querySelector("select")!;
+    expect(select.multiple).toBe(true);
+    expect(select.selectedOptions).toHaveLength(2);
   });
   it("retains a native select for a real dropdown", async () => {
     await render(<DropdownControl {...props(field({ isListBox: false }))} />);
@@ -138,9 +132,48 @@ describe("list-box canvas presentation", () => {
           canFillFormValue={restriction.canFillFormValue}
         />,
       );
-      expect(
-        host.querySelectorAll('[role="option"][aria-disabled="true"]'),
-      ).toHaveLength(3);
+      expect(host.querySelector("select")?.disabled).toBe(true);
+    },
+  );
+  it.each([[], ["Only"], ["One", "Two"]])(
+    "keeps an unselected list empty with options %j",
+    async (...options) => {
+      await render(
+        <DropdownControl
+          {...props(field({ isListBox: true, options, value: "" }))}
+        />,
+      );
+      const select = host.querySelector("select")!;
+      expect(select.size).toBeGreaterThan(1);
+      expect(select.selectedIndex).toBe(-1);
+      expect(select.selectedOptions).toHaveLength(0);
+    },
+  );
+  it.each([false, true])(
+    "saves a checkpoint before a native selection change (multiple=%s)",
+    async (multiple) => {
+      const controlProps = props(
+        field({ isListBox: true, isMultiSelect: multiple }),
+      );
+      const history = vi.fn();
+      await render(
+        <DropdownControl {...controlProps} onTriggerHistorySave={history} />,
+      );
+      const select = host.querySelector("select")!;
+      await act(async () => {
+        for (const option of select.options) {
+          option.selected =
+            option.value === "2" || (multiple && option.value === "0");
+        }
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      expect(history).toHaveBeenCalledOnce();
+      expect(controlProps.onUpdate).toHaveBeenCalledExactlyOnceWith("choice", {
+        value: multiple ? "One\nThree" : "Three",
+      });
+      expect(history.mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(controlProps.onUpdate).mock.invocationCallOrder[0],
+      );
     },
   );
 });

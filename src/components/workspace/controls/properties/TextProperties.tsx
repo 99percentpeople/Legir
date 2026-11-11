@@ -168,11 +168,11 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
               <button
                 onClick={() => {
                   onTriggerHistorySave();
-                  onChange({ alignment: "left" });
+                  onChange({ horizontalAlignment: "left" });
                 }}
                 className={cn(
                   "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                  (data.alignment || "left") === "left" &&
+                  (data.horizontalAlignment || "left") === "left" &&
                     "bg-background text-foreground shadow-sm",
                 )}
                 title={t("properties.alignment_options.left")}
@@ -182,11 +182,11 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
               <button
                 onClick={() => {
                   onTriggerHistorySave();
-                  onChange({ alignment: "center" });
+                  onChange({ horizontalAlignment: "center" });
                 }}
                 className={cn(
                   "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                  data.alignment === "center" &&
+                  data.horizontalAlignment === "center" &&
                     "bg-background text-foreground shadow-sm",
                 )}
                 title={t("properties.alignment_options.center")}
@@ -196,11 +196,11 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
               <button
                 onClick={() => {
                   onTriggerHistorySave();
-                  onChange({ alignment: "right" });
+                  onChange({ horizontalAlignment: "right" });
                 }}
                 className={cn(
                   "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                  data.alignment === "right" &&
+                  data.horizontalAlignment === "right" &&
                     "bg-background text-foreground shadow-sm",
                 )}
                 title={t("properties.alignment_options.right")}

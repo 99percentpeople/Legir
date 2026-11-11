@@ -317,7 +317,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                   fontSize: "inherit",
                   color: "inherit",
                   lineHeight: "inherit",
-                  textAlign: data.alignment || "left",
+                  textAlign: data.horizontalAlignment || "left",
                   scrollbarWidth: "none",
                   transform: `translateY(${verticalOffset + editingOffset}px)`,
                   height: Math.max(
@@ -342,17 +342,17 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                   <text
                     key={index}
                     x={
-                      data.alignment === "right"
+                      data.horizontalAlignment === "right"
                         ? content.width
-                        : data.alignment === "center"
+                        : data.horizontalAlignment === "center"
                           ? content.width / 2
                           : 0
                     }
                     y={verticalOffset + baseline + index * baseLineHeightPx}
                     textAnchor={
-                      data.alignment === "right"
+                      data.horizontalAlignment === "right"
                         ? "end"
-                        : data.alignment === "center"
+                        : data.horizontalAlignment === "center"
                           ? "middle"
                           : "start"
                     }

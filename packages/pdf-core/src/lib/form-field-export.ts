@@ -22,7 +22,6 @@ import {
   PDFRef,
   PDFTextField,
   PDFWidgetAnnotation,
-  TextAlignment,
 } from "@legir/pdfium/authoring";
 import { FieldType, type FormField } from "@legir/pdf-model";
 import { canPreserveFormAppearance } from "@legir/pdf-model/formAppearance";
@@ -544,19 +543,9 @@ export const updateExistingSourceField = async (
           textField.setFontSize(field.style!.fontSize!),
         );
       }
-      if (field.alignment === "center") {
-        runExistingFieldUpdate("setAlignment", () =>
-          textField.setAlignment(TextAlignment.Center),
-        );
-      } else if (field.alignment === "right") {
-        runExistingFieldUpdate("setAlignment", () =>
-          textField.setAlignment(TextAlignment.Right),
-        );
-      } else if (field.alignment === "left") {
-        runExistingFieldUpdate("setAlignment", () =>
-          textField.setAlignment(TextAlignment.Left),
-        );
-      }
+      runExistingFieldUpdate("setHorizontalAlignment", () =>
+        textField.setHorizontalAlignment(field.horizontalAlignment),
+      );
       runExistingFieldUpdate("setVerticalAlignment", () =>
         textField.setVerticalAlignment(field.verticalAlignment),
       );

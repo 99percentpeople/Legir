@@ -46,7 +46,7 @@ the callback above intentionally supplies no raster stamp fallback.
 
 ## Text alignment
 
-Text fields accept `alignment: "left" | "center" | "right"` and
+Text fields and FreeText annotations accept `horizontalAlignment: "left" | "center" | "right"` and
 `verticalAlignment: "top" | "middle" | "bottom"`. The latter places the entire
 text block inside the control, including wrapped lines, explicit line breaks,
 font metrics, border padding and quarter-turn rotations. Explicit vertical
@@ -64,7 +64,7 @@ const fields = model.fields.map((field) =>
   field.type === FieldType.TEXT
     ? {
         ...field,
-        alignment: "center" as const,
+        horizontalAlignment: "center" as const,
         verticalAlignment: "middle" as const,
       }
     : field,
@@ -76,6 +76,13 @@ Omission preserves top alignment. Alignment uses the complete wrapped line block
 inside `textPadding`; overflowing blocks stay at the top so their start remains
 accessible. Editor display, editable annotation appearances and flattened output
 share this layout. FreeText also round-trips the optional `/LegirVAlign` extension.
+
+The model package exports `HorizontalAlignment`, `VerticalAlignment` and
+`TextAlignmentOptions`. Horizontal centering uses `center`; vertical centering
+uses `middle`. PDF import and export use `horizontalAlignment` and
+`verticalAlignment` consistently. Callers must use these names and values;
+`alignment` and vertical `center` are not supported. PDF storage remains `/Q`
+and `/LegirVAlign`, with `middle` written directly for vertical centering.
 
 ## List boxes and dropdowns
 
