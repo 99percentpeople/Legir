@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Legir contributors. MIT; see ../../LICENSE.
+import type { FontEngine } from "./font-engine.js";
 import {
   PDFArray,
   PDFCatalog,
@@ -15,7 +16,7 @@ import {
   PDFString,
   PDFOperator,
 } from "./objects.js";
-import { PDFFont, StandardFonts, type Fontkit } from "./fonts.js";
+import { PDFFont, StandardFonts } from "./fonts.js";
 import { PDFForm } from "./forms.js";
 import { PDFAttachments } from "./attachments.js";
 import {
@@ -56,7 +57,7 @@ export class PDFDocument {
   private pages?: PDFPage[];
   private form?: PDFForm;
   private readonly fonts: PDFFont[] = [];
-  private fontkit?: Fontkit;
+  private fontEngine?: FontEngine;
   private encryption?: SaveOptions;
   get isEncrypted() {
     const trailer = this.nativeView?.native.getTrailer();
@@ -201,10 +202,10 @@ export class PDFDocument {
   getAttachments() {
     return new PDFAttachments(this);
   }
-  registerFontkit(fontkit: unknown) {
-    if (!fontkit || typeof (fontkit as Fontkit).create !== "function")
-      throw new Error("Invalid font shaper");
-    this.fontkit = fontkit as Fontkit;
+  registerFontEngine(engine: FontEngine) {
+    if (!engine || typeof engine.createFont !== "function")
+      throw new Error("Invalid font engine: expected createFont(bytes)");
+    this.fontEngine = engine;
   }
   embedStandardFont(name: StandardFonts | string) {
     const font = new PDFFont(this.context, name, undefined, true, this);
@@ -221,14 +222,14 @@ export class PDFDocument {
     )
       return this.embedStandardFont(source);
     const bytes = decodeImageInput(source);
-    if (!this.fontkit)
+    if (!this.fontEngine)
       throw new Error(
-        "Register a font shaper before embedding custom font bytes",
+        "Call registerFontEngine() before embedding custom font bytes",
       );
     const font = new PDFFont(
       this.context,
       bytes,
-      this.fontkit.create(bytes),
+      await this.fontEngine.createFont(bytes),
       options.subset ?? true,
       this,
     );

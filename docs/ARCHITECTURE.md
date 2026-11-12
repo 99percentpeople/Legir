@@ -353,8 +353,10 @@ object graph. `index.ts` is the client; `documentPipeline.ts` runs in the worker
 native xref and owns form fields, font resources/subsets, text layout, image
 embedding and vector appearance generation. The application has no pdf-lib or
 PDF.js dependency, including test dependencies. Authoring values are thin native
-views, not a second parsed xref or a JavaScript PDF serializer. `pdf-fontkit`
-shapes/subsets custom fonts; `fast-png` and `@xmldom/xmldom` decode PNG/SVG inputs.
+views, not a second parsed xref or a JavaScript PDF serializer. The injected `FontEngine`
+shapes/subsets custom fonts. The application lazily loads upstream `fontkit` via
+the optional `@legir/pdfium/fontkit` adapter; SDK packages have no fontkit
+dependency. `fast-png` and `@xmldom/xmldom` decode PNG/SVG inputs.
 PDF parsing, encryption, grafts and file writing remain native. Native glyph
 advances/encodings use PDFium; standard Base-14 vertical metrics keep existing
 form layout stable despite substituted font outlines.

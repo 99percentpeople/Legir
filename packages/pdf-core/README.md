@@ -1,7 +1,7 @@
 # @legir/pdf-core
 
 PDF import/export policies and transactional document sessions, extracted from
-Legir. Depends on `@legir/pdfium`, `@legir/pdf-model` and `pdf-fontkit`, not on
+Legir. Depends on `@legir/pdfium` and `@legir/pdf-model`, not on any font library,
 React, Zustand, Tauri, the application event bus or Vite.
 
 Install with `bun add @legir/pdf-core` or `npm install @legir/pdf-core`.
@@ -43,6 +43,33 @@ The example assumes a normal AcroForm text field and supported embedded/standard
 fonts. It is not a general PDF sanitization or digital-signature service.
 Unknown image-stamp fallback parsing can require a browser image/canvas host;
 the callback above intentionally supplies no raster stamp fallback.
+
+## Custom font engine
+
+Custom, CJK and system-font export require a host-supplied `FontEngine` from
+`@legir/pdfium/authoring`. Standard Base-14 fonts and imports do not load one.
+Configure this in every realm that exports PDFs, including content workers:
+
+```ts
+import { configurePdfHost } from "@legir/pdf-core/host";
+
+configurePdfHost({
+  loadFontEngine: async () => {
+    const [{ createFontkitEngine }, fontkit] = await Promise.all([
+      import("@legir/pdfium/fontkit"),
+      import("fontkit"),
+    ]);
+    return createFontkitEngine(fontkit);
+  },
+});
+```
+
+Install upstream `fontkit` in the consuming application (`npm install fontkit@3.0.0`)
+when using this optional adapter. The SDK does not install or import it. Other
+engines can implement `FontEngine` directly. Font bytes still come from
+`customFont`, `readFontAsset` or the system-font provider; loading the engine does
+not fetch fonts. A missing engine rejects custom-font export with a configuration
+error. See the [authoring contract](../pdfium/README.md#custom-fonts).
 
 ## Text alignment
 
@@ -143,7 +170,7 @@ or separate editable object graph was added by the extraction.
 
 `configurePdfHost` supplies optional integration capabilities once per JavaScript
 realm: PDFium module URL, asset URL or font-asset reader, system-font provider,
-font catalog, progress/password events, existing-document lookup and a content
+font engine, font catalog, progress/password events, existing-document lookup and a content
 worker factory. Do not put per-request tokens, tenant data or credentials in the
 realm-scoped host configuration.
 

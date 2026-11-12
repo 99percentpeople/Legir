@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readPageText, renderPageBody } from "./nativeVerification";
 import { readFile } from "node:fs/promises";
-import fontkit from "pdf-fontkit";
+import * as fontkit from "fontkit";
+import { createFontkitEngine } from "@legir/pdfium/fontkit";
 import {
   PDFBool,
   PDFArray,
@@ -517,7 +518,7 @@ describe("exportPDF form handling", () => {
       await readFile("public/fonts/NotoSansSC-Regular.ttf"),
     );
     const metricsDoc = await PDFDocument.create();
-    metricsDoc.registerFontkit(fontkit);
+    metricsDoc.registerFontEngine(createFontkitEngine(fontkit));
     const metricsFont = await metricsDoc.embedFont(customFontBytes);
     const exportedBytes = await exportPDF(
       sourceBytes,

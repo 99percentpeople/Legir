@@ -1,11 +1,19 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as fontkit from "fontkit";
+import { createFontkitEngine } from "@legir/pdfium/fontkit";
+import { configurePdfHost } from "@legir/pdf-core/host";
 import { DocumentSession } from "@legir/pdf-core";
 import { getPDFium } from "@legir/pdf-core/runtime";
 import { FieldType, type FormField } from "@legir/pdf-model";
 import { PDFDocument, PDFName, PDFStream } from "@legir/pdfium/authoring";
 import { parseFieldStyle } from "../dist/lib/control-parsing.js";
+
+beforeEach(() => {
+  configurePdfHost({ loadFontEngine: () => createFontkitEngine(fontkit) });
+});
+afterEach(() => configurePdfHost({ loadFontEngine: undefined }));
 
 const alignments = ["top", "middle", "bottom"] as const;
 const hash = (bytes: Uint8Array) =>

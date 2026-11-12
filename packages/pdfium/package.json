@@ -1,6 +1,6 @@
 {
   "name": "@legir/pdfium",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Standalone PDFium WebAssembly engine and TypeScript bindings",
   "type": "module",
   "license": "MIT",
@@ -32,6 +32,10 @@
     "./authoring": {
       "types": "./dist/authoring/index.d.ts",
       "import": "./dist/authoring/index.js"
+    },
+    "./fontkit": {
+      "types": "./dist/fontkit.d.ts",
+      "import": "./dist/fontkit.js"
     }
   },
   "scripts": {

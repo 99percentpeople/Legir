@@ -18,7 +18,7 @@ const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 const getManualChunk = (id: string) => {
   const normalized = id.replaceAll("\\", "/");
-  if (normalized.includes("/node_modules/pdf-fontkit/")) return "pdf-fontkit";
+  if (normalized.includes("/node_modules/fontkit/")) return "fontkit";
   if (normalized.includes("/node_modules/@ai-sdk/openai/")) {
     return "ai-provider-openai";
   }

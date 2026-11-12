@@ -9,3 +9,9 @@ export * from "./operators.js";
 export { PDFImage } from "./images.js";
 export { PDFSvg } from "./svg.js";
 export { NativeEditingContext } from "./nativeContext.js";
+export type {
+  FontEngine,
+  ShapingFont,
+  FontGlyph,
+  FontSubset,
+} from "./font-engine.js";

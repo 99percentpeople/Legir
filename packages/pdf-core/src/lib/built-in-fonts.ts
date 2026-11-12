@@ -1,12 +1,10 @@
-import type { PDFFont, PDFDocument } from "@legir/pdfium/authoring";
+import type { PDFFont, PDFDocument, FontEngine } from "@legir/pdfium/authoring";
 import {
   getSystemFontBytes,
   hasSystemFontProvider,
   getPdfHost,
 } from "../host.js";
 import { hasWorkerFontProvider } from "../engine/fontHost.js";
-
-type Fontkit = Parameters<PDFDocument["registerFontkit"]>[0];
 
 export type ExportFontConfig = {
   id: "cjk_sans" | "cjk_serif";
@@ -119,19 +117,19 @@ const setFontMapIfMissing = (
 export const loadAndEmbedExportFonts = async (args: {
   pdfDoc: PDFDocument;
   fontMap: Map<string, PDFFont>;
-  fontkit: Fontkit;
+  fontEngine: FontEngine;
   customFont?: { bytes: Uint8Array; name?: string };
   includeFontIds?: Set<ExportFontConfig["id"]>;
   subset?: boolean;
 }) => {
-  const { pdfDoc, fontMap, fontkit, customFont, includeFontIds } = args;
+  const { pdfDoc, fontMap, fontEngine, customFont, includeFontIds } = args;
   const subset = args.subset ?? true;
 
-  let fontkitRegistered = false;
-  const ensureFontkit = () => {
-    if (!fontkitRegistered) {
-      pdfDoc.registerFontkit(fontkit);
-      fontkitRegistered = true;
+  let fontEngineRegistered = false;
+  const ensureFontEngine = () => {
+    if (!fontEngineRegistered) {
+      pdfDoc.registerFontEngine(fontEngine);
+      fontEngineRegistered = true;
     }
   };
 
@@ -140,7 +138,7 @@ export const loadAndEmbedExportFonts = async (args: {
     bytes: Uint8Array,
     useSubset: boolean,
   ): Promise<PDFFont | undefined> => {
-    ensureFontkit();
+    ensureFontEngine();
     try {
       return await pdfDoc.embedFont(bytes, { subset: useSubset });
     } catch (e) {
@@ -192,25 +190,25 @@ export const loadAndEmbedExportFonts = async (args: {
 export const loadAndEmbedSelectedSystemFonts = async (args: {
   pdfDoc: PDFDocument;
   fontMap: Map<string, PDFFont>;
-  fontkit: Fontkit;
+  fontEngine: FontEngine;
   families: string[];
   subset?: boolean;
 }) => {
   if (!hasSystemFontProvider()) return;
 
-  const { pdfDoc, fontMap, fontkit } = args;
+  const { pdfDoc, fontMap, fontEngine } = args;
   const subset = args.subset ?? true;
 
-  let fontkitRegistered = false;
-  const ensureFontkit = () => {
-    if (!fontkitRegistered) {
-      pdfDoc.registerFontkit(fontkit);
-      fontkitRegistered = true;
+  let fontEngineRegistered = false;
+  const ensureFontEngine = () => {
+    if (!fontEngineRegistered) {
+      pdfDoc.registerFontEngine(fontEngine);
+      fontEngineRegistered = true;
     }
   };
 
   const embedFont = async (bytes: Uint8Array): Promise<PDFFont | undefined> => {
-    ensureFontkit();
+    ensureFontEngine();
     try {
       return await pdfDoc.embedFont(bytes, { subset });
     } catch (e) {

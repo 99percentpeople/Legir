@@ -1,4 +1,13 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { configurePdfHost } from "../dist/host.js";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { readFile } from "node:fs/promises";
 import {
   PDFDocument,
@@ -6,7 +15,8 @@ import {
   StandardFonts,
   type PDFFont,
 } from "@legir/pdfium/authoring";
-import fontkit from "pdf-fontkit";
+import * as fontkit from "fontkit";
+import { createFontkitEngine } from "@legir/pdfium/fontkit";
 import { FieldType, type FormField, type Annotation } from "@legir/pdf-model";
 import {
   canFontEncodeText,
@@ -22,7 +32,11 @@ beforeAll(async () => {
     ),
   );
 });
+beforeEach(() => {
+  configurePdfHost({ loadFontEngine: () => createFontkitEngine(fontkit) });
+});
 afterEach(() => {
+  configurePdfHost({ loadFontEngine: undefined });
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -67,7 +81,7 @@ describe("font coverage without encoding probes", () => {
 
   it("includes all visible option-list labels in the font decision", async () => {
     const { pdfDoc, fontMap } = await createFontMap();
-    pdfDoc.registerFontkit(fontkit);
+    pdfDoc.registerFontEngine(createFontkitEngine(fontkit));
     const cjk = await pdfDoc.embedFont(fontBytes, { subset: true });
     fontMap.set("CustomSans", cjk);
     const control = field({
@@ -90,11 +104,26 @@ describe("font coverage without encoding probes", () => {
 });
 
 describe("load fonts only for actual appearances", () => {
+  it("requires a host engine only when custom fonts are actually needed", async () => {
+    configurePdfHost({ loadFontEngine: undefined });
+    const args = await createFontMap();
+    await expect(
+      prepareExportFonts({ ...args, fields: [field()], annotations: [] }),
+    ).resolves.toBeUndefined();
+    await expect(
+      prepareExportFonts({
+        ...args,
+        fields: [field({ value: "中文", style: { fontFamily: "CustomSans" } })],
+        annotations: [],
+        customFont: { bytes: fontBytes },
+      }),
+    ).rejects.toThrow("loadFontEngine");
+  });
   it("does not load CJK fonts for Western text, authors, tooltips or comments", async () => {
     const args = await createFontMap();
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
-    const register = vi.spyOn(args.pdfDoc, "registerFontkit");
+    const register = vi.spyOn(args.pdfDoc, "registerFontEngine");
     await prepareExportFonts({
       ...args,
       fields: [
@@ -204,7 +233,7 @@ describe("load fonts only for actual appearances", () => {
     source.getPage(0).node.addAnnot(ref);
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
-    const register = vi.spyOn(PDFDocument.prototype, "registerFontkit");
+    const register = vi.spyOn(PDFDocument.prototype, "registerFontEngine");
     const annotations: Annotation[] = [
       {
         id: "preserved",

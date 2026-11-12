@@ -138,7 +138,7 @@ describe("npm PDF library releases", () => {
       dependencies: {
         "@legir/pdf-model": "workspace:*",
         "@legir/pdfium": "workspace:*",
-        "pdf-fontkit": "^1.8.9",
+        "fast-png": "^8.0.0",
       },
     };
     const result = npmPackageMetadata(
@@ -148,7 +148,7 @@ describe("npm PDF library releases", () => {
     );
     expect(result.dependencies["@legir/pdf-model"]).toBe("0.1.0");
     expect(result.dependencies["@legir/pdfium"]).toBe("0.1.0");
-    expect(result.dependencies["pdf-fontkit"]).toBe("^1.8.9");
+    expect(result.dependencies["fast-png"]).toBe("^8.0.0");
     expect(source.dependencies["@legir/pdf-model"]).toBe("workspace:*");
     expect(result.publishConfig).toEqual({ access: "public" });
     expect(result.repository).toEqual({

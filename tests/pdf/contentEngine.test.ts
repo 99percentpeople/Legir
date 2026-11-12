@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
-import fontkit from "pdf-fontkit";
+import * as fontkit from "fontkit";
+import { createFontkitEngine } from "@legir/pdfium/fontkit";
 import { readPageText } from "./nativeVerification";
 import {
   degrees,
@@ -281,7 +282,7 @@ describe("PDFium content engine", () => {
 
   it("uses real CJK font metrics instead of byte-length estimates", async () => {
     const doc = await PDFDocument.create();
-    doc.registerFontkit(fontkit);
+    doc.registerFontEngine(createFontkitEngine(fontkit));
     const font = await doc.embedFont(
       new Uint8Array(await readFile("public/fonts/NotoSansSC-Regular.ttf")),
       { subset: true },

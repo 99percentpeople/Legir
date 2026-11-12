@@ -1,6 +1,6 @@
 {
   "name": "@legir/pdf-core",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "PDF import, export, forms and document sessions without the application shell",
   "type": "module",
   "license": "MIT",
@@ -75,8 +75,7 @@
   },
   "dependencies": {
     "@legir/pdf-model": "workspace:*",
-    "@legir/pdfium": "workspace:*",
-    "pdf-fontkit": "^1.8.9"
+    "@legir/pdfium": "workspace:*"
   },
   "devDependencies": {
     "typescript": "~6.0.3",

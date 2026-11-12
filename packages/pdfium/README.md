@@ -172,7 +172,7 @@ appearance helpers; OCR models can consume its `renderOcrImage` result.
 
 `@legir/pdfium/authoring` is the package's own higher-level editing layer. It
 provides the object/field vocabulary used by Legir, Standard-14 and caller-supplied
-fontkit fonts, PNG/JPEG, vector SVG shapes/text/images, page drawing and metadata.
+fonts through an injected `FontEngine`, PNG/JPEG, vector SVG shapes/text/images, page drawing and metadata.
 It is not a drop-in implementation of every API from other PDF libraries.
 
 ```ts
@@ -194,6 +194,47 @@ and cancellation. `PDFContext` only constructs values; it cannot parse or save
 files independently. Native object graph copying is used whenever views share
 an engine. The application retains its page-assembly policies for forms, links,
 annotations/replies and source identity.
+
+### Custom fonts
+
+`PDFDocument.registerFontEngine(engine)` accepts the library-neutral
+`FontEngine` contract exported by `@legir/pdfium/authoring`. Its `createFont(bytes)`
+may be synchronous or asynchronous. The returned `ShapingFont` supplies Unicode
+coverage, metrics, glyph layout, an explicit `outlineFormat`, and subsets whose
+`includeGlyph(sourceGlyphId)` returns a stable CID. `encode()` returns font bytes
+or a promise and must throw/reject on failure. CIDs must remain stable across
+repeated saves and subsequent glyph additions; CFF subsets must use those CIDs.
+For `subset: false`, `ShapingFont.encode()` supplies the complete embeddable
+program with CIDs/GIDs equal to source glyph IDs. Encoders return raw TrueType or
+CID-keyed CFF bytes, not a WOFF or OpenType/CFF container. The fontkit adapter
+encodes all source glyphs in order for this mode.
+
+The core authoring entry point has no fontkit dependency. Applications that choose
+upstream `fontkit` can use the optional, dependency-free adapter:
+
+```ts
+import * as fontkit from "fontkit"; // Application dependency: fontkit@3.0.0
+import { createFontkitEngine } from "@legir/pdfium/fontkit";
+import { PDFDocument } from "@legir/pdfium/authoring";
+
+const doc = await PDFDocument.create();
+try {
+  doc.registerFontEngine(createFontkitEngine(fontkit));
+  const font = await doc.embedFont(fontBytes, { subset: true });
+  doc.addPage().drawText("Hello", { font, size: 12 });
+  const bytes = await doc.save();
+} finally {
+  doc.destroy();
+}
+```
+
+Migration: replace `registerFontkit(fontkit)` with
+`registerFontEngine(createFontkitEngine(fontkit))`, and replace stream-based
+`pdf-fontkit` with upstream `fontkit`. The adapter uses `subset.encode()` and
+recreates encoders for each save. An otherwise empty CFF subset includes one
+unreferenced extra glyph to avoid upstream's negative charset range; it adds no
+page text and does not change assigned CIDs. A CFF face containing only `.notdef`
+is rejected explicitly. Collections must be resolved to one face by the caller.
 
 SVG vector authoring supports paths (including arcs), shapes, transforms,
 text/font mapping, clipping, embedded PNG/JPEG images and transparency. Filters,

@@ -4,13 +4,58 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createPDFium } from "@legir/pdfium";
 import {
+  PDFDocument,
   NativeEditingContext,
   fromPdfTextAlignment,
   toPdfTextAlignment,
 } from "@legir/pdfium/authoring";
+import { createFontkitEngine } from "@legir/pdfium/fontkit";
 import { DocumentSession } from "@legir/pdf-core";
 import { FieldType } from "@legir/pdf-model";
 import { PDFWorkerService } from "@legir/pdf-renderer";
+
+// Installing the SDK, including its optional adapter, must not install a font
+// library. A consumer can supply a completely independent engine implementation.
+assert.equal(typeof createFontkitEngine, "function");
+for (const name of ["fontkit", "pdf-fontkit"])
+  await assert.rejects(import(name), { code: "ERR_MODULE_NOT_FOUND" });
+const fontDoc = await PDFDocument.create();
+try {
+  const bbox = { minX: 0, minY: 0, maxX: 500, maxY: 700 };
+  fontDoc.registerFontEngine({
+    createFont: async () => ({
+      postscriptName: "ConsumerFont",
+      unitsPerEm: 1000,
+      ascent: 800,
+      descent: -200,
+      characterSet: [65],
+      bbox,
+      outlineFormat: "truetype",
+      encode: () => {
+        throw new Error("Metrics-only consumer fixture");
+      },
+      layout: () => ({
+        glyphs: [{ id: 42, codePoints: [65], advanceWidth: 500, bbox }],
+        positions: [{ xAdvance: 500, yOffset: 0 }],
+        advanceWidth: 500,
+      }),
+      createSubset: () => ({
+        includeGlyph: (id) => {
+          assert.equal(id, 42);
+          return 1;
+        },
+        encode: () => {
+          throw new Error("Metrics-only consumer fixture");
+        },
+      }),
+    }),
+  });
+  const font = await fontDoc.embedFont(new Uint8Array([1]));
+  assert.equal(font.widthOfTextAtSize("A", 12), 6);
+  assert.equal(font.encodeText("A").toString(), "<0001>");
+} finally {
+  fontDoc.destroy();
+}
 
 for (const [code, alignment] of ["left", "center", "right"].entries()) {
   assert.equal(fromPdfTextAlignment(code), alignment);

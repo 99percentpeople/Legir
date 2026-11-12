@@ -1,6 +1,6 @@
-import type { PDFDocument, PDFFont } from "@legir/pdfium/authoring";
+import type { PDFDocument, PDFFont, FontEngine } from "@legir/pdfium/authoring";
 import { FieldType, type Annotation, type FormField } from "@legir/pdf-model";
-import { hasSystemFontProvider } from "../host.js";
+import { hasSystemFontProvider, getPdfHost } from "../host.js";
 import {
   loadAndEmbedExportFonts,
   loadAndEmbedSelectedSystemFonts,
@@ -58,16 +58,23 @@ export const prepareExportFonts = async (args: {
       )
     : [];
 
-  let fontkit: Parameters<PDFDocument["registerFontkit"]>[0] | undefined;
-  const getFontkit = async () =>
-    (fontkit ??= (await import("pdf-fontkit")).default);
+  let fontEngine: FontEngine | undefined;
+  const getFontEngine = async () => {
+    if (fontEngine) return fontEngine;
+    const load = getPdfHost().loadFontEngine;
+    if (!load)
+      throw new Error(
+        "Custom font export requires configurePdfHost({ loadFontEngine })",
+      );
+    return (fontEngine = await load());
+  };
 
   // Resolve the selected fonts before deciding whether a CJK fallback is needed.
   if (needsCustomFont && customFont?.bytes) {
     await loadAndEmbedExportFonts({
       pdfDoc,
       fontMap,
-      fontkit: await getFontkit(),
+      fontEngine: await getFontEngine(),
       customFont: { bytes: customFont.bytes, name: customFont.name },
       includeFontIds: new Set(),
       subset: true,
@@ -77,7 +84,7 @@ export const prepareExportFonts = async (args: {
     await loadAndEmbedSelectedSystemFonts({
       pdfDoc,
       fontMap,
-      fontkit: await getFontkit(),
+      fontEngine: await getFontEngine(),
       families: systemFamilies,
       subset: true,
     });
@@ -101,7 +108,7 @@ export const prepareExportFonts = async (args: {
     await loadAndEmbedExportFonts({
       pdfDoc,
       fontMap,
-      fontkit: await getFontkit(),
+      fontEngine: await getFontEngine(),
       includeFontIds,
       subset: true,
     });

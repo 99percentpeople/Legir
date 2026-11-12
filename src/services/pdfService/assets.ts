@@ -6,6 +6,7 @@ const assetUrl = (path: string) => {
   return `${base.endsWith("/") ? base : base + "/"}${path.replace(/^\//, "")}`;
 };
 configurePdfHost({
+  loadFontEngine: async () => (await import("./fontEngine")).fontEngine,
   resolveAssetUrl: assetUrl,
   moduleUrl: () =>
     typeof process !== "undefined" && process.versions?.node

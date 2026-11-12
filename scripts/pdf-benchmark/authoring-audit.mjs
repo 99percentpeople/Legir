@@ -4,7 +4,8 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import fontkit from "pdf-fontkit";
+import * as fontkit from "fontkit";
+import { createFontkitEngine } from "@legir/pdfium/fontkit";
 const [output, historicalModule] = process.argv.slice(2);
 if (!output)
   throw new Error("Usage: node authoring-audit.mjs OUTPUT [AUTHORING_MODULE]");
@@ -17,7 +18,7 @@ const { PDFDocument, StandardFonts, rgb, degrees } = api;
 await mkdir(output, { recursive: true });
 const pdf = await PDFDocument.create();
 try {
-  pdf.registerFontkit(fontkit);
+  pdf.registerFontEngine(createFontkitEngine(fontkit));
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const cjk = await pdf.embedFont(
     new Uint8Array(await readFile("public/fonts/NotoSansSC-Regular.ttf")),

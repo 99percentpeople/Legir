@@ -40,6 +40,27 @@ To check local tarballs against npm without publishing, run:
 node scripts/publish-npm-libraries.mjs /path/to/release-assets --check
 ```
 
+## Upgrading from 0.3.1 to 0.4.0
+
+Upgrade all four libraries together. Custom font support now uses a host-supplied
+`FontEngine`; the SDK no longer installs or imports a font library.
+
+- Replace `PDFDocument.registerFontkit(fontkit)` with
+  `PDFDocument.registerFontEngine(engine)` for each authoring document.
+- Configure `configurePdfHost({ loadFontEngine: () => engine })` for high-level
+  exports in each main-thread, worker or server-process realm.
+- Applications using fontkit should install upstream `fontkit@3.0.0` and construct
+  the engine with `createFontkitEngine(fontkit)` from `@legir/pdfium/fontkit`.
+  Remove the old `pdf-fontkit` dependency. Other engines can implement the public
+  `FontEngine` contract directly.
+- Font bytes are still supplied separately. Base-14 fonts need no font engine.
+
+The optional adapter handles unused CFF subsets and rebuilds encoders on each
+save to preserve glyph IDs across repeated saves. Font encoding errors now
+reject the save operation. See the [font contract and direct-use example](pdfium/README.md#custom-fonts)
+and the [high-level host setup](pdf-core/README.md#custom-font-engine).
+The native PDFium WASM revision is unchanged.
+
 ## Upgrading from 0.2.x to 0.3.1
 
 Upgrade all four libraries together. This release changes the public text
@@ -76,7 +97,8 @@ Legir UI / stores / platform adapters
 
 `src/services/pdfService/host.ts` connects Legir's event bus, font providers,
 content-worker constructor and document-owner lookup to the core. `assets.ts`
-provides the Vite/PWA asset locations in the main realm and render worker.
+provides the Vite/PWA asset locations and lazy font engine in the main realm
+and both PDF workers.
 `pdfWorkerService.ts` supplies the render-worker constructor and preserves the
 application's lazy default client. The packages never import those adapters.
 
@@ -145,7 +167,7 @@ does not make those paths part of the npm API.
 Browser file reading and drag/drop belong to application adapters, not the model.
 `pdf-renderer` exposes its client root, `worker`, `content-worker`, and typed
 `protocol`; caches and the mutable owner registry are private. `pdfium` keeps its
-root, `authoring` and `wasm/*` asset exports.
+root, `authoring`, optional `fontkit` adapter and `wasm/*` asset exports.
 
 Use one `DocumentSession` per document job and serialize operations on that session;
 always dispose it. Worker clients own their worker lifecycle and must be destroyed.

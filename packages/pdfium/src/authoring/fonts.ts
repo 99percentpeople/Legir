@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Legir contributors. MIT; see ../../LICENSE.
 import type { PDFDocument } from "./document.js";
+import type { FontGlyph, FontSubset, ShapingFont } from "./font-engine.js";
 import {
   PDFContext,
   PDFDict,
@@ -35,36 +36,6 @@ function standardVerticalMetrics(name: string): [number, number] {
   if (name.startsWith("Times")) return [683, -217];
   return name === "Symbol" ? [1010, -293] : [820, -143];
 }
-export interface FontGlyph {
-  id: number;
-  codePoints: number[];
-  advanceWidth: number;
-  bbox: { minX: number; minY: number; maxX: number; maxY: number };
-}
-export interface FontSubset {
-  includeGlyph(glyph: FontGlyph | number): number;
-  encodeStream(): {
-    on(event: string, fn: (value: Uint8Array) => void): unknown;
-  };
-}
-export interface ShapingFont {
-  postscriptName: string | null;
-  unitsPerEm: number;
-  ascent: number;
-  descent: number;
-  capHeight?: number;
-  italicAngle?: number;
-  characterSet: number[];
-  bbox: { minX: number; minY: number; maxX: number; maxY: number };
-  cff?: unknown;
-  layout(text: string): {
-    glyphs: FontGlyph[];
-    positions: { xAdvance: number; yOffset: number }[];
-    advanceWidth: number;
-  };
-  createSubset(): FontSubset;
-}
-export type Fontkit = { create(bytes: Uint8Array): ShapingFont };
 
 /** Font resources live in the editor's native xref. Only glyph subsets and
  * layout metrics live in JS; this object never parses or saves a PDF. */
@@ -73,8 +44,7 @@ export class PDFFont {
   readonly name: string;
   readonly embedder: {
     font:
-      | ShapingFont
-      | { CapHeight: number; Ascender: number; FontBBox: number[] };
+      ShapingFont | { CapHeight: number; Ascender: number; FontBBox: number[] };
     scale?: number;
   };
   private readonly metrics = new Map<number, number[]>();
@@ -120,7 +90,6 @@ export class PDFFont {
         throw new Error(
           "Register a font shaper before embedding a custom font",
         );
-      this.source = source;
       this.subset = subset ? shaping.createSubset() : undefined;
       this.name = `${subset ? "LEGIRF+" : ""}${(shaping.postscriptName || "CustomFont").replace(/[^\w+-]/g, "")}-${context.largestObjectNumber + 1}`;
       this.embedder = { font: shaping, scale: 1000 / shaping.unitsPerEm };
@@ -140,7 +109,6 @@ export class PDFFont {
       this.dirty = true;
     }
   }
-  private readonly source?: Uint8Array;
   private metric(unicode: number) {
     let result = this.metrics.get(unicode);
     if (!result) {
@@ -172,7 +140,7 @@ export class PDFFont {
     const run = this.shaping.layout(text);
     const output = new Uint8Array(run.glyphs.length * 2);
     run.glyphs.forEach((glyph, index) => {
-      const cid = this.subset ? this.subset.includeGlyph(glyph) : glyph.id;
+      const cid = this.subset ? this.subset.includeGlyph(glyph.id) : glyph.id;
       if (!this.used.has(cid)) {
         this.used.set(cid, { glyph, unicode: glyph.codePoints });
         this.dirty = true;
@@ -213,28 +181,8 @@ export class PDFFont {
     const font = this.shaping,
       scale = 1000 / font.unitsPerEm,
       context = this.context;
-    let data = this.source!;
-    if (this.subset)
-      data = await new Promise<Uint8Array>((resolve, reject) => {
-        const chunks: Uint8Array[] = [];
-        let size = 0;
-        const stream = this.subset!.encodeStream();
-        stream.on("data", (bytes) => {
-          chunks.push(bytes);
-          size += bytes.length;
-        });
-        stream.on("end", () => {
-          const bytes = new Uint8Array(size);
-          let offset = 0;
-          for (const chunk of chunks) {
-            bytes.set(chunk, offset);
-            offset += chunk.length;
-          }
-          resolve(bytes);
-        });
-        stream.on("error", reject);
-      });
-    const cff = !!font.cff;
+    const data = await (this.subset ?? font).encode();
+    const cff = font.outlineFormat === "cff";
     context.assign(
       this.fontFileRef!,
       context.flateStream(data, {

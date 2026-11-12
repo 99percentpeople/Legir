@@ -1,3 +1,4 @@
+import type { FontEngine } from "@legir/pdfium/authoring";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@legir/pdf-model";
 import type { FontRequest } from "./engine/fontHost.js";
 import { hasWorkerFontProvider, requestHostFont } from "./engine/fontHost.js";
@@ -59,6 +60,8 @@ export interface PdfContentOwner {
  * The core never imports application state, Tauri, React or a bundler API.
  */
 export interface PdfHost {
+  /** Lazy font engine, configured independently in each main/worker/server realm. */
+  loadFontEngine?: () => FontEngine | Promise<FontEngine>;
   moduleUrl?: () => string | undefined;
   resolveAssetUrl?: (path: string) => string;
   readFontAsset?: (path: string) => Promise<Uint8Array | undefined>;

@@ -1,36 +1,9 @@
-import type { PDFFont } from "@legir/pdfium/authoring";
+import type { PDFFont, ShapingFont } from "@legir/pdfium/authoring";
 import { DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM } from "@legir/pdf-model/fonts";
 
-type FontkitBBoxLike = {
-  minY?: unknown;
-  maxY?: unknown;
-};
-
-type FontkitGlyphLike = {
-  bbox?: FontkitBBoxLike;
-};
-
-type FontkitPositionLike = {
-  yOffset?: unknown;
-};
-
-type FontkitRunLike = {
-  glyphs?: FontkitGlyphLike[];
-  positions?: FontkitPositionLike[];
-};
-
-type FontkitFontLike = {
-  unitsPerEm?: unknown;
-  ascent?: unknown;
-  descent?: unknown;
-  bbox?: FontkitBBoxLike;
-  layout?: (text: string, features?: unknown) => FontkitRunLike;
-};
-
-type FontkitEmbedderLike = {
-  font?: FontkitFontLike;
+type ShapingEmbedderLike = {
+  font?: Partial<ShapingFont>;
   scale?: unknown;
-  fontFeatures?: unknown;
 };
 
 type StandardFontLike = {
@@ -44,7 +17,7 @@ type StandardFontEmbedderLike = {
 };
 
 type PdfFontWithEmbedder = {
-  embedder?: FontkitEmbedderLike | StandardFontEmbedderLike;
+  embedder?: ShapingEmbedderLike | StandardFontEmbedderLike;
 };
 
 const isFiniteNumber = (value: unknown): value is number =>
@@ -59,25 +32,24 @@ const getCenterAboveBaselineEm = (
   unitsPerEm: number,
 ) => (minY + maxY) / (2 * unitsPerEm);
 
-const getFontkitVisualCenterAboveBaselineEm = (
+const getShapingVisualCenterAboveBaselineEm = (
   font: PDFFont,
   text: string,
 ): number | undefined => {
   const embedder = (font as unknown as PdfFontWithEmbedder).embedder as
-    | FontkitEmbedderLike
-    | undefined;
-  const fontkitFont = embedder?.font;
-  if (typeof fontkitFont?.layout !== "function") return undefined;
+    ShapingEmbedderLike | undefined;
+  const shapingFont = embedder?.font;
+  if (typeof shapingFont?.layout !== "function") return undefined;
 
   const scale = toFiniteNumber(embedder?.scale);
   const unitsPerEm =
-    toFiniteNumber(fontkitFont.unitsPerEm) ??
+    toFiniteNumber(shapingFont.unitsPerEm) ??
     (scale !== undefined && scale > 0 ? 1000 / scale : undefined);
   if (!unitsPerEm || unitsPerEm <= 0) return undefined;
 
-  let run: FontkitRunLike;
+  let run: ReturnType<ShapingFont["layout"]>;
   try {
-    run = fontkitFont.layout(text.length ? text : "Mg", embedder?.fontFeatures);
+    run = shapingFont.layout(text.length ? text : "Mg");
   } catch {
     return undefined;
   }
@@ -97,14 +69,14 @@ const getFontkitVisualCenterAboveBaselineEm = (
   }
 
   if (!Number.isFinite(minY) || !Number.isFinite(maxY) || minY >= maxY) {
-    const ascent = toFiniteNumber(fontkitFont.ascent);
-    const descent = toFiniteNumber(fontkitFont.descent);
+    const ascent = toFiniteNumber(shapingFont.ascent);
+    const descent = toFiniteNumber(shapingFont.descent);
     if (ascent !== undefined && descent !== undefined && descent < ascent) {
       minY = descent;
       maxY = ascent;
     } else {
-      const bboxMinY = toFiniteNumber(fontkitFont.bbox?.minY);
-      const bboxMaxY = toFiniteNumber(fontkitFont.bbox?.maxY);
+      const bboxMinY = toFiniteNumber(shapingFont.bbox?.minY);
+      const bboxMaxY = toFiniteNumber(shapingFont.bbox?.maxY);
       if (
         bboxMinY === undefined ||
         bboxMaxY === undefined ||
@@ -124,8 +96,7 @@ const getStandardFontVisualCenterAboveBaselineEm = (
   font: PDFFont,
 ): number | undefined => {
   const embedder = (font as unknown as PdfFontWithEmbedder).embedder as
-    | StandardFontEmbedderLike
-    | undefined;
+    StandardFontEmbedderLike | undefined;
   const standardFont = embedder?.font;
   if (!standardFont) return undefined;
 
@@ -147,7 +118,7 @@ export const getPdfTextVisualCenterAboveBaselineEm = (
   text: string,
 ): number => {
   return (
-    getFontkitVisualCenterAboveBaselineEm(font, text) ??
+    getShapingVisualCenterAboveBaselineEm(font, text) ??
     getStandardFontVisualCenterAboveBaselineEm(font) ??
     DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM
   );
