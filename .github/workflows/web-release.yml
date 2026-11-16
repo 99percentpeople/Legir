@@ -1,0 +1,67 @@
+name: publish-web
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable version tag to publish, e.g. v0.2.1
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Stable deploys must not race each other while assigning the production domain.
+concurrency:
+  group: web-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    environment:
+      name: web-production
+      url: https://legir.app
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - name: Verify the existing stable tag and application version
+        run: |
+          set -euo pipefail
+          bun run check:desktop "$RELEASE_TAG"
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)"
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "Missing $name; see docs/DEPLOYMENT.md." >&2
+              exit 1
+            fi
+          done
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-bun-1.4.2-
+      - name: Install pinned Vercel CLI
+        run: npm install --global vercel@65.16.0
+      - name: Load the stable project's production configuration
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Build the tagged Web App once
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Publish prebuilt output to legir.app
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

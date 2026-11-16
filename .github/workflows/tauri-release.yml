@@ -48,6 +48,7 @@ jobs:
     uses: ./.github/workflows/tauri-bundles.yml
     with:
       ref: ${{ needs.preflight.outputs.tag }}
+      release: true
 
   publish:
     needs: [preflight, build]

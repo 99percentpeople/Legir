@@ -7,6 +7,10 @@ on:
         description: Git ref to build; empty uses the caller's ref.
         type: string
         default: ""
+      release:
+        description: Full optimized installers for a stable tag; false builds fast no-install editions.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,15 +31,28 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-
       - run: bun install --frozen-lockfile
       - run: bun run check:desktop
       - run: bun run lint
       - run: bun run test
-      - run: bun run test:pdfium
+      # Root test already includes all four PDF library projects.
       - run: bun run test:consumer
 
   build:
     needs: validate
+    env:
+      # Both modes are release binaries (no devtools/debug frontend). Daily
+      # builds trade binary size/optimization for shorter compile and link time.
+      CARGO_PROFILE_RELEASE_LTO: ${{ inputs.release && 'true' || 'false' }}
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ inputs.release && '1' || '16' }}
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: ${{ inputs.release && 's' || '1' }}
+      RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/legir
     strategy:
       fail-fast: false
       matrix:
@@ -60,6 +77,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
+
+      - name: Record the checked-out commit
+        id: source
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Install Linux build dependencies
         if: startsWith(matrix.platform, 'ubuntu-')
@@ -99,19 +121,30 @@ jobs:
       - name: Restore Rust build cache
         uses: swatinem/rust-cache@v2
         with:
-          shared-key: tauri-${{ matrix.target }}
+          shared-key: tauri-${{ inputs.release && 'release' || 'dev' }}-${{ matrix.target }}
           workspaces: "./src-tauri -> target"
           cache-on-failure: true
 
       - run: bun install --frozen-lockfile
 
-      - name: Build selected native bundles
+      - name: Build native packages for the selected channel
+        shell: bash
         env:
-          # Avoid embedding the checkout path, without nightly-only trim-paths.
-          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/legir
-        run: bun run build:app --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --ci -- --locked
+          RELEASE: ${{ inputs.release }}
+          TARGET: ${{ matrix.target }}
+          BUNDLES: ${{ matrix.bundles }}
+        run: |
+          if [ "$RELEASE" = "true" ]; then
+            bun run build:app --target "$TARGET" --bundles "$BUNDLES" --ci -- --locked
+          elif [[ "$TARGET" == *apple-darwin ]]; then
+            # A usable macOS portable edition needs the complete .app, not DMG.
+            bun run build:app --target "$TARGET" --bundles app --ci -- --locked
+          else
+            bun run build:app --target "$TARGET" --no-bundle --ci -- --locked
+          fi
 
       - name: Stage installers with a flat layout
+        if: inputs.release
         run: bun scripts/desktop-release.ts stage src-tauri/target/${{ matrix.target }}/release/bundle desktop-dist
 
       - name: Stage no-install editions (Linux ships the native executable)
@@ -120,7 +153,7 @@ jobs:
       - name: Upload installers and no-install packages
         uses: actions/upload-artifact@v6
         with:
-          name: desktop-${{ matrix.target }}
+          name: desktop-${{ inputs.release && 'release' || 'dev' }}-${{ matrix.target }}-${{ steps.source.outputs.sha }}
           compression-level: 0
           retention-days: 14
           if-no-files-found: error

@@ -35,6 +35,8 @@ export default tseslint.config(
       "scripts/check-package-consumer.mjs",
       "scripts/pdf-consumer-smoke.mjs",
       "scripts/publish-npm-libraries.mjs",
+      "scripts/check-www-changes.mjs",
+      "scripts/ignore-web-build.mjs",
     ],
     languageOptions: {
       globals: {

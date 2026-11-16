@@ -15,6 +15,7 @@ dev-dist
 
 # Turbo
 .turbo
+.vercel
 
 # Local build/temp artifacts
 .tmp/

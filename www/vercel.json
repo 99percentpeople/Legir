@@ -5,6 +5,7 @@
   "installCommand": "cd .. && bun install --frozen-lockfile --filter '!./' --filter legir-www --linker hoisted --ignore-scripts --force",
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
+  "ignoreCommand": "node ../scripts/check-www-changes.mjs --vercel",
   "routes": [
     {
       "handle": "filesystem"

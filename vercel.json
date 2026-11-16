@@ -5,6 +5,7 @@
   "installCommand": "bun install --frozen-lockfile --filter './'",
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
+  "ignoreCommand": "node scripts/ignore-web-build.mjs",
   "routes": [
     {
       "handle": "filesystem"

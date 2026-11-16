@@ -10,6 +10,8 @@ on:
       - "public/**"
       - "packages/pdf-model/**"
       - "config/vite/workspacePackages.ts"
+      - "config/www-build-inputs.json"
+      - "scripts/check-www-changes.mjs"
       - "package.json"
       - "bun.lock"
       - "tsconfig.json"
@@ -21,6 +23,8 @@ on:
       - "public/**"
       - "packages/pdf-model/**"
       - "config/vite/workspacePackages.ts"
+      - "config/www-build-inputs.json"
+      - "scripts/check-www-changes.mjs"
       - "package.json"
       - "bun.lock"
       - "tsconfig.json"
@@ -34,7 +38,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      build: ${{ steps.scope.outputs.build }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check website and shared inputs before installing dependencies
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          FORCE_BUILD: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "$FORCE_BUILD" = "true" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=$(node scripts/check-www-changes.mjs)" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     name: build (${{ matrix.dependencies }})
     runs-on: ubuntu-22.04
     strategy:

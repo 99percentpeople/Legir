@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     # A version tag uses the release workflow, not a second full matrix build.
-    branches: ["**"]
+    branches: [main]
     paths:
       - "src/**"
       - "packages/**"
@@ -61,3 +61,5 @@ concurrency:
 jobs:
   build:
     uses: ./.github/workflows/tauri-bundles.yml
+    with:
+      release: false

@@ -2,7 +2,7 @@
 
 ## Build locally
 
-Use Bun (CI currently pins 1.3.3) and Rust through rustup. `rust-toolchain.toml` pins Rust 1.94.0, so rustup selects the same compiler locally and in CI. Nightly is no longer required. Keep `~/.cargo/bin` on PATH on Linux/macOS; restart the terminal after installing rustup on Windows.
+Use Bun (CI currently pins 1.4.2) and Rust through rustup. `rust-toolchain.toml` pins Rust 1.94.0, so rustup selects the same compiler locally and in CI. Nightly is no longer required. Keep `~/.cargo/bin` on PATH on Linux/macOS; restart the terminal after installing rustup on Windows.
 
 Install the platform prerequisites from [Tauri's prerequisites guide](https://v2.tauri.app/start/prerequisites/): Windows requires the C++ build tools and WebView2, macOS requires Xcode Command Line Tools, and Linux requires WebKitGTK 4.1 and the native development libraries.
 
@@ -105,7 +105,7 @@ This does not change the project's compiler flags or global shell configuration.
 
 ## Build and release workflows
 
-`tauri-bundles.yml` is the shared build workflow. It validates versions, runs lint/type checks and tests once, then builds five native targets:
+`tauri-bundles.yml` is the shared build workflow. It validates versions, runs lint/type checks and tests once, then builds five native targets. The table below describes **tagged stable releases**; daily builds produce only the no-install editions:
 
 | System  | Architecture        | Installer         | No-install edition                                    |
 | ------- | ------------------- | ----------------- | ----------------------------------------------------- |
@@ -119,7 +119,7 @@ Only one installer and one no-install edition per architecture are published. MS
 
 The Linux ARM64 job uses GitHub's public-repository ARM runner. Private repositories need an available runner with the same architecture.
 
-`tauri-build.yml` calls that workflow for relevant branch/PR changes and manual builds. A version tag runs only the release workflow, avoiding a second full native build. Marketing-only source changes do not normally trigger native builds. CI installers are retained for 14 days; Actions artifacts are for validation, not permanent public download links.
+`tauri-build.yml` calls that workflow with `release: false` for relevant `main`/PR changes and manual builds. These daily release-mode binaries use optimization level 1, no LTO and 16 codegen units. Windows/Linux skip installer creation; macOS builds only the complete `.app` for its portable archive. Artifacts are named `desktop-dev-<target>-<sha>` and retained for 14 days. They do not overwrite stable GitHub Releases. A version tag runs only the full release workflow (`release: true`), avoiding a second native build. Marketing-only source changes do not normally trigger native builds. See [deployment channels](DEPLOYMENT.md) for the independent website, latest Web App and tag-only stable Web App.
 
 `tauri-release.yml` runs on a pushed `v*` tag or a manual dispatch with an **existing version tag**. It checks that the tag matches all three version fields:
 
@@ -172,9 +172,9 @@ GitHub's anonymous API rate limits still apply. A same-origin cached release end
 
 ## Size, build speed and distribution constraints
 
-The Rust release profile retains `opt-level = "s"`, LTO, one codegen unit, abort-on-panic and symbol stripping. Removing nightly-only `profile-rustflags`, `-Zthreads` and `trim-paths` makes normal rustup installations usable without sacrificing those existing size optimizations. CI remaps the checkout path using the stable `--remap-path-prefix` compiler flag. Stable-vs-nightly build time and size must be measured on equivalent builds; do not assume that changing compiler channel alone improves either.
+For tagged stable releases, the Rust release profile retains `opt-level = "s"`, LTO, one codegen unit, abort-on-panic and symbol stripping. Removing nightly-only `profile-rustflags`, `-Zthreads` and `trim-paths` makes normal rustup installations usable without sacrificing those existing size optimizations. CI remaps the checkout path using the stable `--remap-path-prefix` compiler flag. Stable-vs-nightly build time and size must be measured on equivalent builds; do not assume that changing compiler channel alone improves either.
 
-Tauri builds the frontend directly, not through Turbo, so `TAURI_ENV_*` settings cannot accidentally reuse a web/debug frontend from a mismatched Turbo cache. Native dependencies are cached per target. Installers are already compressed, so Actions uploads skip redundant ZIP compression.
+Tauri builds the frontend directly, not through Turbo, so `TAURI_ENV_*` settings cannot accidentally reuse a web/debug frontend from a mismatched Turbo cache. Native dependencies are cached per target and build channel, so daily optimization flags cannot contaminate stable builds. Bun dependencies are also cached in validation. Root tests already include all four PDF libraries, so CI does not repeat the standalone PDFium suite. Installers are already compressed, so Actions uploads skip redundant ZIP compression.
 
 ### No-install does not mean dependency-free or a portable user profile
 

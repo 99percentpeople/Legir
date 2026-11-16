@@ -45,3 +45,10 @@ then builds in `www` and publishes `dist`. Use the checked-in install command;
 a dashboard override that installs the entire workspace bypasses this boundary.
 
 See the root [deployment guide](../README.md#deployment) for domains and app links.
+
+Vercel and Actions share `config/www-build-inputs.json` to skip builds when neither
+the site nor its shared inputs changed. The Vercel check runs before dependency
+installation and compares against the previous successful deployment. Unknown
+history builds conservatively. When adding a shared import, extend that scope;
+`tests/www/buildBoundary.test.ts` verifies the actual TypeScript dependency graph.
+Shared manifests/lockfiles still trigger builds. See [all deployment channels](../docs/DEPLOYMENT.md).

@@ -85,7 +85,12 @@ real Worker/WASM rendering in headless Chromium.
 
 ## Deployment
 
-Deploy the repository root as the app project at `https://legir.app`, and deploy `www/` as a separate Vercel project at `https://www.legir.app` with `Root Directory = www`. Bind each domain to its project's production deployment without a redirect between the two domains.
+Use three separate Vercel projects: `www/` at `https://www.legir.app` for the
+marketing site, the repository root at `https://dev.legir.app` for the latest
+`main`, and the root at `https://legir.app` for tagged stable releases.
+See [deployment setup and release commands](docs/DEPLOYMENT.md) for the project
+environment variables, GitHub credentials, build skipping and desktop channels.
+Bind each domain to its project's production deployment without redirects.
 
 The landing project shares source files and assets with the repository root, so enable **Include source files outside of the Root Directory in the Build Step** in its Vercel settings.
 
