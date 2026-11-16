@@ -42,7 +42,8 @@ PDF 库继续使用独立的 `pdf-libs-v*` tag 和版本，不随应用版本一
 
 `web-release.yml` 使用固定版本的 Vercel CLI，拉取正式项目的 Production 配置，
 对 tag 执行一次 `vercel build --prod`，再 `deploy --prebuilt --prod`，
-不会在 Vercel 服务器上再构建一次。版本/tag 验证失败时不会部署。
+不会在 Vercel 服务器上再构建一次。上传前还必须通过依赖边界、ESLint 和完整
+Vitest 测试。版本/tag 验证、构建或测试失败时不会部署。
 项目安装命令只安装应用依赖。不要将 AI 服务密钥放入构建环境。
 
 ## 官网跳过构建的边界
