@@ -46,13 +46,13 @@ describe("automatic workspace demo lifecycle", () => {
       </div>
     );
   }
-  async function visible(value: boolean) {
+  async function visible(value: boolean, ratio = value ? 1 : 0) {
     await act(async () =>
       intersect(
         [
           {
             isIntersecting: value,
-            intersectionRatio: value ? 1 : 0,
+            intersectionRatio: ratio,
           } as IntersectionObserverEntry,
         ],
         {} as IntersectionObserver,
@@ -77,7 +77,7 @@ describe("automatic workspace demo lifecycle", () => {
         disconnect() {}
       },
     );
-    dispatch.mockClear();
+    dispatch.mockReset();
     chat.mockClear();
     next.mockClear();
     container = document.createElement("div");
@@ -110,6 +110,65 @@ describe("automatic workspace demo lifecycle", () => {
       expect.objectContaining({ kind: "stop" }),
     );
   });
+  it("starts when only the top of the demo is visible", async () => {
+    await visible(true, 0.05);
+    await advance(1000);
+    expect(dispatch).toHaveBeenCalledWith({ type: "scene", mode: "forms" });
+  });
+
+  it("stops in a hidden tab and resumes when the visible tab returns", async () => {
+    await visible(true);
+    await advance(1000);
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    dispatch.mockClear();
+    await advance(10000);
+    expect(dispatch).not.toHaveBeenCalled();
+    hidden.mockReturnValue(false);
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(dispatch).toHaveBeenCalledWith({ type: "scene", mode: "forms" });
+    hidden.mockRestore();
+  });
+
+  it("keeps zoom scroll compensation while animating the paper", async () => {
+    await act(async () => root.render(<Harness mode="read" />));
+    const stage = document.createElement("div");
+    stage.className = "demo-stage";
+    stage.scrollTop = 300;
+    Object.defineProperties(stage, {
+      scrollHeight: { value: 2000 },
+      clientHeight: { value: 100 },
+    });
+    const paper = document.createElement("div");
+    paper.className = "demo-paper-frame";
+    stage.append(paper);
+    container.querySelector(".demo-editor-body")!.append(stage);
+    let zoomed = false;
+    paper.getBoundingClientRect = () =>
+      zoomed ? new DOMRect(20, -150, 80, 320) : new DOMRect(10, -200, 100, 400);
+    const cancel = vi.fn();
+    const animate = vi.fn(
+      () => ({ finished: Promise.resolve(), cancel }) as unknown as Animation,
+    );
+    paper.animate = animate;
+    dispatch.mockImplementation((action) => {
+      if (action.type === "zoom") {
+        zoomed = true;
+        stage.scrollTop = 250;
+      }
+    });
+    await visible(true);
+    await advance(1800);
+    expect(animate).toHaveBeenCalledOnce();
+    expect(stage.scrollTop).toBe(250);
+    expect(stage.dataset.demoScrolling).toBeUndefined();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it("discards the previous scene's timers when switching presets", async () => {
     await visible(true);
     await advance(1500);

@@ -179,10 +179,10 @@ export function useDemoAutoplay(options: Options) {
     const update = () => setVisible(inView && !document.hidden);
     const observer = new IntersectionObserver(
       ([entry]) => {
-        inView = entry.isIntersecting && entry.intersectionRatio >= 0.2;
+        inView = entry.isIntersecting;
         update();
       },
-      { threshold: 0.2 },
+      { threshold: 0 },
     );
     observer.observe(element);
     document.addEventListener("visibilitychange", update);
@@ -302,6 +302,14 @@ export function useDemoAutoplay(options: Options) {
       if (!actions.length) return;
       phase("responding");
       const previousOverlays = new Set(overlays());
+      const zooming = actions.some((action) =>
+        ["zoom", "scale", "fit"].includes(action.type),
+      );
+      const papers = zooming
+        ? [...root!.querySelectorAll<HTMLElement>(".demo-paper-frame")].map(
+            (element) => ({ element, before: demoRect(element) }),
+          )
+        : [];
       const scrolls = [
         ...root!.querySelectorAll<HTMLElement>(
           ".demo-stage,.demo-sidebar-scroll",
@@ -326,6 +334,27 @@ export function useDemoAutoplay(options: Options) {
       motion.check();
       flushSync(() => actions.forEach(send));
       const transitions: Promise<void>[] = [];
+      // Navigation has already kept the reading anchor centered at the new
+      // scale. Animate the paper geometry from its old viewport position;
+      // replaying scroll offsets here would turn zoom into a second pan.
+      for (const { element, before } of papers) {
+        const after = demoRect(element);
+        if (!before.width || !before.height || !after.width || !after.height)
+          continue;
+        transitions.push(
+          motion.animate(
+            element,
+            [
+              {
+                transformOrigin: "top left",
+                transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${before.width / after.width}, ${before.height / after.height})`,
+              },
+              { transformOrigin: "top left", transform: "none" },
+            ],
+            420,
+          ),
+        );
+      }
       for (const content of root!.querySelectorAll<HTMLElement>(
         "[data-page-card-content], [data-page-exits] > *",
       )) {
@@ -355,6 +384,7 @@ export function useDemoAutoplay(options: Options) {
         );
       }
       for (const { element, top, left } of scrolls) {
+        if (zooming && element.classList.contains("demo-stage")) continue;
         const toTop = element.scrollTop,
           toLeft = element.scrollLeft;
         if (Math.abs(toTop - top) + Math.abs(toLeft - left) < 1) continue;

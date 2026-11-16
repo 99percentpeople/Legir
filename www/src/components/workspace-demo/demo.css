@@ -71,6 +71,16 @@
 .demo-editor[data-autoplay="true"] .demo-stage {
   scroll-behavior: auto;
 }
+/* Browsing the landing page must not scroll or pause the scripted document.
+   Clicking or typing in the demo restores its normal scrolling controls. */
+.demo-editor :is(.demo-stage, .demo-sidebar-scroll, [data-page-grid]) {
+  scrollbar-gutter: stable;
+}
+.demo-editor[data-autoplay="true"]
+  :is(.demo-stage, .demo-sidebar-scroll, [data-page-grid]) {
+  overflow: hidden;
+  overscroll-behavior: auto;
+}
 @container (max-width: 767px) {
   .demo-toolbar:has(.demo-page-tools) {
     flex-wrap: wrap;
@@ -247,6 +257,7 @@
   overflow: auto;
   background: var(--color-gray-100);
   overscroll-behavior: contain;
+  overflow-anchor: none;
 }
 .dark .demo-stage {
   background: var(--color-gray-900);

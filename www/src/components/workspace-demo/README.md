@@ -6,6 +6,16 @@ checked-in application source. Below 768px or on touch devices without hover,
 the site switches between static images of the six presets and does not import
 or mount this runtime, including in phone landscape orientation.
 
+On desktop, playback starts as soon as the demo enters the viewport and pauses
+while offscreen or in a hidden browser tab. Scrolling the landing page does not
+stop playback or scroll the scripted document. Clicking, typing, or using the
+pause button hands control to the visitor and restores internal scrolling.
+Reduced-motion preferences continue to disable automatic playback.
+
+Scripted zoom keeps the reading anchor fixed while animating the paper geometry.
+The zoom's scroll compensation is applied with the layout change, never replayed
+as a separate scrolling animation. Explicit page navigation still scrolls smoothly.
+
 ## Application components reused
 
 | Demo area                                                          | Application source                                                                                         |

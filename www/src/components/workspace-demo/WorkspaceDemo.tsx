@@ -258,7 +258,6 @@ export function WorkspaceDemo({
         onPointerDownCapture={onPause}
         onKeyDownCapture={onPause}
         onInput={() => queueMicrotask(onPause)}
-        onWheelCapture={onPause}
         onKeyDown={(event) => {
           if (
             event.key === "Escape" &&
