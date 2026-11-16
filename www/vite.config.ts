@@ -36,4 +36,32 @@ export default defineConfig(({ command }) => ({
     ],
   },
   envPrefix: ["VITE_"],
+  build: {
+    rolldownOptions: {
+      output: {
+        strictExecutionOrder: true,
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: [
+            {
+              name: "aria",
+              test: /\/(?:@react-aria|@react-stately|@internationalized)\/|\/react-aria-components\//,
+            },
+            {
+              name: "radix",
+              test: /\/(?:@radix-ui|radix-ui)\//,
+            },
+            {
+              name: "drag-drop",
+              test: /\/@dnd-kit\//,
+            },
+            {
+              name: "markdown",
+              test: /\/micromark[^/]*\//,
+            },
+          ],
+        },
+      },
+    },
+  },
 }));

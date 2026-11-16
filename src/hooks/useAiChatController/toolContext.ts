@@ -487,7 +487,7 @@ const buildNormalizedAnchorSearchText = (
   let normalizedText = "";
   const normalizedIndexToOriginalIndex: number[] = [];
 
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < text.length;) {
     const char = text[index]!;
     const previousChar = index > 0 ? text[index - 1] : "";
 
@@ -619,8 +619,6 @@ const resolveTextAnchorOffsets = (
     }> = [];
 
     variants.forEach((variant, variantRank) => {
-      let foundAnyForVariant = false;
-
       for (const normalizedTextMode of normalizedTextModes) {
         const normalizedVariant = normalizeAnchorSearchQuery(
           variant,
@@ -634,7 +632,6 @@ const resolveTextAnchorOffsets = (
         );
         if (matchIndexes.length === 0) continue;
 
-        foundAnyForVariant = true;
         for (const normalizedStart of matchIndexes) {
           const normalizedEnd = normalizedStart + normalizedVariant.length;
           const originalStart =
@@ -661,7 +658,7 @@ const resolveTextAnchorOffsets = (
           });
         }
 
-        if (foundAnyForVariant) break;
+        break;
       }
     });
 

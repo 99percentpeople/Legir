@@ -156,7 +156,7 @@ const bench = {
     const start = now();
     const nativePreview = "supportsImportPreview" in worker!;
     const preview = nativePreview ? worker! : createPdfWorkerService();
-    let readableMs = 0;
+    let readableMs: number;
     if (nativePreview) {
       const opening = startPdfOpenSession(donorBytes!, {
         workerService: preview,

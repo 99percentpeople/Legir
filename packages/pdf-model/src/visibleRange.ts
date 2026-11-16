@@ -18,7 +18,7 @@ export const findVisibleRange = (opts: {
   const starts = opts.starts;
   const ends = opts.ends;
 
-  let start = 0;
+  let start: number;
   {
     let lo = 0;
     let hi = count - 1;
@@ -35,7 +35,7 @@ export const findVisibleRange = (opts: {
     start = ans;
   }
 
-  let end = count - 1;
+  let end: number;
   {
     let lo = 0;
     let hi = count - 1;

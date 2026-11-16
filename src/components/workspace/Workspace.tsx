@@ -200,9 +200,7 @@ type TextSelectionPayload = NonNullable<TextSelectionToolbarState["selection"]>;
 type Point = { x: number; y: number };
 type ShapeDraftSession = {
   tool:
-    | "draw_shape_polyline"
-    | "draw_shape_polygon"
-    | "draw_shape_cloud_polygon";
+    "draw_shape_polyline" | "draw_shape_polygon" | "draw_shape_cloud_polygon";
   pageIndex: number;
   points: Point[];
   hoverPoint: Point | null;
@@ -2206,7 +2204,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
           if (snapTo !== null) {
             const dist = Math.abs(snapTo - (newY + newH));
             if (dist < bestSnapDist) {
-              bestSnapDist = dist;
               bestSnapType = "s";
               bestSnapVal = snapTo;
               bestGuide = guide;

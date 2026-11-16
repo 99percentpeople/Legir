@@ -11,7 +11,10 @@ export default defineConfig({
           server: { deps: { external: [/\/packages\/pdfium\/dist\//] } },
           environment: "jsdom",
           globals: false,
-          setupFiles: ["./packages/pdfium/tests/helpers/authoringLifecycle.ts"],
+          setupFiles: [
+            "./packages/pdfium/tests/helpers/authoringLifecycle.ts",
+            "./tests/modelsDevSnapshot.setup.ts",
+          ],
           include: [
             "src/**/*.{test,spec}.{ts,tsx}",
             "tests/**/*.{test,spec}.{ts,tsx}",

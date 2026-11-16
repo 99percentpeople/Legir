@@ -249,13 +249,15 @@ provider registry and never use connection IDs as provider identities.
   Unlisted saved formats remain visible but cannot be newly selected. Explicitly
   choosing the catalog format also restores its default endpoint; merely opening
   settings or refreshing the catalog never changes saved configuration.
-- `modelsDev.ts` loads a bundled snapshot lazily, restores the last valid cached
+- `modelsDev.ts` fetches a bundled JSON asset lazily, restores the last valid cached
   catalog, and refreshes `https://models.dev/api.json` with a 24-hour TTL. Catalog
   fetches carry no provider credentials. Invalid/failed responses retain the last
   valid catalog. Refresh never changes saved connection URLs or keys.
 - `models-dev.snapshot.json` is generated data, not hand-maintained. Regenerate it
   with `bun run update:ai-catalog` (or pass a downloaded API JSON file as the next
-  argument). It is lazy-loaded separately from normal PDF startup. Runtime
+  argument). Vite emits it as a separate JSON asset, included in the PWA precache,
+  rather than compiling the catalog into JavaScript. It is fetched only when
+  the catalog initializes, separately from normal PDF startup. Runtime
   catalog refresh does not require rebuilding the application. The source catalog's
   MIT license is retained in `public/models-dev.LICENSE.txt`.
 - `settings.ts` resolves a saved connection; `registry.ts` selects its protocol

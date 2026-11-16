@@ -4,6 +4,10 @@ import type {
   LanguageModelV4,
 } from "@ai-sdk/provider";
 import type { ModelMessage } from "ai";
+import {
+  withoutTrailingSlash,
+  withUserAgentSuffix,
+} from "@ai-sdk/provider-utils";
 
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type { AiRuntimeAdapter } from "@/services/ai/providers/runtimeAdapters/types";
@@ -20,15 +24,12 @@ export const createOpenAiCompatibleChatOnlyProvider = async (
   config: AiSdkProviderConfig,
   options: OpenAiCompatibleChatOnlyOptions,
 ) => {
-  const [providerModule, compatibleModule, providerUtilsModule] =
-    await Promise.all([
-      import("@ai-sdk/provider"),
-      import("@ai-sdk/openai-compatible"),
-      import("@ai-sdk/provider-utils"),
-    ]);
+  const [providerModule, compatibleModule] = await Promise.all([
+    import("@ai-sdk/provider"),
+    import("@ai-sdk/openai-compatible"),
+  ]);
   const { NoSuchModelError } = providerModule;
   const { OpenAICompatibleChatLanguageModel } = compatibleModule;
-  const { withoutTrailingSlash, withUserAgentSuffix } = providerUtilsModule;
   const baseURL = withoutTrailingSlash(
     config.baseURL ?? options.defaultBaseUrl,
   );

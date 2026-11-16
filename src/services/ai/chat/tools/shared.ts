@@ -164,6 +164,7 @@ const parseArgsObject = (value: unknown) => {
         error instanceof Error ? error.message : "Invalid JSON tool arguments.";
       throw new Error(
         `Invalid JSON tool arguments. ${message}. If you are using regex, escape backslashes in JSON strings, e.g. \\\\s* instead of \\s*.`,
+        { cause: error },
       );
     }
   }

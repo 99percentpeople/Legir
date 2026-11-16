@@ -44,8 +44,7 @@ type WorkspacePageZoomAnchor = {
 };
 
 export type WorkspaceZoomAnchor =
-  | WorkspaceContentZoomAnchor
-  | WorkspacePageZoomAnchor;
+  WorkspaceContentZoomAnchor | WorkspacePageZoomAnchor;
 
 type WorkspaceZoomSource = "wheel" | "pinch" | "double-tap";
 
@@ -391,8 +390,6 @@ export const useWorkspaceViewport = (opts: {
         }
 
         const fixedXPadding = WORKSPACE_BASE_PADDING_PX;
-        fixedX = fixedXPadding;
-        scaledX = 0;
         if (relX < fixedXPadding) {
           fixedX = relX;
           scaledX = 0;

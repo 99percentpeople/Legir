@@ -1,5 +1,6 @@
 import "./services/pdfService/host";
 import "./globals.css";
+import React from "react";
 
 import { initializePwaLaunchQueue } from "./services/platform/browser/launch";
 import { parseEditorWindowBootstrap } from "./services/platform/multiWindow/bootstrap";
@@ -44,7 +45,6 @@ if (!isDesktopApp()) {
 
 const bootstrapApp = async () => {
   const [
-    { default: React },
     { createRoot },
     { default: App },
     { ThemeProvider },
@@ -53,7 +53,6 @@ const bootstrapApp = async () => {
     { Router },
     { useBootstrapAwareBrowserLocation },
   ] = await Promise.all([
-    import("react"),
     import("react-dom/client"),
     import("./App"),
     import("./components/theme-provider"),

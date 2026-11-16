@@ -37,7 +37,7 @@ import {
 } from "./operators.js";
 import { PDFImage, embedJpeg, embedPng, decodeImageInput } from "./images.js";
 import { PDFSvg, drawSvg } from "./svg.js";
-import type { NativeEditingContext } from "./nativeContext.js";
+import { NativeEditingContext } from "./nativeContext.js";
 import type { SaveOptions } from "../types.js";
 import { createPDFium, type PDFium } from "../index.js";
 let defaultEngine: Promise<PDFium> | undefined;
@@ -102,7 +102,6 @@ export class PDFDocument {
     engine: PDFium,
     native: InstanceType<PDFium["PDFDocument"]>,
   ) {
-    const { NativeEditingContext } = await import("./nativeContext.js");
     const view = new NativeEditingContext(engine, native);
     view.document.ownsNative = true;
     ownedDocuments.register(view.document, native, view.document);

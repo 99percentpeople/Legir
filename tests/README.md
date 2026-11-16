@@ -15,6 +15,10 @@ root `test` aggregates all of them with the application project. Libraries defau
 to Node, the application defaults to jsdom, and browser-specific cases use
 explicit per-file environment overrides.
 
+`modelsDevSnapshot.setup.ts` maps the catalog's Vite asset URL to a data URL
+containing the same checked-in JSON. Node tests exercise real fetch/JSON parsing
+without a Vite asset server or a network request to models.dev.
+
 | Area                                                                                    | Responsibility                                                                                                                                                                        |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tests/pdf/`                                                                            | App import/export policies, forms, annotation replies, page assembly, owner routing, cancellation, incremental/full saves and cache invalidation.                                     |

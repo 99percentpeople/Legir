@@ -76,6 +76,9 @@ export const createPwaPlugin = (displayName: string) =>
     includeAssets: ["icons/app-icon.svg", "icons/pdf-icon.svg"],
     manifest: createPwaManifest(displayName),
     injectManifest: {
+      // The registered worker is classic and self-contained. IIFE output also
+      // avoids the plugin's legacy inlineDynamicImports option for ES builds.
+      rollupFormat: "iife",
       globIgnores: [
         "fonts/*.ttf",
         // Only provider chunks are optional offline. Keep the AI runtime and

@@ -114,7 +114,7 @@ export const decodeStampImageDataUrl = (dataUrl: string) => {
     return { bytes, mimeType };
   }
 
-  let decoded = payload;
+  let decoded: string;
   try {
     decoded = decodeURIComponent(payload);
   } catch {
@@ -138,7 +138,7 @@ export const getStampSvgIntrinsicSize = (dataUrl: string) => {
   const { bytes, mimeType } = decodeStampImageDataUrl(dataUrl);
   if (mimeType !== "image/svg+xml") return undefined;
 
-  let svgText = "";
+  let svgText: string;
   try {
     svgText = new TextDecoder().decode(bytes);
   } catch {

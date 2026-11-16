@@ -356,7 +356,6 @@ export const buildAiChatAlgorithmicMemoryText = (
     remainingChars - (blocks.length > 0 ? 2 : 0),
   );
   if (openingSection.text) {
-    if (blocks.length > 0) remainingChars -= 2;
     blocks.push(openingSection.text);
     remainingChars = openingSection.remainingChars;
   }
@@ -367,7 +366,6 @@ export const buildAiChatAlgorithmicMemoryText = (
     remainingChars - (blocks.length > 0 ? 2 : 0),
   );
   if (recentSection.text) {
-    if (blocks.length > 0) remainingChars -= 2;
     blocks.push(recentSection.text);
   }
 

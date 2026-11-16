@@ -24,16 +24,14 @@ export interface FloatingWindowProps {
   isOpen: boolean;
   title: React.ReactNode;
   header?:
-    | React.ReactNode
-    | ((ctx: FloatingWindowRenderContext) => React.ReactNode);
+    React.ReactNode | ((ctx: FloatingWindowRenderContext) => React.ReactNode);
   onClose: () => void;
   closeLabel?: string;
   headerClassName?: string;
   bodyClassName?: string;
   closeButtonClassName?: string;
   children:
-    | React.ReactNode
-    | ((ctx: FloatingWindowRenderContext) => React.ReactNode);
+    React.ReactNode | ((ctx: FloatingWindowRenderContext) => React.ReactNode);
 
   defaultSize?: { width: number; height: number };
   minSize?: { width: number; height: number };
@@ -370,12 +368,10 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         if (finalWidth !== right - left) {
           if (dir.includes("w") && !dir.includes("e"))
             left = right - finalWidth;
-          else right = left + finalWidth;
         }
         if (finalHeight !== bottom - top) {
           if (dir.includes("n") && !dir.includes("s"))
             top = bottom - finalHeight;
-          else bottom = top + finalHeight;
         }
 
         // Clamp whole rect in case start position was already out-of-bounds.

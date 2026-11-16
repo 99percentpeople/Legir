@@ -124,10 +124,12 @@ export const findPdfSearchResults = (
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Invalid regular expression.";
-      throw new Error(`Invalid regex search pattern: ${message}`);
+      throw new Error(`Invalid regex search pattern: ${message}`, {
+        cause: error,
+      });
     }
 
-    let match: RegExpExecArray | null = null;
+    let match: RegExpExecArray | null;
     while ((match = pattern.exec(pageText)) !== null) {
       const matchText = match[0] ?? "";
       if (!matchText.length) {

@@ -34,7 +34,7 @@ type DefaultAppearanceTarget = {
 const getLastRegexMatch = (value: string, regex: RegExp) => {
   regex.lastIndex = 0;
   let last: RegExpExecArray | null = null;
-  let match: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null;
   while ((match = regex.exec(value))) {
     last = match;
     if (match[0].length === 0) regex.lastIndex += 1;

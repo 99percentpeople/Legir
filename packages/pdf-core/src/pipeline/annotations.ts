@@ -107,7 +107,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
       if (seenRefs.has(key)) return undefined;
       seenRefs.add(key);
 
-      let resolved: unknown = undefined;
+      let resolved: unknown;
       try {
         resolved = pdfDoc.context.lookup(value);
       } catch {
@@ -138,7 +138,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
       return [value.asNumber()];
     }
     if (value instanceof PDFArray) {
-      let rawFirst: unknown = undefined;
+      let rawFirst: unknown;
       try {
         rawFirst = value.get(0);
       } catch {
@@ -160,7 +160,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
         return named || undefined;
       }
 
-      let first: unknown = undefined;
+      let first: unknown;
       try {
         first = value.lookup(0);
       } catch {
@@ -188,7 +188,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
 
   const readDictValue = (dict: PDFDict, key: string): unknown => {
     const pdfKey = PDFName.of(key);
-    let value: unknown = undefined;
+    let value: unknown;
     try {
       value = dict.lookup(pdfKey);
     } catch {
@@ -226,7 +226,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
     }
     if (next instanceof PDFArray) {
       for (let i = 0; i < next.size(); i++) {
-        let item: unknown = undefined;
+        let item: unknown;
         try {
           item = next.lookup(i);
         } catch {
@@ -274,7 +274,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
     };
 
     if (value instanceof PDFArray) {
-      let rawFirst: unknown = undefined;
+      let rawFirst: unknown;
       try {
         rawFirst = value.get(0);
       } catch {
@@ -283,7 +283,7 @@ export const buildPdfLibAnnotsByPageIndex = async (
       const rawResolved = resolveFromValue(rawFirst);
       if (typeof rawResolved === "number") return rawResolved;
 
-      let lookedUp: unknown = undefined;
+      let lookedUp: unknown;
       try {
         lookedUp = value.lookup(0);
       } catch {
@@ -324,8 +324,8 @@ export const buildPdfLibAnnotsByPageIndex = async (
 
     for (let i = 0; i < annots.size(); i++) {
       let sourcePdfRef:
-        | { objectNumber: number; generationNumber: number }
-        | undefined = undefined;
+        { objectNumber: number; generationNumber: number } | undefined =
+        undefined;
       try {
         const rawRef = (
           annots as unknown as { get?: (i: number) => unknown }

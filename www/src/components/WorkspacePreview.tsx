@@ -80,7 +80,7 @@ export function WorkspacePreview({ copy, language }: PreviewProps) {
     event: KeyboardEvent<HTMLButtonElement>,
     index: number,
   ) {
-    let next = index;
+    let next: number;
     if (event.key === "ArrowRight") next = (index + 1) % PREVIEW_MODES.length;
     else if (event.key === "ArrowLeft")
       next = (index + PREVIEW_MODES.length - 1) % PREVIEW_MODES.length;

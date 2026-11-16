@@ -5,6 +5,7 @@ import {
   isTextGenerationModelId,
   type AiProviderSpec,
 } from "./catalog";
+import snapshotUrl from "./models-dev.snapshot.json?url";
 export interface CatalogModel {
   id: string;
   name: string;
@@ -167,8 +168,10 @@ export const getModelsDevProviders = (): AiProviderSpec[] =>
     .sort((a, b) => a.label.localeCompare(b.label));
 export const initializeModelsDev = (): Promise<void> =>
   (initialized ??= (async () => {
-    const bundled = await import("./models-dev.snapshot.json?raw");
-    let next = parseModelsDevCatalog(JSON.parse(bundled.default));
+    const response = await fetch(snapshotUrl, { credentials: "omit" });
+    if (!response.ok)
+      throw new Error(`Bundled models.dev catalog: ${response.status}`);
+    let next = parseModelsDevCatalog(await response.json());
     try {
       const cached: unknown = JSON.parse(
         localStorage.getItem(CACHE_KEY) || "null",
@@ -185,7 +188,10 @@ export const initializeModelsDev = (): Promise<void> =>
       /* Unavailable storage keeps the bundled snapshot. */
     }
     publish(next);
-  })());
+  })().catch((error) => {
+    initialized = undefined;
+    throw error;
+  }));
 export const refreshModelsDev = async (
   options: { force?: boolean; fetch?: typeof fetch } = {},
 ) => {

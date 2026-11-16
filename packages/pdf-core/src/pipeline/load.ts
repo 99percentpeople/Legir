@@ -280,7 +280,7 @@ export const loadPDFInternal = async (
 
   const loadSession = createPdfLoadSession("loadPDF", options?.signal);
   let loadOk = false;
-  let openPassword: string | undefined = undefined;
+  let openPassword: string | undefined;
   let pdfDoc: PDFDocument | undefined;
   const workerService = options?.workerService;
   if (!workerService)
