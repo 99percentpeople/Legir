@@ -37,6 +37,12 @@ interface PDFCanvasLayerProps {
   sessionRenderKey?: string | null;
 }
 
+type CanvasBuffer = {
+  id: string;
+  transferred: boolean;
+  detached: OffscreenCanvas | null;
+};
+
 const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   workerService,
   page,
@@ -50,6 +56,15 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   // Double buffering: Two canvases to prevent flickering during resize/re-render
   const canvasARef = useRef<HTMLCanvasElement>(null);
   const canvasBRef = useRef<HTMLCanvasElement>(null);
+  // Transfer is permanent for a DOM canvas. Geometry edits reuse its worker
+  // ownership; a different worker needs fresh elements and transfer state.
+  const canvasBuffers = useMemo<Record<"A" | "B", CanvasBuffer>>(() => {
+    const id = Math.random().toString(36).slice(2, 11);
+    return {
+      A: { id: `${id}-A`, transferred: false, detached: null },
+      B: { id: `${id}-B`, transferred: false, detached: null },
+    };
+  }, [workerService]);
 
   const [activeCanvas, setActiveCanvas] = useState<"A" | "B">("A");
   const [isRendered, setIsRendered] = useState(false);
@@ -152,12 +167,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   useLayoutEffect(() => {
     renderedScaleRef.current = null;
-    setActiveCanvas("A");
     setIsRendered(false);
-    isATransferred.current = false;
-    isBTransferred.current = false;
-    detachedCanvasARef.current = null;
-    detachedCanvasBRef.current = null;
   }, [pageIndex, pageInfo, workerService]);
 
   useLayoutEffect(() => {
@@ -166,24 +176,14 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     return () => previewControllerRef.current?.abort();
   }, [pageIndex, pageInfo, renderScale, workerService]);
 
-  // Stable IDs for canvas elements to allow reuse in Worker
-  const componentId = useRef(Math.random().toString(36).substr(2, 9));
-  const canvasAId = useRef(`${componentId.current}-A`);
-  const canvasBId = useRef(`${componentId.current}-B`);
-  const isATransferred = useRef(false);
-  const isBTransferred = useRef(false);
-  // Cache for detached OffscreenCanvas objects to prevent loss during pre-send aborts
-  const detachedCanvasARef = useRef<OffscreenCanvas | null>(null);
-  const detachedCanvasBRef = useRef<OffscreenCanvas | null>(null);
-
   useEffect(() => {
     if (!workerService) return;
     return () => {
       void workerService.releaseCanvas({
-        canvasIds: [canvasAId.current, canvasBId.current],
+        canvasIds: [canvasBuffers.A.id, canvasBuffers.B.id],
       });
     };
-  }, [workerService]);
+  }, [workerService, canvasBuffers]);
 
   // Rendering Logic with Double Buffering and Debounce
   useEffect(() => {
@@ -230,12 +230,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
       if (!targetCanvas) return false;
 
-      const targetId =
-        activeCanvas === "A" ? canvasBId.current : canvasAId.current;
-      const isTransferredRef =
-        activeCanvas === "A" ? isBTransferred : isATransferred;
-      const detachedCanvasRef =
-        activeCanvas === "A" ? detachedCanvasBRef : detachedCanvasARef;
+      const buffer = canvasBuffers[activeCanvas === "A" ? "B" : "A"];
 
       let offscreenCanvas: OffscreenCanvas | undefined;
 
@@ -249,22 +244,22 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         // but we set it on the placeholder to ensure layout is correct.
         // The worker handles the actual bitmap size.
 
-        if (!isTransferredRef.current) {
-          if (detachedCanvasRef.current) {
+        if (!buffer.transferred) {
+          if (buffer.detached) {
             // Use cached canvas if available
-            offscreenCanvas = detachedCanvasRef.current;
+            offscreenCanvas = buffer.detached;
           } else {
             // Transfer control
             targetCanvas.width = renderMetrics.pixelWidth;
             targetCanvas.height = renderMetrics.pixelHeight;
             offscreenCanvas = targetCanvas.transferControlToOffscreen();
             // Cache it immediately
-            detachedCanvasRef.current = offscreenCanvas;
+            buffer.detached = offscreenCanvas;
           }
 
           // Optimistically set transferred to true to prevent concurrent transfers
           // We will rollback if pre-send abort occurs
-          isTransferredRef.current = true;
+          buffer.transferred = true;
         }
 
         // We pass the tile size to the worker
@@ -273,7 +268,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
           scale: renderScale * dpr,
           rotation: page.rotation,
           canvas: offscreenCanvas,
-          canvasId: targetId,
+          canvasId: buffer.id,
           priority: isInView ? -1 : 0,
           signal: signal,
         });
@@ -281,7 +276,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         // If we reached here, the message was sent successfully.
         // Worker now owns the canvas. Clear our cache.
         if (offscreenCanvas) {
-          detachedCanvasRef.current = null;
+          buffer.detached = null;
         }
 
         // Return true if completed successfully
@@ -293,16 +288,16 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         // Handle pre-send aborts: Restore state so we can retry with the cached canvas
         if (error?.phase === "pre-send") {
           // If we were trying to send a canvas, rollback the transferred state
-          // The canvas remains in detachedCanvasRef for the next attempt
-          if (detachedCanvasRef.current) {
-            isTransferredRef.current = false;
+          // Retain the detached canvas for the next attempt.
+          if (buffer.detached) {
+            buffer.transferred = false;
           }
         } else {
           // For other errors (including post-send aborts), assume transfer happened
           // or failed in a way we can't recover the canvas.
           // If it was a post-send abort, Worker owns it.
           if (offscreenCanvas) {
-            detachedCanvasRef.current = null;
+            buffer.detached = null;
           }
         }
 
@@ -342,10 +337,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
               pageIndex,
             });
           }
-          void updateImageData(
-            targetId === "A" ? canvasAId.current : canvasBId.current,
-            epoch,
-          );
+          void updateImageData(canvasBuffers[targetId].id, epoch);
         });
       });
     });
@@ -360,6 +352,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     // Re-run if visibility changes or scale/doc changes
   }, [
     activeCanvas,
+    canvasBuffers,
     isInView,
     pageIndex,
     pageInfo,
@@ -468,6 +461,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
       {/* Canvas A */}
       <canvas
+        key={canvasBuffers.A.id}
         ref={canvasARef}
         className="absolute inset-0 size-full"
         style={{ display: canvasADisplay }}
@@ -475,6 +469,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
       {/* Canvas B */}
       <canvas
+        key={canvasBuffers.B.id}
         ref={canvasBRef}
         className="absolute inset-0 size-full"
         style={{ display: canvasBDisplay }}

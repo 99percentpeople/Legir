@@ -20,6 +20,12 @@ import {
 import { captureHistorySnapshot } from "./historySlice";
 import { cloneAnnotationReplies } from "@legir/pdf-model/annotationReplies";
 import { revokeObjectUrlIfNeeded } from "../helpers";
+import {
+  cropPageGeometry,
+  resizePageGeometry,
+  resetPageCrop,
+  pageGeometryKey,
+} from "@legir/pdf-model/pageGeometry";
 
 export type ImportedPages = {
   sourceId?: string;
@@ -38,6 +44,9 @@ export const createPageEditingSlice: EditorStoreSlice<
     EditorActions,
     | "setSelectedPageIds"
     | "rotatePages"
+    | "resizePages"
+    | "cropPages"
+    | "resetPageCrop"
     | "deletePages"
     | "movePages"
     | "duplicatePages"
@@ -45,11 +54,14 @@ export const createPageEditingSlice: EditorStoreSlice<
     | "insertPdfPages"
   >
 > = (set, get) => {
-  const check = () => {
+  const check = (geometryOnly = false) => {
     const state = get();
     if (!state.pdfBytes || state.documentLoadState !== "ready")
       throw new Error("Document is not ready");
-    assertPdfPermissionOperation("assemble_pages", state.documentPermissions);
+    assertPdfPermissionOperation(
+      geometryOnly ? "edit_page_geometry" : "assemble_pages",
+      state.documentPermissions,
+    );
     return state;
   };
   const commit = (
@@ -61,8 +73,9 @@ export const createPageEditingSlice: EditorStoreSlice<
       sources?: Record<string, PageSource>;
       selection?: string[];
     },
+    geometryOnly = false,
   ) => {
-    const state = check();
+    const state = check(geometryOnly);
     if (!nextPages.length) return;
     // Preserve untouched pages and give moved pages a stable source before
     // changing their logical index. Memoized cards can then keep their content.
@@ -94,7 +107,11 @@ export const createPageEditingSlice: EditorStoreSlice<
         images[after] = state.thumbnailImages[before];
     const previews: Record<number, string> = {};
     for (const [before, after] of indexes)
-      if (after !== undefined && state.pagePreviewImages[before])
+      if (
+        after !== undefined &&
+        state.pagePreviewImages[before] &&
+        pageGeometryKey(state.pages[before]) === pageGeometryKey(pages[after])
+      )
         previews[after] = state.pagePreviewImages[before];
     const retainedPreviews = new Set(Object.values(previews));
     for (const url of new Set(Object.values(state.pagePreviewImages)))
@@ -137,9 +154,26 @@ export const createPageEditingSlice: EditorStoreSlice<
       isDirty: true,
       dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
         state.dirtyPermissionScopes,
-        { assemble: true },
+        geometryOnly ? { modifyContents: true } : { assemble: true },
       ),
     });
+  };
+  const editGeometry = (
+    ids: string[],
+    edit: (page: PageData) => PageData["geometry"],
+  ) => {
+    const state = check(true),
+      selected = new Set(ids);
+    let changed = false;
+    // Validate every selected page before publishing a single transaction.
+    const pages = identifyPages(state.pages).map((page) => {
+      if (!selected.has(getPageId(page))) return page;
+      const next = { ...page, geometry: edit(page) };
+      if (pageGeometryKey(next) === pageGeometryKey(page)) return page;
+      changed = true;
+      return next;
+    });
+    if (changed) commit(pages, undefined, true);
   };
   const insert = (
     payload: Omit<ImportedPages, "source">,
@@ -227,6 +261,18 @@ export const createPageEditingSlice: EditorStoreSlice<
     });
   };
   return {
+    resizePages: (ids, options) =>
+      editGeometry(ids, (page) => resizePageGeometry(page, options)),
+    cropPages: (ids, margins, options) =>
+      editGeometry(ids, (page) => {
+        const base = options?.reset
+          ? { ...page, geometry: resetPageCrop(page) }
+          : page;
+        return Object.values(margins).every((value) => value === 0)
+          ? base.geometry
+          : cropPageGeometry(base, margins);
+      }),
+    resetPageCrop: (ids) => editGeometry(ids, resetPageCrop),
     setSelectedPageIds: (ids) =>
       set((state) => {
         const available = new Set(state.pages.map(getPageId));

@@ -1,3 +1,4 @@
+import { getPageGeometry } from "@legir/pdf-model/pageGeometry";
 import {
   useEffect,
   useRef,
@@ -94,7 +95,8 @@ export const useWorkspaceStampDrop = (options: {
       event.clientY,
       pageIndex,
     );
-    const scale = state.scale;
+    const geometry = getPageGeometry(page);
+    const scale = state.scale * geometry.scale;
     const viewportWidth = options.containerRef.current?.clientWidth;
     const viewportHeight = options.containerRef.current?.clientHeight;
     const files = Array.from(event.dataTransfer.files).filter(isStampImageFile);
@@ -118,8 +120,10 @@ export const useWorkspaceStampDrop = (options: {
             scale,
             viewportWidth,
             viewportHeight,
-            pageWidth: page.width,
-            pageHeight: page.height,
+            pageWidth: geometry.box.width,
+            pageHeight: geometry.box.height,
+            pageX: geometry.box.x,
+            pageY: geometry.box.y,
           },
         ),
         stamp: { kind: "image", image, appearance: { frame: "plain" } },

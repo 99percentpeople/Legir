@@ -1,3 +1,7 @@
+import {
+  PageGeometryDialog,
+  type PageGeometryMode,
+} from "./PageGeometryDialog";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
@@ -61,6 +65,18 @@ const PageEditor = memo(function PageEditor({
     [pages, selection],
   );
   const enabled = canAssemblePdf(permissions);
+  const geometryEnabled = canPerformPdfPermissionOperation(
+    "edit_page_geometry",
+    permissions,
+  );
+  const [geometryDialog, setGeometryDialog] = useState<{
+    mode: PageGeometryMode;
+    ids: string[];
+  } | null>(null);
+  const openGeometry = useCallback(
+    (mode: PageGeometryMode, ids: string[]) => setGeometryDialog({ mode, ids }),
+    [],
+  );
   const [dialog, setDialog] = useState<"blank" | "import" | null>(null);
   const [position, setPosition] = useState<InsertPosition>("end");
   const [targetPage, setTargetPage] = useState(1);
@@ -93,7 +109,7 @@ const PageEditor = memo(function PageEditor({
     [store],
   );
   const clipboard = usePageClipboard({
-    busy: loading || dialog !== null,
+    busy: loading || dialog !== null || geometryDialog !== null,
     onPaste: (file, index) => {
       dropGeneration.current++;
       queue.current = [];
@@ -294,7 +310,9 @@ const PageEditor = memo(function PageEditor({
             selectedPageIds={selectedPageIds}
             total={pages.length}
             enabled={enabled}
-            busy={loading || dialog !== null}
+            busy={loading || dialog !== null || geometryDialog !== null}
+            geometryEnabled={geometryEnabled}
+            onGeometry={openGeometry}
             onOpen={openDialog}
             run={run}
           />,
@@ -306,7 +324,7 @@ const PageEditor = memo(function PageEditor({
             variant="ghost"
             size="icon"
             className="h-8 w-8 sm:h-9 sm:w-9"
-            disabled={dialog !== null}
+            disabled={dialog !== null || geometryDialog !== null}
             aria-label={t("common.actions.done")}
             title={t("common.actions.done")}
             onClick={() => finish()}
@@ -344,11 +362,23 @@ const PageEditor = memo(function PageEditor({
         pages={pages}
         selectedPageIds={selectedPageIds}
         workerService={workerService}
-        enabled={enabled && !loading && !dialog}
+        enabled={enabled && !loading && !dialog && !geometryDialog}
+        onGeometry={
+          geometryEnabled && !loading && !dialog && !geometryDialog
+            ? openGeometry
+            : undefined
+        }
         onOpen={finish}
         onFilesDrop={dropFiles}
         run={run}
       />
+      {geometryDialog && (
+        <PageGeometryDialog
+          {...geometryDialog}
+          worker={workerService}
+          onClose={() => setGeometryDialog(null)}
+        />
+      )}
       <Dialog
         open={dialog !== null}
         onOpenChange={(open) => {

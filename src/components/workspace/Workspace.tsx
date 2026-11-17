@@ -1,3 +1,4 @@
+import { getPageGeometry } from "@legir/pdf-model/pageGeometry";
 import React, {
   Suspense,
   useRef,
@@ -784,6 +785,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const page = editorState.pages.find(
         (item) => item.pageIndex === pageIndex,
       );
+      const geometry = page ? getPageGeometry(page) : undefined;
       return addStampAtRect(
         pageIndex,
         getStampRectAtPoint(point, {
@@ -791,11 +793,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
           presetId: stampStyle.presetId,
           imageWidth: stampStyle.image?.intrinsicSize?.width,
           imageHeight: stampStyle.image?.intrinsicSize?.height,
-          scale: editorState.scale,
+          scale: editorState.scale * (geometry?.scale ?? 1),
           viewportWidth: containerRef.current?.clientWidth,
           viewportHeight: containerRef.current?.clientHeight,
-          pageWidth: page?.width,
-          pageHeight: page?.height,
+          pageWidth: geometry?.box.width,
+          pageHeight: geometry?.box.height,
+          pageX: geometry?.box.x,
+          pageY: geometry?.box.y,
         }),
       );
     },
@@ -3367,6 +3371,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         id={`page-${page.pageIndex}`}
         className={cn(
           "relative w-fit flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl",
+          page.geometry && "overflow-hidden",
           stampDrop.dropPageIndex === page.pageIndex && "ring-primary ring-2",
         )}
         data-app-text-selecting={
@@ -3408,7 +3413,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
         />
 
         <div
-          className="pointer-events-none absolute top-0 left-0 origin-top-left"
+          className={cn(
+            "pointer-events-none absolute top-0 left-0 origin-top-left",
+            page.geometry && "[&_svg.absolute]:overflow-visible",
+          )}
           data-page-overlay="true"
           data-page-view-rotation={getPageDisplayRotation(
             page,

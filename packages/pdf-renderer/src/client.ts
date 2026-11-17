@@ -978,6 +978,8 @@ class PDFWorkerService {
     scale?: number;
     targetWidth?: number;
     rotation?: number;
+    /** Source viewport and pending geometry; defaults to the configured logical page. */
+    pageGeometry?: PageData;
     clipRect?: { x: number; y: number; width: number; height: number };
     renderAnnotations?: boolean;
     thumbnailContent?: ThumbnailContent;
@@ -991,6 +993,10 @@ class PDFWorkerService {
     password?: string;
     signal?: AbortSignal;
   }): Promise<{ bytes: Uint8Array; mimeType: string }> {
+    const logicalPage = this.logicalPages[options.pageIndex];
+    const pageGeometry =
+      options.pageGeometry ??
+      (!options.docId && logicalPage?.geometry ? logicalPage : undefined);
     options = await this.preparePage(options);
     return new Promise((resolve, reject) => {
       const worker = this.worker;
@@ -1092,6 +1098,7 @@ class PDFWorkerService {
             scale,
             targetWidth,
             rotation,
+            pageGeometry,
             clipRect,
             renderAnnotations,
             thumbnailContent,
@@ -1110,6 +1117,7 @@ class PDFWorkerService {
             scale,
             targetWidth,
             rotation,
+            pageGeometry,
             clipRect,
             renderAnnotations,
             thumbnailContent,
@@ -1132,6 +1140,8 @@ class PDFWorkerService {
     pageIndex: number;
     scale: number;
     rotation?: number;
+    /** Source viewport and pending geometry; defaults to the configured logical page. */
+    pageGeometry?: PageData;
     canvas?: OffscreenCanvas;
     canvasId: string;
     priority?: number;
@@ -1140,6 +1150,10 @@ class PDFWorkerService {
     docId?: string;
     signal?: AbortSignal;
   }): Promise<boolean> {
+    const logicalPage = this.logicalPages[options.pageIndex];
+    const pageGeometry =
+      options.pageGeometry ??
+      (!options.docId && logicalPage?.geometry ? logicalPage : undefined);
     options = await this.preparePage(options);
     return new Promise((resolve, reject) => {
       const worker = this.worker;
@@ -1209,6 +1223,7 @@ class PDFWorkerService {
           pageIndex,
           scale,
           rotation,
+          pageGeometry,
           canvas,
           canvasId,
           priority: priority || 0,

@@ -844,6 +844,35 @@ Current conventions worth preserving:
 
 ## Page Structure Editing
 
+Page size and crop dialogs use the same document-local toolbar and selection.
+They support preset/custom paper, orientation, original-size or proportional
+content fitting, nine alignment anchors, numeric/drag cropping, and page ranges.
+Dialog drafts never edit the store; applying a batch validates every page before
+one history transaction. Page geometry requires `edit_page_geometry` (content
+modification permission), independently of page assembly permission.
+
+`PageData.geometry` stores a visible rectangle and uniform scale in the immutable
+source viewport, before `rotationDelta`; resizing also records the paper boundary
+used by crop reset. Loading retains a distinct source MediaBox so crop reset works
+after saving and reopening too. Original page dimensions, source bytes and control coordinates
+remain unchanged. `@legir/pdf-model/pageGeometry` owns the shared forward/inverse
+mapping, validation, resize/crop operations and effective viewport. Reading layout,
+pointer coordinates, text selection, overlays, previews and thumbnails use that
+mapping. The renderer transports each logical page's geometry alongside its source
+route, including for imported/copied pages; thumbnail overlays use the same mapping.
+Geometry changes invalidate reader placeholders and thumbnail snapshots, including
+same-size crops at different offsets. History and tab snapshots retain geometry.
+
+Export applies geometry after coordinate-dependent control export and before saved
+rotation. Crop updates the visible box without deleting content. Resize scales PDF
+boxes, content streams, annotation geometry, widget appearances and target-page
+destination coordinates together. Original streams/resources are retained through
+wrappers, and inherited widget text styles receive local scaled overrides so fields
+shared across differently sized pages remain independent in appearance. The source
+UserUnit is retained; resize scaling is materialized rather than relying on a new
+UserUnit value that some external readers ignore. This does not rasterize pages or
+flatten editable fields. Repeated saves start from the original transactional source.
+
 The `pages` editor mode provides import, blank pages, duplication, deletion,
 rotation and reordering. `pageEditingSlice` applies one atomic transaction per
 operation, including fields, annotations, outline destinations, selection and

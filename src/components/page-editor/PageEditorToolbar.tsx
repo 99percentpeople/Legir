@@ -1,5 +1,5 @@
 import { memo, useLayoutEffect, useRef, useState } from "react";
-import { FileInput, FilePlus2 } from "lucide-react";
+import { FileInput, FilePlus2, Crop, Scaling } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { ResponsiveToolbar } from "@/components/toolbar/ResponsiveToolbar";
 import type { ResponsiveToolbarItem } from "@/components/toolbar/types";
@@ -24,6 +24,8 @@ export const PageEditorToolbar = memo(function PageEditorToolbar({
   enabled,
   busy,
   onOpen,
+  onGeometry,
+  geometryEnabled,
   run,
 }: {
   selectedPageIds: string[];
@@ -31,6 +33,8 @@ export const PageEditorToolbar = memo(function PageEditorToolbar({
   enabled: boolean;
   busy: boolean;
   onOpen: (dialog: "blank" | "import") => void;
+  onGeometry?: (mode: "resize" | "crop", ids: string[]) => void;
+  geometryEnabled?: boolean;
   run: (action: () => void) => void;
 }) {
   const { t } = useLanguage();
@@ -89,6 +93,23 @@ export const PageEditorToolbar = memo(function PageEditorToolbar({
         </Button>
       ),
     },
+    ...(["resize", "crop"] as const).map((mode) => ({
+      id: mode,
+      label: t(`page_editor.geometry.${mode}`),
+      content: (
+        <Button
+          variant="ghost"
+          size="icon"
+          className={buttonClass}
+          disabled={!geometryEnabled || busy || !count}
+          aria-label={t(`page_editor.geometry.${mode}`)}
+          title={t(`page_editor.geometry.${mode}`)}
+          onClick={() => onGeometry?.(mode, selectedPageIds)}
+        >
+          {mode === "crop" ? <Crop size={18} /> : <Scaling size={18} />}
+        </Button>
+      ),
+    })),
     ...bulkActions.map(({ id, label }) => ({
       id,
       label: t(label),

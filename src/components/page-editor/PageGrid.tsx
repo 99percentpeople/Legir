@@ -79,6 +79,7 @@ type GridProps = {
   onFilesDrop: (files: Promise<PlatformDroppedPdf[]>, index: number) => void;
   onCopy?: (ids?: string[]) => void;
   onPaste?: (index?: number) => void;
+  onGeometry?: (mode: "resize" | "crop", ids: string[]) => void;
   run: (action: () => void) => void;
 };
 
@@ -96,6 +97,7 @@ const PageCard = memo(function PageCard({
   onOpen,
   onCopy,
   onPaste,
+  onGeometry,
   run,
 }: {
   page: PageData;
@@ -111,6 +113,7 @@ const PageCard = memo(function PageCard({
   onOpen: GridProps["onOpen"];
   onCopy: GridProps["onCopy"];
   onPaste: GridProps["onPaste"];
+  onGeometry: GridProps["onGeometry"];
   run: GridProps["run"];
 }) {
   const { t } = useLanguage();
@@ -156,6 +159,15 @@ const PageCard = memo(function PageCard({
             canSelectRange={canSelectRange}
             disabled={moving || pinching}
             onSelect={select}
+            onGeometry={
+              onGeometry
+                ? (mode) =>
+                    onGeometry(
+                      mode,
+                      selected ? store.getState().selectedPageIds : ids,
+                    )
+                : undefined
+            }
             onCopy={
               onCopy ? () => onCopy(selected ? undefined : ids) : undefined
             }
@@ -246,6 +258,7 @@ export const PageGrid = memo(function PageGrid({
   onFilesDrop,
   onCopy,
   onPaste,
+  onGeometry,
   run,
 }: GridProps) {
   const { t } = useLanguage();
@@ -584,6 +597,7 @@ export const PageGrid = memo(function PageGrid({
                           onOpen={onOpen}
                           onCopy={onCopy}
                           onPaste={onPaste}
+                          onGeometry={onGeometry}
                           run={run}
                         />
                       );

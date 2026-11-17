@@ -1,3 +1,4 @@
+import { getPageGeometry } from "@legir/pdf-model/pageGeometry";
 import { getOrderedPageControls } from "@legir/pdf-model/controlLayerOrder";
 import { detachFormFieldSource } from "@legir/pdf-model/formAppearance";
 import { cloneAnnotationReplies } from "@legir/pdf-model/annotationReplies";
@@ -124,14 +125,17 @@ export function preparePastedControl(
     (!Number.isFinite(position.x) || !Number.isFinite(position.y))
   )
     return null;
+  const box = getPageGeometry(page).box;
   const x = position?.x ?? rect.x + 12;
   const y = position?.y ?? rect.y + 12;
   const dx =
-    (clampToPage ? Math.max(0, Math.min(x, page.width - rect.width)) : x) -
-    rect.x;
+    (clampToPage
+      ? Math.max(box.x, Math.min(x, box.x + box.width - rect.width))
+      : x) - rect.x;
   const dy =
-    (clampToPage ? Math.max(0, Math.min(y, page.height - rect.height)) : y) -
-    rect.y;
+    (clampToPage
+      ? Math.max(box.y, Math.min(y, box.y + box.height - rect.height))
+      : y) - rect.y;
   const id = crypto.randomUUID();
   if (control.type === "field") {
     return {
@@ -224,10 +228,17 @@ export function preparePastedControls(
   const y = Math.min(...bounds.map((rect) => rect.y));
   const width = Math.max(...bounds.map((rect) => rect.x + rect.width)) - x;
   const height = Math.max(...bounds.map((rect) => rect.y + rect.height)) - y;
+  const box = getPageGeometry(page).box;
   const dx =
-    Math.max(0, Math.min(position?.x ?? x + 12, page.width - width)) - x;
+    Math.max(
+      box.x,
+      Math.min(position?.x ?? x + 12, box.x + box.width - width),
+    ) - x;
   const dy =
-    Math.max(0, Math.min(position?.y ?? y + 12, page.height - height)) - y;
+    Math.max(
+      box.y,
+      Math.min(position?.y ?? y + 12, box.y + box.height - height),
+    ) - y;
   const fields = [...state.fields];
   const result: ControlClipboard[] = [];
   for (const [index, control] of controls.entries()) {

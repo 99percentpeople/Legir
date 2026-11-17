@@ -108,6 +108,7 @@ export const canAssemblePdf = (
 
 export type PdfPermissionOperation =
   | "assemble_pages"
+  | "edit_page_geometry"
   | "create_annotation"
   | "edit_annotation"
   | "delete_annotation"
@@ -149,6 +150,7 @@ export const canPerformPdfPermissionOperation = (
     case "edit_annotation":
     case "delete_annotation":
       return canModifyPdfAnnotations(permissions);
+    case "edit_page_geometry":
     case "edit_form_structure":
     case "edit_document_metadata":
       return canModifyPdfContents(permissions);
@@ -213,7 +215,8 @@ export const canUseModeWithPdfPermissions = (
   mode: EditorMode,
   permissions: PDFDocumentPermissions | null | undefined,
 ): boolean => {
-  if (mode === "pages") return canAssemblePdf(permissions);
+  if (mode === "pages")
+    return canAssemblePdf(permissions) || canModifyPdfContents(permissions);
   return mode === "form"
     ? canModifyPdfContents(permissions) || canFillPdfForms(permissions)
     : canModifyPdfAnnotations(permissions);

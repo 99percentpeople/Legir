@@ -26,6 +26,14 @@ layout, font naming and permission helpers. Existing coordinate conventions,
 field names and serialized values are preserved; this extraction is not a data
 migration or a new template schema.
 
+`pageGeometry` provides `resizePageGeometry`, `cropPageGeometry`, `resetPageCrop`,
+`getEditedPage` and source/display coordinate transforms. Optional
+`PageData.geometry` retains edits separately from source dimensions and control
+coordinates. Widths and margins are physical points in the displayed orientation;
+the stored rectangle is in the source viewport before `rotationDelta`. A batch
+host should validate all target pages before committing any of them. The core's
+`pageStructure` export writes these changes while preserving editable controls.
+
 Choice fields keep presentation separate from selection: `FormField.isListBox`
 identifies a list box, while `isMultiSelect` controls how many values it accepts.
 `isListBoxField` from `@legir/pdf-model/choiceFields` also recognizes legacy

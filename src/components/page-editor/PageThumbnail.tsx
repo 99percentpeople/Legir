@@ -1,3 +1,4 @@
+import { getEditedPage } from "@legir/pdf-model/pageGeometry";
 import React, { useEffect, useState } from "react";
 import { File } from "lucide-react";
 import { renderThumbnail } from "@/services/pdfService/thumbnailRenderer";
@@ -50,6 +51,7 @@ export const PageThumbnail = React.memo(function PageThumbnail({
     };
   }, [image, onImage, page.blank, page.pageIndex, worker, content]);
   const view = getPageView(page, 0);
+  const edited = getEditedPage(page);
   const src = image ?? localImage;
   return (
     <div
@@ -72,8 +74,8 @@ export const PageThumbnail = React.memo(function PageThumbnail({
           src={src}
           className="absolute top-1/2 left-1/2 max-w-none object-contain"
           style={{
-            width: `${(page.width / view.width) * 100}%`,
-            height: `${(page.height / view.height) * 100}%`,
+            width: `${(edited.width / view.width) * 100}%`,
+            height: `${(edited.height / view.height) * 100}%`,
             transform: `translate(-50%, -50%) rotate(${getPageDisplayRotation(page, 0)}deg)`,
           }}
         />

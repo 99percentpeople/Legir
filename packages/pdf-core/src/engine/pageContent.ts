@@ -50,17 +50,21 @@ export function getNativePageObjectViewport(
       Math.min(mediaBox[2], cropBox[2]),
       Math.min(mediaBox[3], cropBox[3]),
     ];
-    return createViewportFromPageInfo(
-      {
-        viewBox:
-          viewBox[2] > viewBox[0] && viewBox[3] > viewBox[1]
-            ? viewBox
-            : mediaBox,
-        userUnit: unit.isNumber() && unit.asNumber() > 0 ? unit.asNumber() : 1,
-        rotation: rotate.isNumber() ? rotate.asNumber() : 0,
-      },
-      { scale, rotation },
-    );
+    return {
+      ...createViewportFromPageInfo(
+        {
+          viewBox:
+            viewBox[2] > viewBox[0] && viewBox[3] > viewBox[1]
+              ? viewBox
+              : mediaBox,
+          userUnit:
+            unit.isNumber() && unit.asNumber() > 0 ? unit.asNumber() : 1,
+          rotation: rotate.isNumber() ? rotate.asNumber() : 0,
+        },
+        { scale, rotation },
+      ),
+      sourceMediaBox: mediaBox,
+    };
   } finally {
     crop.destroy();
     media.destroy();

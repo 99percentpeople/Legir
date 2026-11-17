@@ -1,3 +1,4 @@
+import { pageGeometryKey } from "@legir/pdf-model/pageGeometry";
 import { THUMBNAIL_WARMUP_PRIORITY } from "@/constants";
 import { getPageId } from "@legir/pdf-core/lib/pageStructure";
 import {
@@ -37,6 +38,7 @@ function sameSnapshot(a: Snapshot, b: Snapshot) {
       : `${page.source?.documentId ?? "default"}:${page.source?.pageIndex ?? page.pageIndex}`;
   return (
     source(a.page) === source(b.page) &&
+    pageGeometryKey(a.page) === pageGeometryKey(b.page) &&
     a.page.width === b.page.width &&
     a.page.height === b.page.height &&
     sameItems(a.content.fields, b.content.fields) &&

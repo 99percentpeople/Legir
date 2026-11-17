@@ -1,3 +1,10 @@
+import {
+  getEditedPage,
+  getPageGeometryMatrix,
+  pageGeometryKey,
+} from "@legir/pdf-model/pageGeometry";
+import type { PageData } from "@legir/pdf-model";
+import { createViewportFromPageInfo } from "@legir/pdf-core/lib/coords";
 /// <reference lib="webworker" />
 import {
   ScanCanvasRenderer,
@@ -246,7 +253,7 @@ const buildQueueTaskKey = (
     (req.thumbnailContent || req.previewCanvasId)
   )
     return req.id;
-  return `${type}|${docId}|${pageIndex}|${scale}|${renderAnnotations}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}|${req.rotation ?? ""}|${clip}`;
+  return `${type}|${docId}|${pageIndex}|${scale}|${renderAnnotations}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}|${req.rotation ?? ""}|${clip}|${req.pageGeometry ? pageGeometryKey(req.pageGeometry) : ""}`;
 };
 
 const cancelQueuedTasksForDoc = (docId: string) => {
@@ -500,6 +507,16 @@ const resolveDestForDoc = (
 ) =>
   readFromDocument(params, (doc) => resolveNativeDestination(doc, params.dest));
 
+const renderViewport = (
+  page: Parameters<typeof getNativePageViewport>[0],
+  scale: number,
+  rotation?: number,
+  geometry?: PageData,
+) =>
+  geometry
+    ? createViewportFromPageInfo(getEditedPage(geometry), { scale, rotation })
+    : getNativePageViewport(page, scale, rotation);
+
 const renderToCanvas = async (
   params: Extract<WorkerRequest, { type: "render" }>,
 ): Promise<TaskResult> => {
@@ -515,10 +532,11 @@ const renderToCanvas = async (
     const canvas = params.canvas ?? canvasMap.get(params.canvasId);
     if (!canvas) throw new Error("Missing render canvas");
     const cached = getPageForDoc(docId, params.pageIndex, true);
-    const viewport = getNativePageViewport(
+    const viewport = renderViewport(
       cached.page,
       params.scale,
       params.rotation,
+      params.pageGeometry,
     );
     const [x, y, width, height] = params.tile ?? [
       0,
@@ -625,13 +643,23 @@ const renderToImage = async (
     const currentSession = sessionFor(docId);
     task.throwIfCancelled();
     const cached = getPageForDoc(docId, params.pageIndex);
-    const base = getNativePageViewport(cached.page, 1, params.rotation);
+    const base = renderViewport(
+      cached.page,
+      1,
+      params.rotation,
+      params.pageGeometry,
+    );
     const scale =
       params.scale ??
       (params.targetWidth
         ? Math.min(1, Math.max(0.05, params.targetWidth / base.width))
         : 1);
-    const viewport = getNativePageViewport(cached.page, scale, params.rotation);
+    const viewport = renderViewport(
+      cached.page,
+      scale,
+      params.rotation,
+      params.pageGeometry,
+    );
     const clip = params.clipRect;
     if (
       clip &&
@@ -755,10 +783,26 @@ const renderToImage = async (
             const page = currentSession.document.loadPage(index);
             const overlayCanvas = new OffscreenCanvas(width, height);
             try {
+              const overlayViewport = getNativePageViewport(page, scale);
+              if (params.pageGeometry) {
+                const source = params.pageGeometry;
+                const m = getPageGeometryMatrix(
+                  source,
+                  (params.rotation ?? source.rotation) - source.rotation,
+                );
+                overlayViewport.transform = [
+                  m[0] * scale,
+                  m[1] * scale,
+                  -m[2] * scale,
+                  -m[3] * scale,
+                  (m[4] + m[2] * content.height) * scale,
+                  (m[5] + m[3] * content.height) * scale,
+                ];
+              }
               drawPageToCanvas(
                 pdfium,
                 page,
-                getNativePageViewport(page, scale),
+                overlayViewport,
                 [0, 0, width, height],
                 overlayCanvas.getContext("2d")!,
                 { annotations: true, transparent: true, imageCache: "reuse" },

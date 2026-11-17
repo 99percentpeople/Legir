@@ -1,11 +1,14 @@
 import type { TextContent } from "@legir/pdf-core/text";
-import type { PDFDocumentPermissions, PDFOutlineItem } from "@legir/pdf-model";
+import type {
+  PageData,
+  PDFDocumentPermissions,
+  PDFOutlineItem,
+} from "@legir/pdf-model";
 import type { ThumbnailContent, Tile } from "@legir/pdf-core/types";
 import type { DocumentCommands } from "@legir/pdf-core/runtime";
 
 type CommandSpec<TRequest extends object, TResponse = never> =
-  | TRequest
-  | [TRequest, TResponse];
+  TRequest | [TRequest, TResponse];
 
 type SpecRequest<T> = T extends [infer Req, unknown] ? Req : T;
 type SpecResponse<T> = T extends [unknown, infer Res] ? Res : never;
@@ -22,6 +25,7 @@ export type WorkerCommandPayloadMap = {
       pageIndex: number;
       scale: number;
       rotation?: number;
+      pageGeometry?: PageData;
       canvas?: OffscreenCanvas;
       canvasId: string;
       priority?: number;
@@ -58,6 +62,7 @@ export type WorkerCommandPayloadMap = {
       scale?: number;
       targetWidth?: number;
       rotation?: number;
+      pageGeometry?: PageData;
       /** Region in displayed page space at scale 1; rendered without a full-page bitmap. */
       clipRect?: { x: number; y: number; width: number; height: number };
       renderAnnotations?: boolean;

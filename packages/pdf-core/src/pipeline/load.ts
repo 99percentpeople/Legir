@@ -348,8 +348,18 @@ export const loadPDFInternal = async (
     const pages: PageData[] = pdfLibPages.map((pdfLibPage, idx) => {
       const viewport = createPdfLibViewport(pdfLibPage, { scale: 1.0 });
       const userUnit = viewport.userUnit ?? 1;
+      const media = pdfLibPage.getMediaBox();
+      const sourceMediaBox: PageData["viewBox"] = [
+        media.x,
+        media.y,
+        media.x + media.width,
+        media.y + media.height,
+      ];
       return {
         pageIndex: idx,
+        ...(sourceMediaBox.some((v, i) => v !== viewport.viewBox?.[i])
+          ? { sourceMediaBox }
+          : {}),
         width: viewport.width,
         height: viewport.height,
         viewBox:

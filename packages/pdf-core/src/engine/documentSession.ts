@@ -306,6 +306,11 @@ export class DocumentSession {
           width: viewport.width,
           height: viewport.height,
           viewBox: viewport.viewBox!,
+          ...(viewport.sourceMediaBox.some(
+            (v, i) => v !== viewport.viewBox?.[i],
+          )
+            ? { sourceMediaBox: viewport.sourceMediaBox }
+            : {}),
           userUnit: viewport.userUnit ?? 1,
           rotation: viewport.rotation,
         };

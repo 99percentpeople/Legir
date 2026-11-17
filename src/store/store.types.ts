@@ -66,6 +66,16 @@ export interface EditorActions {
   duplicateControls: (ids: string[], dx: number, dy: number) => void;
   setSelectedPageIds: (ids: string[]) => void;
   rotatePages: (ids: string[], degrees: number) => void;
+  resizePages: (
+    ids: string[],
+    options: import("@legir/pdf-model").PageResizeOptions,
+  ) => void;
+  cropPages: (
+    ids: string[],
+    margins: import("@legir/pdf-model").PageCropMargins,
+    options?: { reset?: boolean },
+  ) => void;
+  resetPageCrop: (ids: string[]) => void;
   deletePages: (ids: string[]) => void;
   movePages: (ids: string[], beforeIndex: number) => void;
   duplicatePages: (ids: string[]) => void;
@@ -81,8 +91,7 @@ export interface EditorActions {
   ) => void;
   setState: (
     updates:
-      | Partial<EditorState>
-      | ((prev: EditorState) => Partial<EditorState>),
+      Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>),
   ) => void;
   withProcessing: <T>(
     status: string | null | undefined,
@@ -91,8 +100,7 @@ export interface EditorActions {
   setProcessingStatus: (status: string | null) => void;
   setUiState: (
     updates:
-      | Partial<EditorUiState>
-      | ((prev: EditorState) => Partial<EditorUiState>),
+      Partial<EditorUiState> | ((prev: EditorState) => Partial<EditorUiState>),
   ) => void;
   resetUiState: () => void;
   openSidebar: (tab?: SidebarTab) => void;

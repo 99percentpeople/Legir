@@ -19,6 +19,7 @@ export function PageSelectionMenu({
   onCopy,
   onPaste,
   onDelete,
+  onGeometry,
   deleteDisabled = false,
 }: {
   children: ReactNode;
@@ -29,6 +30,7 @@ export function PageSelectionMenu({
   onCopy?: () => void;
   onPaste?: () => void;
   onDelete?: () => void;
+  onGeometry?: (mode: "resize" | "crop") => void;
   deleteDisabled?: boolean;
 }) {
   const { t } = useLanguage();
@@ -50,6 +52,17 @@ export function PageSelectionMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent>
+        {onGeometry && (
+          <>
+            <ContextMenuItem onSelect={() => onGeometry("resize")}>
+              {t("page_editor.geometry.resize")}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onGeometry("crop")}>
+              {t("page_editor.geometry.crop")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
         {onCopy && (
           <ContextMenuItem onSelect={onCopy}>
             {t("common.actions.copy")}

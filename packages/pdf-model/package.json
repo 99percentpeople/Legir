@@ -98,6 +98,10 @@
     "./visibleRange": {
       "types": "./dist/visibleRange.d.ts",
       "import": "./dist/visibleRange.js"
+    },
+    "./pageGeometry": {
+      "types": "./dist/pageGeometry.d.ts",
+      "import": "./dist/pageGeometry.js"
     }
   },
   "scripts": {

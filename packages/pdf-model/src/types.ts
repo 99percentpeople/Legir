@@ -59,10 +59,7 @@ export type Tool =
 export type MoveDirection = "UP" | "DOWN" | "LEFT" | "RIGHT";
 
 export type ControlLayerMove =
-  | "bring_forward"
-  | "send_backward"
-  | "bring_to_front"
-  | "send_to_back";
+  "bring_forward" | "send_backward" | "bring_to_front" | "send_to_back";
 
 export interface FieldStyle {
   borderColor?: string; // Hex
@@ -147,13 +144,7 @@ export interface Annotation extends TextAlignmentOptions {
   pageIndex: number;
   layerOrder?: number;
   type:
-    | "highlight"
-    | "ink"
-    | "comment"
-    | "freetext"
-    | "link"
-    | "shape"
-    | "stamp";
+    "highlight" | "ink" | "comment" | "freetext" | "link" | "shape" | "stamp";
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
@@ -174,8 +165,7 @@ export interface Annotation extends TextAlignmentOptions {
   lineHeight?: number;
   /** FreeText insets from the outer box, in points (including the border). */
   textPadding?:
-    | number
-    | { top: number; right: number; bottom: number; left: number };
+    number | { top: number; right: number; bottom: number; left: number };
   fontFamily?: string; // For text
   rotationDeg?: number;
   subtype?: string; // To preserve original PDF subtype
@@ -295,6 +285,36 @@ export interface PDFOutlineItem {
   pageIndex?: number;
 }
 
+export interface PageGeometryRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Edits in the immutable source viewport, before rotationDelta. */
+export interface PageGeometry {
+  box: PageGeometryRect;
+  scale: number;
+  /** Paper boundary from the last resize; cropping only changes box. */
+  mediaBox?: PageGeometryRect;
+}
+
+export interface PageResizeOptions {
+  width: number;
+  height: number;
+  content: "original" | "fit";
+  anchorX: 0 | 0.5 | 1;
+  anchorY: 0 | 0.5 | 1;
+}
+
+export interface PageCropMargins {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface PageData {
   /** Stable identity; absent on legacy snapshots until the first structural edit. */
   id?: string;
@@ -302,10 +322,13 @@ export interface PageData {
   blank?: boolean;
   /** Saved page rotation, relative to the source viewport used by controls. */
   rotationDelta?: number;
+  geometry?: PageGeometry;
   pageIndex: number;
   width: number;
   height: number;
   viewBox: [number, number, number, number];
+  /** Original PDF paper boundary, when different from the source viewport. */
+  sourceMediaBox?: [number, number, number, number];
   userUnit: number;
   rotation: number;
 }

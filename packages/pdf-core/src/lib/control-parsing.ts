@@ -73,7 +73,7 @@ export const parseFieldStyle = (
   if (pdfDoc && annotation.fieldName) {
     const libProps = getFieldPropertiesFromPdfLib(pdfDoc, annotation.fieldName);
     if (libProps) {
-      if (libProps.da) {
+      if (libProps.da && !da) {
         da = libProps.da;
       }
       horizontalAlignment = fromPdfTextAlignment(libProps.q);

@@ -820,6 +820,10 @@ export const exportPDF = async (
       }
     }
 
+    if (structure?.pages.some((page) => page.geometry)) {
+      const { applyPageGeometry } = await import("../lib/pageGeometry.js");
+      applyPageGeometry(pdfDoc, structure.pages);
+    }
     applyPageRotation?.();
 
     if (targetPageIndexes.length > 0) {

@@ -1,11 +1,7 @@
 export type StampKind = "preset" | "image";
 
 export type StampPresetId =
-  | "approved"
-  | "rejected"
-  | "draft"
-  | "confidential"
-  | "final";
+  "approved" | "rejected" | "draft" | "confidential" | "final";
 
 export interface StampPreset {
   id: StampPresetId;
@@ -330,6 +326,8 @@ interface StampPlacementOptions {
   viewportHeight?: number;
   pageWidth?: number;
   pageHeight?: number;
+  pageX?: number;
+  pageY?: number;
 }
 
 export const getDefaultStampDimensions = (options?: StampPlacementOptions) => {
@@ -382,14 +380,20 @@ export const getStampRectAtPoint = (
   return {
     x: isPositiveFiniteNumber(options?.pageWidth)
       ? Math.max(
-          0,
-          Math.min(options.pageWidth - size.width, point.x - size.width / 2),
+          options.pageX ?? 0,
+          Math.min(
+            (options.pageX ?? 0) + options.pageWidth - size.width,
+            point.x - size.width / 2,
+          ),
         )
       : point.x - size.width / 2,
     y: isPositiveFiniteNumber(options?.pageHeight)
       ? Math.max(
-          0,
-          Math.min(options.pageHeight - size.height, point.y - size.height / 2),
+          options.pageY ?? 0,
+          Math.min(
+            (options.pageY ?? 0) + options.pageHeight - size.height,
+            point.y - size.height / 2,
+          ),
         )
       : point.y - size.height / 2,
     width: size.width,

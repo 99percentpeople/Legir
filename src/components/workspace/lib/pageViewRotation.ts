@@ -1,8 +1,17 @@
 import type { PageData } from "@/types";
+import {
+  getEditedPage,
+  getPageGeometryMatrix,
+  transformPagePoint,
+  inversePagePoint,
+} from "@legir/pdf-model/pageGeometry";
 
 type Point = { x: number; y: number };
 type Rect = Point & { width: number; height: number };
-type PageSize = Pick<PageData, "width" | "height" | "rotationDelta">;
+type PageSize = Pick<
+  PageData,
+  "width" | "height" | "rotationDelta" | "geometry"
+>;
 export const getPageDisplayRotation = (
   page: Pick<PageData, "rotationDelta">,
   rotation: number,
@@ -12,6 +21,7 @@ export const getPageDisplayRotation = (
 // Stored control geometry and PDF export always keep using that source viewport.
 export const getPageView = (page: PageData, rotation: number): PageData => {
   rotation = getPageDisplayRotation(page, rotation);
+  page = getEditedPage(page);
   if (!rotation) return page;
   const swap = rotation === 90 || rotation === 270;
   return {
@@ -27,16 +37,10 @@ export const pagePointToView = (
   page: PageSize,
   rotation: number,
 ): Point => {
-  switch (getPageDisplayRotation(page, rotation)) {
-    case 90:
-      return { x: page.height - point.y, y: point.x };
-    case 180:
-      return { x: page.width - point.x, y: page.height - point.y };
-    case 270:
-      return { x: point.y, y: page.width - point.x };
-    default:
-      return point;
-  }
+  return transformPagePoint(
+    point,
+    getPageGeometryMatrix(page, getPageDisplayRotation(page, rotation)),
+  );
 };
 
 export const viewPointToPage = (
@@ -44,16 +48,10 @@ export const viewPointToPage = (
   page: PageSize,
   rotation: number,
 ): Point => {
-  switch (getPageDisplayRotation(page, rotation)) {
-    case 90:
-      return { x: point.y, y: page.height - point.x };
-    case 180:
-      return { x: page.width - point.x, y: page.height - point.y };
-    case 270:
-      return { x: page.width - point.y, y: point.x };
-    default:
-      return point;
-  }
+  return inversePagePoint(
+    point,
+    getPageGeometryMatrix(page, getPageDisplayRotation(page, rotation)),
+  );
 };
 
 export const viewRectToPage = (
@@ -80,9 +78,13 @@ export const getPageOverlayTransform = (
   rotation: number,
   scale: number,
 ) => {
-  const origin = pagePointToView({ x: 0, y: 0 }, page, rotation);
   const angle = getPageDisplayRotation(page, rotation);
-  return angle
-    ? `translate(${origin.x * scale}px, ${origin.y * scale}px) rotate(${angle}deg)`
-    : undefined;
+  if (!page.geometry) {
+    const origin = pagePointToView({ x: 0, y: 0 }, page, rotation);
+    return angle
+      ? `translate(${origin.x * scale}px, ${origin.y * scale}px) rotate(${angle}deg)`
+      : undefined;
+  }
+  const m = getPageGeometryMatrix(page, angle);
+  return `matrix(${m[0]}, ${m[1]}, ${m[2]}, ${m[3]}, ${m[4] * scale}, ${m[5] * scale})`;
 };

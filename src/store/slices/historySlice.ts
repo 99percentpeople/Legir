@@ -1,3 +1,4 @@
+import { pageGeometryKey } from "@legir/pdf-model/pageGeometry";
 import type { EditorState, HistorySnapshot } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 import { getPageId, mapPageIndexes } from "@legir/pdf-core/lib/pageStructure";
@@ -37,7 +38,11 @@ export const createHistorySlice: EditorStoreSlice<
         images[after] = state.thumbnailImages[before];
     const previews: Record<number, string> = {};
     for (const [before, after] of indexes)
-      if (after !== undefined && state.pagePreviewImages[before])
+      if (
+        after !== undefined &&
+        state.pagePreviewImages[before] &&
+        pageGeometryKey(state.pages[before]) === pageGeometryKey(pages[after])
+      )
         previews[after] = state.pagePreviewImages[before];
     const retainedPreviews = new Set(Object.values(previews));
     for (const url of new Set(Object.values(state.pagePreviewImages)))
